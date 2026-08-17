@@ -1,10 +1,20 @@
 import { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
-import { Fuel, UtensilsCrossed, Anchor, DoorClosed, MoreHorizontal, Plus, LucideIcon } from 'lucide-react';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import {
+  Fuel,
+  UtensilsCrossed,
+  Anchor,
+  DoorClosed,
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Trash2,
+  LucideIcon
+} from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { Expense, ExpenseCategory } from '../types';
-import { Button, Input, Select, PageHeader, EmptyState, useToast } from '../components/ui';
+import { Button, Input, Select, PageHeader, EmptyState, IconButton, ConfirmDialog, useToast } from '../components/ui';
 import './Costs.css';
 
 interface Props {
@@ -27,21 +37,144 @@ const CATEGORY_BY_VALUE = new Map(CATEGORIES.map((c) => [c.value, c]));
 const categoryMeta = (category: ExpenseCategory) =>
   CATEGORY_BY_VALUE.get(category) ?? CATEGORY_BY_VALUE.get(FALLBACK_CATEGORY)!;
 
+/** Parst ein Betragsfeld (Komma oder Punkt) – gibt null bei ungültiger Eingabe zurück. */
+function parseAmount(raw: string): number | null {
+  const parsed = parseFloat(raw.replace(',', '.'));
+  return isNaN(parsed) ? null : parsed;
+}
+
+type ExpenseChanges = Pick<Expense, 'title' | 'amountEuro' | 'category' | 'paidBy'>;
+
+interface ExpenseRowProps {
+  expense: Expense;
+  users: string[];
+  currentUser: string;
+  onSave: (id: string, changes: ExpenseChanges) => Promise<boolean>;
+  onRequestDelete: (id: string) => void;
+}
+
+function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: ExpenseRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(expense.title);
+  const [amount, setAmount] = useState(String(expense.amountEuro));
+  const [category, setCategory] = useState<ExpenseCategory>(expense.category);
+  const [paidBy, setPaidBy] = useState(expense.paidBy);
+  const { notify } = useToast();
+
+  const startEditing = () => {
+    setTitle(expense.title);
+    setAmount(String(expense.amountEuro));
+    setCategory(expense.category);
+    setPaidBy(expense.paidBy);
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      notify('Beschreibung darf nicht leer sein.', 'danger');
+      return;
+    }
+    const parsedAmount = parseAmount(amount);
+    if (parsedAmount === null) {
+      notify('Ungültiger Betrag.', 'danger');
+      return;
+    }
+    const saved = await onSave(expense.id!, {
+      title: trimmedTitle,
+      amountEuro: parsedAmount,
+      category,
+      paidBy
+    });
+    if (saved) setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="costs-row-edit">
+        <Input
+          autoFocus
+          className="costs-row-edit-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Beschreibung"
+        />
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Betrag in €"
+        />
+        <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
+        <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+          <option value="Bordkasse">Bordkasse</option>
+          {users.map((name) => (
+            <option key={name} value={name}>
+              {name === currentUser ? `Ich (${name})` : name}
+            </option>
+          ))}
+        </Select>
+        <div className="row costs-row-edit-actions">
+          <Button fullWidth onClick={handleSave}>
+            Speichern
+          </Button>
+          <Button variant="secondary" fullWidth onClick={() => setIsEditing(false)}>
+            Abbrechen
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const { icon: Icon, label } = categoryMeta(expense.category);
+  return (
+    <div className="costs-row">
+      <div className="costs-row-icon">
+        <Icon size={17} strokeWidth={1.75} />
+      </div>
+      <div className="costs-row-body">
+        <div className="costs-row-title">{expense.title}</div>
+        <div className="helper-text">
+          {label} · {expense.paidBy}
+        </div>
+      </div>
+      <div className="mono-num costs-row-amount">{expense.amountEuro.toFixed(2)} €</div>
+      <div className="costs-row-actions">
+        <IconButton label="Ausgabe bearbeiten" onClick={startEditing}>
+          <Pencil size={16} />
+        </IconButton>
+        <IconButton label="Ausgabe löschen" tone="danger" onClick={() => onRequestDelete(expense.id!)}>
+          <Trash2 size={16} />
+        </IconButton>
+      </div>
+    </div>
+  );
+}
+
 export default function Costs({ user, users }: Props) {
   const expenses = useCollection<Expense>('expenses', 'timestamp', 'desc');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('verpflegung');
   const [paidBy, setPaidBy] = useState(user);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const trimmedTitle = title.trim();
-    const parsedAmount = parseFloat(amount.replace(',', '.'));
     if (!trimmedTitle) return;
-    if (isNaN(parsedAmount)) {
+    const parsedAmount = parseAmount(amount);
+    if (parsedAmount === null) {
       notify('Ungültiger Betrag.', 'danger');
       return;
     }
@@ -63,6 +196,30 @@ export default function Costs({ user, users }: Props) {
       console.error(err);
       notify('Fehler beim Speichern.', 'danger');
     }
+  };
+
+  const handleSaveEdit = async (id: string, changes: ExpenseChanges) => {
+    try {
+      await updateDoc(doc(db, 'expenses', id), changes);
+      notify('Ausgabe aktualisiert', 'success');
+      return true;
+    } catch (err) {
+      console.error(err);
+      notify('Fehler beim Speichern.', 'danger');
+      return false;
+    }
+  };
+
+  const handleDeleteExpense = async () => {
+    if (!deleteTargetId) return;
+    try {
+      await deleteDoc(doc(db, 'expenses', deleteTargetId));
+      notify('Ausgabe gelöscht', 'success');
+    } catch (err) {
+      console.error(err);
+      notify('Fehler beim Löschen.', 'danger');
+    }
+    setDeleteTargetId(null);
   };
 
   const total = expenses.reduce((sum, item) => sum + item.amountEuro, 0);
@@ -119,25 +276,28 @@ export default function Costs({ user, users }: Props) {
         <EmptyState title="Noch keine Ausgaben" hint="Die erste Ausgabe der Reise oben eintragen." />
       ) : (
         <div className="costs-list">
-          {expenses.map((exp) => {
-            const { icon: Icon, label } = categoryMeta(exp.category);
-            return (
-              <div key={exp.id} className="costs-row">
-                <div className="costs-row-icon">
-                  <Icon size={17} strokeWidth={1.75} />
-                </div>
-                <div className="costs-row-body">
-                  <div className="costs-row-title">{exp.title}</div>
-                  <div className="helper-text">
-                    {label} · {exp.paidBy}
-                  </div>
-                </div>
-                <div className="mono-num costs-row-amount">{exp.amountEuro.toFixed(2)} €</div>
-              </div>
-            );
-          })}
+          {expenses.map((exp) => (
+            <ExpenseRow
+              key={exp.id}
+              expense={exp}
+              users={users}
+              currentUser={user}
+              onSave={handleSaveEdit}
+              onRequestDelete={setDeleteTargetId}
+            />
+          ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="Ausgabe löschen"
+        description="Dieser Eintrag wird endgültig aus der Reisekasse entfernt."
+        confirmLabel="Löschen"
+        destructive
+        onConfirm={handleDeleteExpense}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }
