@@ -25,8 +25,10 @@ export default function App() {
       <div style={{ padding: '2rem', textAlign: 'center', marginTop: '20vh' }}>
         <h2 style={{ marginBottom: '20px' }}>Wer nutzt dieses Gerät?</h2>
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-          <button className="btn" onClick={() => login('Ich')}>Ich</button>
-          <button className="btn" onClick={() => login('Freundin')}>Freundin</button>
+          <button className="btn" onClick={() => login('Ich')}>Lukas</button>
+          <button className="btn" onClick={() => login('Leon')}>Leon</button>
+          <button className="btn" onClick={() => login('Niklas')}>Niklas</button>
+          <button className="btn" onClick={() => login('Elias')}>Elias</button>
         </div>
       </div>
     );
