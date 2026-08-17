@@ -1,12 +1,34 @@
-export type LogType = 
-  | 'gps'
-  | 'schleuse'
-  | 'pause'
-  | 'panne'
-  | 'grenze'
-  | 'tanken'
-  | 'anlegen'
-  | 'pegel';
+// Kategorie-Id eines Log-Ereignisses. Entspricht der id einer QuickLogConfig
+// (siehe unten) oder einem der ursprünglichen, fest codierten Werte aus
+// bereits bestehenden Firestore-Dokumenten ("gps", "tanken", "pegel" …).
+export type LogType = string;
+
+// Verfügbare Icons für Schnell-Logs. Bewusst klein gehalten und auf
+// vorhandene lucide-react-Icons abgebildet (siehe quickLogIcons.tsx).
+export type QuickLogIconName =
+  | 'anchor'
+  | 'coffee'
+  | 'alert-triangle'
+  | 'map-pin'
+  | 'home'
+  | 'fuel'
+  | 'gauge'
+  | 'tag';
+
+export interface QuickLogConfig {
+  id: string;
+  label: string;
+  iconName: QuickLogIconName;
+}
+
+// Fallback, solange settings/quicklogs in Firestore noch nicht existiert.
+export const DEFAULT_QUICK_LOGS: QuickLogConfig[] = [
+  { id: 'schleuse', label: 'Schleuse', iconName: 'anchor' },
+  { id: 'pause', label: 'Pause', iconName: 'coffee' },
+  { id: 'anlegen', label: 'Anlegen', iconName: 'home' },
+  { id: 'grenze', label: 'Grenze', iconName: 'map-pin' },
+  { id: 'panne', label: 'Panne', iconName: 'alert-triangle' }
+];
 
 export interface GpsPoint {
   id?: string;
