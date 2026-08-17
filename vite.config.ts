@@ -19,6 +19,13 @@ export default defineConfig({
         icons: []
       },
       workbox: {
+        // Alte Precache-Einträge früherer Builds entfernen, damit nach einem
+        // Deploy keine veralteten Assets ausgeliefert werden.
+        cleanupOutdatedCaches: true,
+        // Neuer Service Worker übernimmt sofort, statt auf das Schließen
+        // aller Tabs zu warten.
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
