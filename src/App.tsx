@@ -1,54 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { Gauge, Map as MapIcon, BookOpen, Wallet, Users, Compass } from 'lucide-react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { Gauge, Map as MapIcon, BookOpen, Wallet, Users, Compass, LucideIcon } from 'lucide-react';
 import { ToastProvider } from './components/ui';
-import Dashboard from './Dashboard';
-import MapTab from './MapTab';
-import Stats from './Stats';
-import Costs from './Costs';
-import Settings from './Settings';
+import { TrackingProvider } from './hooks/useTracking';
+import { useCrew } from './hooks/useSettings';
+import Dashboard from './pages/Dashboard';
+import MapTab from './pages/MapTab';
+import Stats from './pages/Stats';
+import Costs from './pages/Costs';
+import Settings from './pages/Settings';
+
+const STORAGE_KEY_USER = 'boat_user';
+
+const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: '/', label: 'Cockpit', icon: Gauge },
+  { to: '/map', label: 'Karte', icon: MapIcon },
+  { to: '/stats', label: 'Logbuch', icon: BookOpen },
+  { to: '/costs', label: 'Kasse', icon: Wallet },
+  { to: '/settings', label: 'Crew', icon: Users }
+];
 
 export default function App() {
-  const [user, setUser] = useState<string>('');
-  const [isTracking, setIsTracking] = useState<boolean>(false);
-  const [users, setUsers] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('boat_user');
-    if (storedUser) setUser(storedUser);
-
-    // Dynamische Nutzerliste aus Firebase laden
-    const docRef = doc(db, 'settings', 'general');
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setUsers(docSnap.data().users || []);
-      } else {
-        // Falls noch keine Datenbank existiert, Standardwerte setzen
-        const defaultUsers = ['Lukas', 'Leon', 'Niklas', 'Elias'];
-        setDoc(docRef, { users: defaultUsers });
-        setUsers(defaultUsers);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const [user, setUser] = useState<string>(() => localStorage.getItem(STORAGE_KEY_USER) ?? '');
+  const { users, loading } = useCrew();
 
   const login = (name: string) => {
-    localStorage.setItem('boat_user', name);
+    localStorage.setItem(STORAGE_KEY_USER, name);
     setUser(name);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('boat_user');
-    setIsTracking(false);
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY_USER);
     setUser('');
   };
 
-  if (loading) {
+  // Nur der Login-Screen braucht die Crew-Liste. Wer bereits angemeldet ist,
+  // startet sofort – die App ist offline-fähig und darf nicht auf Firestore warten.
+  if (loading && !user) {
     return (
       <div className="boot-screen">
         <Compass size={28} className="boot-screen-icon" />
@@ -59,61 +47,53 @@ export default function App() {
 
   if (!user) {
     return (
-      <ToastProvider>
-        <div className="login-screen">
-          <div className="login-screen-head">
-            <Compass size={26} />
-            <h1 className="page-title">Wer ist an Bord?</h1>
-            <p className="helper-text">Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.</p>
-          </div>
-          <div className="login-screen-list">
-            {users.map((name) => (
-              <button key={name} className="login-user" onClick={() => login(name)}>
-                <span className="login-user-avatar">{name.charAt(0).toUpperCase()}</span>
-                <span>{name}</span>
-              </button>
-            ))}
-          </div>
+      <div className="login-screen">
+        <div className="login-screen-head">
+          <Compass size={26} />
+          <h1 className="page-title">Wer ist an Bord?</h1>
+          <p className="helper-text">Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.</p>
         </div>
-      </ToastProvider>
+        <div className="login-screen-list">
+          {users.map((name) => (
+            <button key={name} className="login-user" onClick={() => login(name)}>
+              <span className="avatar">{name.charAt(0).toUpperCase()}</span>
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <div className="content">
-          <Routes>
-            <Route path="/" element={<Dashboard user={user} isTracking={isTracking} setIsTracking={setIsTracking} />} />
-            <Route path="/map" element={<MapTab user={user} isTracking={isTracking} />} />
-            <Route path="/stats" element={<Stats user={user} />} />
-            <Route path="/costs" element={<Costs user={user} users={users} />} />
-            <Route path="/settings" element={<Settings currentUser={user} users={users} onLogout={handleLogout} />} />
-          </Routes>
-        </div>
-        <nav className="bottom-nav">
-          <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Gauge size={20} strokeWidth={2} />
-            <span>Cockpit</span>
-          </NavLink>
-          <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <MapIcon size={20} strokeWidth={2} />
-            <span>Karte</span>
-          </NavLink>
-          <NavLink to="/stats" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <BookOpen size={20} strokeWidth={2} />
-            <span>Logbuch</span>
-          </NavLink>
-          <NavLink to="/costs" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Wallet size={20} strokeWidth={2} />
-            <span>Kasse</span>
-          </NavLink>
-          <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Users size={20} strokeWidth={2} />
-            <span>Crew</span>
-          </NavLink>
-        </nav>
-      </BrowserRouter>
+      {/* Ein Wechsel des Nutzers setzt Tracking-Status und Watcher zurück. */}
+      <TrackingProvider key={user} user={user}>
+        <BrowserRouter>
+          <div className="content">
+            <Routes>
+              <Route path="/" element={<Dashboard user={user} />} />
+              <Route path="/map" element={<MapTab user={user} />} />
+              <Route path="/stats" element={<Stats />} />
+              <Route path="/costs" element={<Costs user={user} users={users} />} />
+              <Route path="/settings" element={<Settings currentUser={user} users={users} onLogout={logout} />} />
+            </Routes>
+          </div>
+          <nav className="bottom-nav">
+            {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
+                <Icon size={20} strokeWidth={2} />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </BrowserRouter>
+      </TrackingProvider>
     </ToastProvider>
   );
 }

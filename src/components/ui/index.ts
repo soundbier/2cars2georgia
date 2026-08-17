@@ -1,7 +1,6 @@
 export { Button } from './Button';
-export type { ButtonVariant } from './Button';
 export { IconButton } from './IconButton';
-export { Input, Select, FieldWrap } from './Field';
+export { Input, Select } from './Field';
 export { Section } from './Section';
 export { Badge } from './Badge';
 export { ListItem } from './ListItem';

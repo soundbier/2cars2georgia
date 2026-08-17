@@ -10,15 +10,6 @@
   margin-top: var(--space-4);
 }
 
-.section-flush {
-  padding: 0;
-  background: transparent;
-  border: none;
-}
-
 .section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: var(--space-3);
 }

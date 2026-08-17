@@ -1,3 +1,4 @@
+import { useEffect, useId } from 'react';
 import { Button } from './Button';
 import './ConfirmDialog.css';
 
@@ -22,6 +23,17 @@ export function ConfirmDialog({
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   return (
@@ -30,18 +42,23 @@ export function ConfirmDialog({
         className="dialog"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="dialog-title"
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 id="dialog-title" className="dialog-title">
+        <h2 id={titleId} className="dialog-title">
           {title}
-        </h3>
+        </h2>
         {description && <p className="dialog-description">{description}</p>}
         <div className="dialog-actions">
           <Button variant="secondary" fullWidth onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button variant={destructive ? 'destructive' : 'primary'} fullWidth onClick={onConfirm} autoFocus>
+          <Button
+            variant={destructive ? 'destructive' : 'primary'}
+            fullWidth
+            onClick={onConfirm}
+            autoFocus
+          >
             {confirmLabel}
           </Button>
         </div>

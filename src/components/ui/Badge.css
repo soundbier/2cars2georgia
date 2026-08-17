@@ -24,20 +24,9 @@
   border-color: var(--color-border);
 }
 
-.badge-accent {
-  background: var(--color-accent-muted);
-  color: var(--color-accent-strong);
-  border-color: var(--color-accent-border);
-}
-
 .badge-success {
   background: var(--color-success-muted);
   color: var(--color-success);
-}
-
-.badge-warning {
-  background: var(--color-warning-muted);
-  color: var(--color-warning);
 }
 
 .badge-danger {
@@ -45,7 +34,3 @@
   color: var(--color-danger);
 }
 
-.badge-info {
-  background: var(--color-info-muted);
-  color: var(--color-info);
-}

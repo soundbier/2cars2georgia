@@ -1,10 +1,10 @@
 // Kategorie-Id eines Log-Ereignisses. Entspricht der id einer QuickLogConfig
-// (siehe unten) oder einem der ursprünglichen, fest codierten Werte aus
-// bereits bestehenden Firestore-Dokumenten ("gps", "tanken", "pegel" …).
+// oder einem der ursprünglichen, fest codierten Werte aus bereits
+// bestehenden Firestore-Dokumenten ("gps", "tanken", "pegel" …).
 export type LogType = string;
 
 // Verfügbare Icons für Schnell-Logs. Bewusst klein gehalten und auf
-// vorhandene lucide-react-Icons abgebildet (siehe quickLogIcons.tsx).
+// vorhandene lucide-react-Icons abgebildet (siehe lib/quickLogIcons.tsx).
 export type QuickLogIconName =
   | 'anchor'
   | 'coffee'
@@ -30,25 +30,35 @@ export const DEFAULT_QUICK_LOGS: QuickLogConfig[] = [
   { id: 'panne', label: 'Panne', iconName: 'alert-triangle' }
 ];
 
-export interface GpsPoint {
-  id?: string;
-  timestamp: number;
-  author: string;
+// Fallback, solange settings/general in Firestore noch nicht existiert.
+export const DEFAULT_USERS = ['Lukas', 'Leon', 'Niklas', 'Elias'];
+
+export interface Coordinates {
   lat: number;
   lng: number;
+}
+
+/** Momentaufnahme des GPS-Empfängers, noch ohne Bezug zu Nutzer/Zeit. */
+export interface LivePosition extends Coordinates {
   speedKmh: number;
 }
 
-export interface LogEvent {
+export interface GpsPoint extends LivePosition {
+  id?: string;
+  timestamp: number;
+  author: string;
+}
+
+export interface LogEvent extends Coordinates {
   id?: string;
   timestamp: number;
   author: string;
   type: LogType;
-  lat: number;
-  lng: number;
   title: string;
   note?: string;
 }
+
+export type ExpenseCategory = 'tanken' | 'liegeplatz' | 'schleuse' | 'verpflegung' | 'sonstiges';
 
 export interface Expense {
   id?: string;
@@ -57,14 +67,5 @@ export interface Expense {
   paidBy: string;
   title: string;
   amountEuro: number;
-  category: 'tanken' | 'liegeplatz' | 'schleuse' | 'verpflegung' | 'sonstiges';
+  category: ExpenseCategory;
 }
-
-export const USER_COLORS: Record<string, string> = {
-  'Lukas': '#f59e0b', // Amber / Orange
-  'Leon': '#0ea5e9',  // Cyan
-  'Niklas': '#10b981',// Green
-  'Elias': '#8b5cf6'  // Purple
-};
-// Fallback-Farbe für neue Nutzer
-export const DEFAULT_USER_COLOR = '#ef4444';

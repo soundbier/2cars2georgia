@@ -1,25 +1,19 @@
-import { HTMLAttributes, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import './Section.css';
 
-interface SectionProps extends HTMLAttributes<HTMLDivElement> {
+interface SectionProps {
   title?: string;
-  action?: ReactNode;
-  flush?: boolean; // ohne Innenabstand, z.B. für Formulare mit eigenem Layout
+  children: ReactNode;
 }
 
 /**
  * Section ist der einzige "Card"-Baustein der App.
  * Bewusst sparsam einsetzen: nur wenn Inhalte tatsächlich gruppiert werden müssen.
  */
-export function Section({ title, action, flush, className, children, ...rest }: SectionProps) {
+export function Section({ title, children }: SectionProps) {
   return (
-    <div className={['section', flush ? 'section-flush' : '', className].filter(Boolean).join(' ')} {...rest}>
-      {(title || action) && (
-        <div className="section-head">
-          {title && <h3 className="section-title">{title}</h3>}
-          {action}
-        </div>
-      )}
+    <div className="section">
+      {title && <h2 className="section-title section-head">{title}</h2>}
       {children}
     </div>
   );

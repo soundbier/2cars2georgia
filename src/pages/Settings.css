@@ -1,0 +1,21 @@
+.settings-page {
+  /* Zusätzlicher Puffer über das globale .content-Padding hinaus, damit das
+     unterste Eingabefeld (z. B. "Neue Kategorie") nie unter der Bottom-Nav
+     verschwindet, auch wenn neue Sections dazukommen. */
+  padding-bottom: var(--space-8);
+}
+
+.settings-add-form {
+  margin-bottom: var(--space-3);
+}
+
+/* Listen in Sections sitzen dicht beieinander – die Trennlinie der
+   ListItems übernimmt die Gliederung. */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-list-self {
+  color: var(--color-accent);
+}

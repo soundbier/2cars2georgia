@@ -7,18 +7,7 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--color-border);
-  text-align: left;
   color: inherit;
-  font: inherit;
-  cursor: default;
-}
-
-button.list-item {
-  cursor: pointer;
-}
-
-button.list-item:active {
-  background: var(--color-surface-hover);
 }
 
 .list-item:last-child {

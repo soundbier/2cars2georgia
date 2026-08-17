@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, FieldValue } from 'firebase/firestore';
 import { UserPlus, Trash2, LogOut, Wifi, WifiOff, Plus, Pencil, Check, X } from 'lucide-react';
-import { db } from './firebase';
-import { useQuickLogs } from './useQuickLogs';
-import { getQuickLogIcon, DEFAULT_QUICK_LOG_ICON } from './quickLogIcons';
-import { QuickLogConfig } from './types';
+import { db } from '../firebase';
+import { useQuickLogs } from '../hooks/useSettings';
+import { getQuickLogIcon, DEFAULT_QUICK_LOG_ICON } from '../lib/quickLogIcons';
+import { QuickLogConfig } from '../types';
 import {
   Button,
   IconButton,
@@ -16,7 +16,7 @@ import {
   PageHeader,
   ConfirmDialog,
   useToast
-} from './components/ui';
+} from '../components/ui';
 import './Settings.css';
 
 interface Props {
@@ -30,27 +30,30 @@ function createQuickLogId(): string {
   return `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export default function Settings({ currentUser, users, onLogout }: Props) {
-  const { quickLogs } = useQuickLogs();
-  const { notify } = useToast();
-
-  // --- Crew ---
-  const [newUser, setNewUser] = useState('');
-  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
-
-  // --- Verbindungsstatus ---
+function useOnlineStatus(): boolean {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 
   useEffect(() => {
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
+    const update = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
     return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
     };
   }, []);
+
+  return isOnline;
+}
+
+export default function Settings({ currentUser, users, onLogout }: Props) {
+  const quickLogs = useQuickLogs();
+  const { notify } = useToast();
+  const isOnline = useOnlineStatus();
+
+  // --- Crew ---
+  const [newUser, setNewUser] = useState('');
+  const [pendingUserRemoval, setPendingUserRemoval] = useState<string | null>(null);
 
   // --- Schnell-Logs ---
   const [newLogLabel, setNewLogLabel] = useState('');
@@ -58,51 +61,62 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
   const [editingLogLabel, setEditingLogLabel] = useState('');
   const [pendingLogRemoval, setPendingLogRemoval] = useState<string | null>(null);
 
+  /** Kapselt Firestore-Schreibzugriffe samt einheitlicher Fehlermeldung. */
+  const runWrite = async (write: () => Promise<void>, errorMessage = 'Fehler beim Speichern.') => {
+    try {
+      await write();
+      return true;
+    } catch (err) {
+      console.error(err);
+      notify(errorMessage, 'danger');
+      return false;
+    }
+  };
+
+  const saveCrew = (change: FieldValue) =>
+    updateDoc(doc(db, 'settings', 'general'), { users: change });
+
+  const saveQuickLogs = (items: QuickLogConfig[]) =>
+    updateDoc(doc(db, 'settings', 'quicklogs'), { items });
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newUser.trim();
     if (!name) return;
-
-    const docRef = doc(db, 'settings', 'general');
-    await updateDoc(docRef, {
-      users: arrayUnion(name)
-    });
-    setNewUser('');
+    if (users.some((u) => u.toLowerCase() === name.toLowerCase())) {
+      notify(`${name} ist bereits an Bord.`, 'danger');
+      return;
+    }
+    if (await runWrite(() => saveCrew(arrayUnion(name)))) setNewUser('');
   };
 
-  const confirmRemoveUser = async () => {
-    if (!pendingRemoval) return;
-    const docRef = doc(db, 'settings', 'general');
-    await updateDoc(docRef, {
-      users: arrayRemove(pendingRemoval)
-    });
-    notify(`${pendingRemoval} entfernt`, 'success');
-    setPendingRemoval(null);
-  };
-
-  const handleRemoveClick = (name: string) => {
+  const handleRemoveUserClick = (name: string) => {
     if (name === currentUser) {
       notify('Du kannst dich nicht selbst löschen.', 'danger');
       return;
     }
-    setPendingRemoval(name);
+    setPendingUserRemoval(name);
   };
 
-  const saveQuickLogs = (items: QuickLogConfig[]) => updateDoc(doc(db, 'settings', 'quicklogs'), { items });
+  const confirmRemoveUser = async () => {
+    if (!pendingUserRemoval) return;
+    if (await runWrite(() => saveCrew(arrayRemove(pendingUserRemoval)), 'Fehler beim Löschen.')) {
+      notify(`${pendingUserRemoval} entfernt`, 'success');
+    }
+    setPendingUserRemoval(null);
+  };
 
   const handleAddQuickLog = async (e: React.FormEvent) => {
     e.preventDefault();
     const label = newLogLabel.trim();
     if (!label) return;
 
-    const newItem: QuickLogConfig = { id: createQuickLogId(), label, iconName: DEFAULT_QUICK_LOG_ICON };
-    try {
-      await saveQuickLogs([...quickLogs, newItem]);
-      setNewLogLabel('');
-    } catch (err) {
-      console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
-    }
+    const newItem: QuickLogConfig = {
+      id: createQuickLogId(),
+      label,
+      iconName: DEFAULT_QUICK_LOG_ICON
+    };
+    if (await runWrite(() => saveQuickLogs([...quickLogs, newItem]))) setNewLogLabel('');
   };
 
   const startEditQuickLog = (log: QuickLogConfig) => {
@@ -111,27 +125,18 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
   };
 
   const handleSaveQuickLogEdit = async () => {
-    if (!editingLogId) return;
     const label = editingLogLabel.trim();
-    if (!label) return;
+    if (!editingLogId || !label) return;
 
-    try {
-      await saveQuickLogs(quickLogs.map((q) => (q.id === editingLogId ? { ...q, label } : q)));
-      setEditingLogId(null);
-    } catch (err) {
-      console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
-    }
+    const items = quickLogs.map((q) => (q.id === editingLogId ? { ...q, label } : q));
+    if (await runWrite(() => saveQuickLogs(items))) setEditingLogId(null);
   };
 
   const confirmRemoveQuickLog = async () => {
     if (!pendingLogRemoval) return;
-    try {
-      await saveQuickLogs(quickLogs.filter((q) => q.id !== pendingLogRemoval));
+    const items = quickLogs.filter((q) => q.id !== pendingLogRemoval);
+    if (await runWrite(() => saveQuickLogs(items), 'Fehler beim Löschen.')) {
       notify('Schnell-Log entfernt', 'success');
-    } catch (err) {
-      console.error(err);
-      notify('Fehler beim Löschen.', 'danger');
     }
     setPendingLogRemoval(null);
   };
@@ -166,27 +171,25 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
       </Section>
 
       <Section title="Besatzung">
-        <form onSubmit={handleAddUser} className="row" style={{ marginBottom: 'var(--space-3)' }}>
+        <form onSubmit={handleAddUser} className="row settings-add-form">
           <Input placeholder="Neuer Name" value={newUser} onChange={(e) => setNewUser(e.target.value)} />
           <IconButton type="submit" label="Crewmitglied hinzufügen" tone="accent" disabled={!newUser.trim()}>
             <UserPlus size={20} />
           </IconButton>
         </form>
 
-        <div className="stack" style={{ gap: 0 }}>
+        <div className="settings-list">
           {users.map((u) => (
             <ListItem
               key={u}
               title={
-                <span style={{ color: u === currentUser ? 'var(--color-accent)' : undefined }}>
-                  {u} {u === currentUser && '(Du)'}
-                </span>
+                u === currentUser ? <span className="settings-list-self">{u} (Du)</span> : u
               }
               trailing={
                 <IconButton
                   label={`${u} entfernen`}
                   tone="danger"
-                  onClick={() => handleRemoveClick(u)}
+                  onClick={() => handleRemoveUserClick(u)}
                   disabled={u === currentUser}
                 >
                   <Trash2 size={17} />
@@ -198,7 +201,7 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
       </Section>
 
       <Section title="Schnell-Logs">
-        <form onSubmit={handleAddQuickLog} className="row" style={{ marginBottom: 'var(--space-3)' }}>
+        <form onSubmit={handleAddQuickLog} className="row settings-add-form">
           <Input
             placeholder="Neue Kategorie, z. B. Wasser tanken"
             value={newLogLabel}
@@ -212,7 +215,7 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
         {quickLogs.length === 0 ? (
           <EmptyState title="Keine Schnell-Logs" hint="Füge oben die erste Kategorie hinzu." />
         ) : (
-          <div className="stack" style={{ gap: 0 }}>
+          <div className="settings-list">
             {quickLogs.map((q) => {
               const Icon = getQuickLogIcon(q.iconName);
               const isEditing = editingLogId === q.id;
@@ -279,13 +282,13 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
       </Section>
 
       <ConfirmDialog
-        open={pendingRemoval !== null}
+        open={pendingUserRemoval !== null}
         title="Crewmitglied entfernen"
-        description={`${pendingRemoval} wird aus der Crew-Liste gelöscht. Bereits erfasste Logs und Ausgaben bleiben erhalten.`}
+        description={`${pendingUserRemoval} wird aus der Crew-Liste gelöscht. Bereits erfasste Logs und Ausgaben bleiben erhalten.`}
         confirmLabel="Entfernen"
         destructive
         onConfirm={confirmRemoveUser}
-        onCancel={() => setPendingRemoval(null)}
+        onCancel={() => setPendingUserRemoval(null)}
       />
 
       <ConfirmDialog

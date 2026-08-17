@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { Fuel, UtensilsCrossed, Anchor, DoorClosed, MoreHorizontal, Plus } from 'lucide-react';
-import { db } from './firebase';
-import { Expense } from './types';
-import { Button, Input, Select, PageHeader, EmptyState, useToast } from './components/ui';
+import { useState } from 'react';
+import { collection, addDoc } from 'firebase/firestore';
+import { Fuel, UtensilsCrossed, Anchor, DoorClosed, MoreHorizontal, Plus, LucideIcon } from 'lucide-react';
+import { db } from '../firebase';
+import { useCollection } from '../hooks/useCollection';
+import { Expense, ExpenseCategory } from '../types';
+import { Button, Input, Select, PageHeader, EmptyState, useToast } from '../components/ui';
 import './Costs.css';
 
 interface Props {
@@ -11,43 +12,35 @@ interface Props {
   users: string[];
 }
 
-const CATEGORIES: { value: Expense['category']; label: string; icon: typeof Fuel }[] = [
+const FALLBACK_CATEGORY: ExpenseCategory = 'sonstiges';
+
+const CATEGORIES: { value: ExpenseCategory; label: string; icon: LucideIcon }[] = [
   { value: 'verpflegung', label: 'Verpflegung', icon: UtensilsCrossed },
   { value: 'tanken', label: 'Tanken', icon: Fuel },
   { value: 'liegeplatz', label: 'Liegeplatz', icon: DoorClosed },
   { value: 'schleuse', label: 'Schleuse', icon: Anchor },
-  { value: 'sonstiges', label: 'Sonstiges', icon: MoreHorizontal }
+  { value: FALLBACK_CATEGORY, label: 'Sonstiges', icon: MoreHorizontal }
 ];
 
-function categoryMeta(category: Expense['category']) {
-  return CATEGORIES.find((c) => c.value === category) ?? CATEGORIES[CATEGORIES.length - 1];
-}
+const CATEGORY_BY_VALUE = new Map(CATEGORIES.map((c) => [c.value, c]));
+
+const categoryMeta = (category: ExpenseCategory) =>
+  CATEGORY_BY_VALUE.get(category) ?? CATEGORY_BY_VALUE.get(FALLBACK_CATEGORY)!;
 
 export default function Costs({ user, users }: Props) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const expenses = useCollection<Expense>('expenses', 'timestamp', 'desc');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<Expense['category']>('verpflegung');
+  const [category, setCategory] = useState<ExpenseCategory>('verpflegung');
   const [paidBy, setPaidBy] = useState(user);
   const { notify } = useToast();
 
-  useEffect(() => {
-    const q = query(collection(db, 'expenses'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: Expense[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as Expense);
-      });
-      setExpenses(list);
-    });
-    return () => unsubscribe();
-  }, []);
-
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !amount) return;
 
+    const trimmedTitle = title.trim();
     const parsedAmount = parseFloat(amount.replace(',', '.'));
+    if (!trimmedTitle) return;
     if (isNaN(parsedAmount)) {
       notify('Ungültiger Betrag.', 'danger');
       return;
@@ -57,7 +50,7 @@ export default function Costs({ user, users }: Props) {
       timestamp: Date.now(),
       author: user,
       paidBy,
-      title,
+      title: trimmedTitle,
       amountEuro: parsedAmount,
       category
     };
@@ -100,7 +93,7 @@ export default function Costs({ user, users }: Props) {
           onChange={(e) => setAmount(e.target.value)}
           required
         />
-        <Select value={category} onChange={(e) => setCategory(e.target.value as Expense['category'])}>
+        <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -120,17 +113,14 @@ export default function Costs({ user, users }: Props) {
         </Button>
       </form>
 
-      <div className="section-title" style={{ margin: 'var(--space-5) 0 var(--space-2)' }}>
-        Verlauf
-      </div>
+      <h2 className="section-title section-title-spaced">Verlauf</h2>
 
       {expenses.length === 0 ? (
         <EmptyState title="Noch keine Ausgaben" hint="Die erste Ausgabe der Reise oben eintragen." />
       ) : (
         <div className="costs-list">
           {expenses.map((exp) => {
-            const meta = categoryMeta(exp.category);
-            const Icon = meta.icon;
+            const { icon: Icon, label } = categoryMeta(exp.category);
             return (
               <div key={exp.id} className="costs-row">
                 <div className="costs-row-icon">
@@ -139,7 +129,7 @@ export default function Costs({ user, users }: Props) {
                 <div className="costs-row-body">
                   <div className="costs-row-title">{exp.title}</div>
                   <div className="helper-text">
-                    {meta.label} · {exp.paidBy}
+                    {label} · {exp.paidBy}
                   </div>
                 </div>
                 <div className="mono-num costs-row-amount">{exp.amountEuro.toFixed(2)} €</div>
