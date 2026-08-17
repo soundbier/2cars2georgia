@@ -5,6 +5,7 @@ import Dashboard from './Dashboard';
 import MapTab from './MapTab';
 import Stats from './Stats';
 import Costs from './Costs';
+import { APP_USERS } from './types';
 
 export default function App() {
   const [user, setUser] = useState<string>('');
@@ -24,11 +25,12 @@ export default function App() {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', marginTop: '20vh' }}>
         <h2 style={{ marginBottom: '20px' }}>Wer nutzt dieses Gerät?</h2>
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-          <button className="btn" onClick={() => login('Ich')}>Lukas</button>
-          <button className="btn" onClick={() => login('Leon')}>Leon</button>
-          <button className="btn" onClick={() => login('Niklas')}>Niklas</button>
-          <button className="btn" onClick={() => login('Elias')}>Elias</button>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {APP_USERS.map((name) => (
+            <button key={name} className="btn" onClick={() => login(name)}>
+              {name}
+            </button>
+          ))}
         </div>
       </div>
     );
