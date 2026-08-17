@@ -37,3 +37,12 @@ export interface Expense {
   amountEuro: number;
   category: 'tanken' | 'liegeplatz' | 'schleuse' | 'verpflegung' | 'sonstiges';
 }
+
+export const USER_COLORS: Record<string, string> = {
+  'Lukas': '#f59e0b', // Amber / Orange
+  'Leon': '#0ea5e9',  // Cyan
+  'Niklas': '#10b981',// Green
+  'Elias': '#8b5cf6'  // Purple
+};
+// Fallback-Farbe für neue Nutzer
+export const DEFAULT_USER_COLOR = '#ef4444';
