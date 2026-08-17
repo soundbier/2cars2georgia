@@ -6,7 +6,6 @@ import { GpsPoint, LogEvent, USER_COLORS, DEFAULT_USER_COLOR, LogType } from './
 import { useTracking } from './useTracking';
 import L from 'leaflet';
 
-// Funktion für dynamisch eingefärbte Marker-Icons
 function createUserIcon(color: string) {
   return L.divIcon({
     className: 'custom-marker',
@@ -23,10 +22,9 @@ interface Props {
 
 export default function MapTab({ user, isTracking }: Props) {
   const { currentPosition } = useTracking(user, isTracking);
-  const [points, setPoints] = useState<[number, number][]>([cite: 15]);
+  const [points, setPoints] = useState<[number, number][]>([]);
   const [events, setEvents] = useState<LogEvent[]>([]);
 
-  // Bearbeitungs-State für das aktive Popup
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editType, setEditType] = useState<LogType>('schleuse');
@@ -36,7 +34,7 @@ export default function MapTab({ user, isTracking }: Props) {
   useEffect(() => {
     const q = query(collection(db, 'track'), orderBy('timestamp', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const pts: [number, number][] =[cite: 15];
+      const pts: [number, number][] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as GpsPoint;
         pts.push([data.lat, data.lng]);
