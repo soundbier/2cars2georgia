@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { Receipt, Plus, Euro } from 'lucide-react';
 import { db } from './firebase';
-import { Expense } from './types';
+import { Expense, APP_USERS } from './types';
 
 interface Props {
   user: string;
@@ -46,21 +47,42 @@ export default function Costs({ user }: Props) {
 
   const total = expenses.reduce((sum, item) => sum + item.amountEuro, 0);
 
+  const inputStyle = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '10px',
+    border: '1px solid var(--surface-border)',
+    background: 'var(--bg)',
+    color: 'var(--text)',
+    fontSize: '1rem',
+    marginBottom: '12px',
+    outline: 'none'
+  };
+
   return (
     <div>
-      <h2 style={{ marginBottom: '16px' }}>Kosten ({total.toFixed(2)} €)</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0 }}>Kosten</h2>
+        <div style={{ background: 'var(--primary)', color: '#fff', padding: '6px 12px', borderRadius: '20px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {total.toFixed(2)} <Euro size={16} />
+        </div>
+      </div>
       
-      <form onSubmit={handleAdd} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <h3>Ausgabe eintragen</h3>
+      <form onSubmit={handleAdd} className="card">
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <Receipt size={20} color="var(--primary)" />
+          Ausgabe eintragen
+        </h3>
+        
         <input 
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
+          style={inputStyle}
           placeholder="Beschreibung (z.B. Diesel, Einkauf)" 
           value={title} 
           onChange={(e) => setTitle(e.target.value)} 
           required 
         />
         <input 
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
+          style={inputStyle}
           type="number" 
           step="0.01" 
           placeholder="Betrag in €" 
@@ -68,42 +90,57 @@ export default function Costs({ user }: Props) {
           onChange={(e) => setAmount(e.target.value)} 
           required 
         />
-        <select 
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
-          value={category} 
-          onChange={(e) => setCategory(e.target.value as Expense['category'])}
-        >
-          <option value="verpflegung">Verpflegung</option>
-          <option value="tanken">Tanken</option>
-          <option value="liegeplatz">Liegeplatz</option>
-          <option value="schleuse">Schleuse</option>
-          <option value="sonstiges">Sonstiges</option>
-        </select>
-        <select 
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
-          value={paidBy} 
-          onChange={(e) => setPaidBy(e.target.value)}
-        >
-          <option value="Ich">Bezahlt von: Ich</option>
-          <option value="Freundin">Bezahlt von: Freundin</option>
-        </select>
-        <button type="submit" className="btn" style={{ marginTop: '8px' }}>Speichern</button>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+          <select 
+            style={{ ...inputStyle, marginBottom: 0 }}
+            value={category} 
+            onChange={(e) => setCategory(e.target.value as Expense['category'])}
+          >
+            <option value="verpflegung">Verpflegung</option>
+            <option value="tanken">Tanken</option>
+            <option value="liegeplatz">Liegeplatz</option>
+            <option value="schleuse">Schleuse</option>
+            <option value="sonstiges">Sonstiges</option>
+          </select>
+          <select 
+            style={{ ...inputStyle, marginBottom: 0 }}
+            value={paidBy} 
+            onChange={(e) => setPaidBy(e.target.value)}
+          >
+            <option value="Bordkasse">Bordkasse</option>
+            {APP_USERS.map((name) => (
+              <option key={name} value={name}>
+                {name === user ? `Ich (${name})` : name}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <button type="submit" className="btn" style={{ width: '100%', marginTop: '8px' }}>
+          <Plus size={20} /> Speichern
+        </button>
       </form>
 
-      <h3 style={{ marginBottom: '12px' }}>Verlauf</h3>
-      {expenses.map((exp) => (
-        <div key={exp.id} className="card" style={{ marginBottom: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <strong>{exp.title}</strong>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-              {exp.category} | {exp.paidBy} | {new Date(exp.timestamp).toLocaleDateString()}
+      <h3 style={{ margin: '24px 0 16px' }}>Verlauf</h3>
+      {expenses.length === 0 ? (
+        <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>Noch keine Ausgaben erfasst.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {expenses.map((exp) => (
+            <div key={exp.id} className="card" style={{ margin: 0, padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <strong style={{ display: 'block', fontSize: '1.05rem', marginBottom: '4px' }}>{exp.title}</strong>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  {exp.category} • Bezahlt von: {exp.paidBy}
+                </div>
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 'bold', color: 'var(--text)' }}>
+                {exp.amountEuro.toFixed(2)} €
+              </div>
             </div>
-          </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-            {exp.amountEuro.toFixed(2)} €
-          </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
