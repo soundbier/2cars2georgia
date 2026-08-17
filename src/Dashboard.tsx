@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
-import { Anchor, Coffee, AlertTriangle, MapPin, Home, Play, Square, Satellite } from 'lucide-react';
+import { Play, Square, Satellite } from 'lucide-react';
 import { db } from './firebase';
 import { useTracking } from './useTracking';
+import { useQuickLogs } from './useQuickLogs';
+import { getQuickLogIcon } from './quickLogIcons';
 import { LogType, LogEvent } from './types';
-import { Button, useToast } from './components/ui';
+import { Button, EmptyState, useToast } from './components/ui';
 import './Dashboard.css';
 
 interface Props {
@@ -13,16 +15,9 @@ interface Props {
   setIsTracking: (val: boolean) => void;
 }
 
-const QUICK_LOGS: { type: LogType; title: string; icon: typeof Anchor; danger?: boolean }[] = [
-  { type: 'schleuse', title: 'Schleuse', icon: Anchor },
-  { type: 'pause', title: 'Pause', icon: Coffee },
-  { type: 'anlegen', title: 'Anlegen', icon: Home },
-  { type: 'grenze', title: 'Grenze', icon: MapPin },
-  { type: 'panne', title: 'Panne', icon: AlertTriangle, danger: true }
-];
-
 export default function Dashboard({ user, isTracking, setIsTracking }: Props) {
   const { currentPosition, error } = useTracking(user, isTracking);
+  const { quickLogs } = useQuickLogs();
   const [isLogging, setIsLogging] = useState(false);
   const { notify } = useToast();
 
@@ -96,19 +91,27 @@ export default function Dashboard({ user, isTracking, setIsTracking }: Props) {
       <div className="section-title" style={{ margin: 'var(--space-5) 0 var(--space-3)' }}>
         Schnell-Logs
       </div>
-      <div className="quick-log-grid">
-        {QUICK_LOGS.map(({ type, title, icon: Icon, danger }) => (
-          <button
-            key={type}
-            className="quick-log-btn"
-            disabled={isLogging || !currentPosition}
-            onClick={() => handleQuickLog(type, title)}
-          >
-            <Icon size={22} strokeWidth={1.75} color={danger ? 'var(--color-danger)' : 'var(--color-accent)'} />
-            <span>{title}</span>
-          </button>
-        ))}
-      </div>
+      {quickLogs.length === 0 ? (
+        <EmptyState title="Keine Schnell-Logs konfiguriert" hint="Unter Crew → Schnell-Logs Kategorien anlegen." />
+      ) : (
+        <div className="quick-log-grid">
+          {quickLogs.map(({ id, label, iconName }) => {
+            const Icon = getQuickLogIcon(iconName);
+            const danger = iconName === 'alert-triangle';
+            return (
+              <button
+                key={id}
+                className="quick-log-btn"
+                disabled={isLogging || !currentPosition}
+                onClick={() => handleQuickLog(id, label)}
+              >
+                <Icon size={22} strokeWidth={1.75} color={danger ? 'var(--color-danger)' : 'var(--color-accent)'} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

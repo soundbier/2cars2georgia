@@ -5,6 +5,7 @@ import { Pencil } from 'lucide-react';
 import { db } from './firebase';
 import { GpsPoint, LogEvent, USER_COLORS, DEFAULT_USER_COLOR, LogType } from './types';
 import { useTracking } from './useTracking';
+import { useQuickLogs } from './useQuickLogs';
 import { Button, Input, Select, useToast, ConfirmDialog } from './components/ui';
 import L from 'leaflet';
 import './MapTab.css';
@@ -31,10 +32,9 @@ interface Props {
   isTracking: boolean;
 }
 
-const EVENT_TYPES: LogType[] = ['schleuse', 'pause', 'panne', 'grenze', 'anlegen', 'tanken', 'pegel'];
-
 export default function MapTab({ user, isTracking }: Props) {
   const { currentPosition } = useTracking(user, isTracking);
+  const { quickLogs } = useQuickLogs();
   const [points, setPoints] = useState<[number, number][]>([]);
   const [events, setEvents] = useState<LogEvent[]>([]);
   const { notify } = useToast();
@@ -158,11 +158,15 @@ export default function MapTab({ user, isTracking }: Props) {
                     <span className="label">Ereignis bearbeiten</span>
                     <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Titel" />
                     <Select value={editType} onChange={(e) => setEditType(e.target.value as LogType)}>
-                      {EVENT_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                      {quickLogs.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {q.label}
                         </option>
                       ))}
+                      {/* Legacy-/gelöschte Kategorie: aktuellen Wert trotzdem anzeigen */}
+                      {!quickLogs.some((q) => q.id === editType) && (
+                        <option value={editType}>{editType}</option>
+                      )}
                     </Select>
                     <div className="row">
                       <Input value={editLat} onChange={(e) => setEditLat(e.target.value)} placeholder="Breitengrad" />
