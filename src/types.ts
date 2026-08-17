@@ -1,3 +1,5 @@
+export const APP_USERS = ['Lukas', 'Leon', 'Niklas', 'Elias'];
+
 export type LogType = 
   | 'gps'
   | 'schleuse'
