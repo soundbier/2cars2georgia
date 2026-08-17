@@ -110,7 +110,7 @@ export default function App() {
           </NavLink>
           <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Users size={20} strokeWidth={2} />
-            <span>Crew</span>
+            <span>Settings</span>
           </NavLink>
         </nav>
       </BrowserRouter>
