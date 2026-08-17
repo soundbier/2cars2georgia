@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { GpsPoint, LogEvent, USER_COLORS, DEFAULT_USER_COLOR, LogType } from './types';
@@ -13,6 +13,14 @@ function createUserIcon(color: string) {
     iconSize: [16, 16],
     iconAnchor: [8, 8]
   });
+}
+
+function MapViewController({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center[0], center[1], map]);
+  return null;
 }
 
 interface Props {
@@ -110,6 +118,7 @@ export default function MapTab({ user, isTracking }: Props) {
   return (
     <div style={{ height: 'calc(100svh - 97px)', margin: '-20px' }}>
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
+        <MapViewController center={center} />
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
