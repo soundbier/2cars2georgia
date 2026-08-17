@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Receipt, Plus, Euro } from 'lucide-react';
 import { db } from './firebase';
-import { Expense, APP_USERS } from './types';
+import { Expense } from './types';
 
 interface Props {
   user: string;
+  users: string[]; // <-- Neue Eigenschaft
 }
 
-export default function Costs({ user }: Props) {
+export default function Costs({ user, users }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -108,7 +109,7 @@ export default function Costs({ user }: Props) {
             onChange={(e) => setPaidBy(e.target.value)}
           >
             <option value="Bordkasse">Bordkasse</option>
-            {APP_USERS.map((name) => (
+            {users.map((name) => (
               <option key={name} value={name}>
                 {name === user ? `Ich (${name})` : name}
               </option>
