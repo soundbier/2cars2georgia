@@ -49,7 +49,7 @@ export default function Dashboard({ user }: { user: string }) {
     <div>
       <div className="cockpit-header">
         <h1 className="page-title">Cockpit</h1>
-        <div className="profile-chip" title={`Angemeldet als ${user}`}>
+        <div className="profile-chip" title={`Angemeldet als ${user}`} aria-label={`Angemeldet als ${user}`}>
           <span className="avatar">{user.charAt(0).toUpperCase()}</span>
           <span className="profile-chip-name">{user}</span>
         </div>
