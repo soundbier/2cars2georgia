@@ -50,7 +50,7 @@ export default function Dashboard({ user, isTracking, setIsTracking }: Props) {
   return (
     <div>
       <div className="cockpit-header">
-        <h1 className="page-title">Cockpit</h1>
+        <h1 className="page-title">Test</h1>
         <div className="profile-chip" title={`Angemeldet als ${user}`} aria-label={`Angemeldet als ${user}`}>
           <span className="profile-chip-avatar">{user.charAt(0).toUpperCase()}</span>
           <span className="profile-chip-name">{user}</span>
