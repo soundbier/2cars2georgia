@@ -9,7 +9,7 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -173,6 +173,7 @@ button {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
   color: var(--color-text);
   font-size: var(--text-lg);
   font-weight: 600;
@@ -213,6 +214,7 @@ button {
   justify-content: space-around;
   align-items: center;
   border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 12px rgba(15, 23, 42, 0.05);
   z-index: 1000;
   padding-bottom: env(safe-area-inset-bottom);
 }

@@ -120,7 +120,7 @@ export default function MapTab({ user, isTracking }: Props) {
         />
         <TileLayer url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" />
 
-        {points.length > 1 && <Polyline positions={points} color="#e2822f" weight={4} />}
+        {points.length > 1 && <Polyline positions={points} color="#0284c7" weight={4} />}
 
         {currentPosition && (
           <Marker position={[currentPosition.lat, currentPosition.lng]} icon={createUserIcon(USER_COLORS[user] || DEFAULT_USER_COLOR)}>
