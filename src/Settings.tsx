@@ -17,6 +17,7 @@ import {
   ConfirmDialog,
   useToast
 } from './components/ui';
+import './Settings.css';
 
 interface Props {
   currentUser: string;
@@ -138,7 +139,7 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
   const pendingLogLabel = quickLogs.find((q) => q.id === pendingLogRemoval)?.label;
 
   return (
-    <div>
+    <div className="settings-page">
       <PageHeader title="Crew" subtitle="Nutzer, Verbindung und Schnell-Logs verwalten" />
 
       <Section title="Systemstatus">

@@ -76,54 +76,48 @@ export default function Costs({ user, users }: Props) {
 
   return (
     <div>
-      <PageHeader
-        title="Reisekasse"
-        action={
-          <div className="costs-total">
-            <span className="label">Gesamt</span>
-            <span className="mono-num costs-total-value">{total.toFixed(2)} €</span>
-          </div>
-        }
-      />
+      <PageHeader title="Reisekasse" subtitle="Ausgaben der Crew erfassen und im Blick behalten" />
+
+      <div className="costs-total-banner">
+        <span className="label">Gesamtausgaben</span>
+        <span className="mono-num costs-total-value">{total.toFixed(2)} €</span>
+      </div>
 
       <form onSubmit={handleAdd} className="costs-form">
         <Input
+          className="costs-form-title"
           placeholder="Beschreibung, z.B. Diesel"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
         />
-        <div className="costs-form-row">
-          <Input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            placeholder="Betrag in €"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
-          <Select value={category} onChange={(e) => setCategory(e.target.value as Expense['category'])}>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="costs-form-row">
-          <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-            <option value="Bordkasse">Bordkasse</option>
-            {users.map((name) => (
-              <option key={name} value={name}>
-                {name === user ? `Ich (${name})` : name}
-              </option>
-            ))}
-          </Select>
-          <Button type="submit">
-            <Plus size={18} /> Eintragen
-          </Button>
-        </div>
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          placeholder="Betrag in €"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+        />
+        <Select value={category} onChange={(e) => setCategory(e.target.value as Expense['category'])}>
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
+        <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+          <option value="Bordkasse">Bordkasse</option>
+          {users.map((name) => (
+            <option key={name} value={name}>
+              {name === user ? `Ich (${name})` : name}
+            </option>
+          ))}
+        </Select>
+        <Button type="submit">
+          <Plus size={18} /> Eintragen
+        </Button>
       </form>
 
       <div className="section-title" style={{ margin: 'var(--space-5) 0 var(--space-2)' }}>

@@ -1,0 +1,6 @@
+.settings-page {
+  /* Zusätzlicher Puffer über das globale .content-Padding hinaus, damit das
+     unterste Eingabefeld (z. B. "Neue Kategorie") nie unter der Bottom-Nav
+     verschwindet, auch wenn neue Sections dazukommen. */
+  padding-bottom: var(--space-8);
+}

@@ -49,12 +49,13 @@ export default function Dashboard({ user, isTracking, setIsTracking }: Props) {
 
   return (
     <div>
-      <p className="helper-text" style={{ marginBottom: 2 }}>
-        Angemeldet als
-      </p>
-      <h1 className="page-title" style={{ marginBottom: 'var(--space-5)' }}>
-        {user}
-      </h1>
+      <div className="cockpit-header">
+        <h1 className="page-title">Cockpit</h1>
+        <div className="profile-chip" title={`Angemeldet als ${user}`} aria-label={`Angemeldet als ${user}`}>
+          <span className="profile-chip-avatar">{user.charAt(0).toUpperCase()}</span>
+          <span className="profile-chip-name">{user}</span>
+        </div>
+      </div>
 
       {/* Bordinstrument: GPS-Status → Geschwindigkeit → Tracking */}
       <div className="instrument">
