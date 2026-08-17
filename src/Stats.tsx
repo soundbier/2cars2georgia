@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Navigation, Clock, User, BookOpen } from 'lucide-react';
 import { db } from './firebase';
+import { useQuickLogs } from './useQuickLogs';
+import { getQuickLogIcon } from './quickLogIcons';
 import { LogEvent, GpsPoint } from './types';
 import { PageHeader, EmptyState } from './components/ui';
 import './Stats.css';
@@ -33,6 +35,7 @@ function calculateDistance(points: GpsPoint[]): string {
 }
 
 export default function Stats({ user: _user }: Props) {
+  const { quickLogs } = useQuickLogs();
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [distance, setDistance] = useState<string>('0.0');
   const [trackingTime, setTrackingTime] = useState<string>('0h 0m');
@@ -106,23 +109,29 @@ export default function Stats({ user: _user }: Props) {
         />
       ) : (
         <div className="logbook-entries">
-          {events.map((evt) => (
-            <div key={evt.id} className="logbook-entry">
-              <div className="logbook-entry-time">
-                <span className="mono-num">
-                  {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <span className="helper-text">{new Date(evt.timestamp).toLocaleDateString()}</span>
-              </div>
-              <div className="logbook-entry-body">
-                <div className="logbook-entry-title">{evt.title}</div>
-                <div className="row helper-text">
-                  <User size={13} />
-                  <span>{evt.author}</span>
+          {events.map((evt) => {
+            const Icon = getQuickLogIcon(quickLogs.find((q) => q.id === evt.type)?.iconName);
+            return (
+              <div key={evt.id} className="logbook-entry">
+                <div className="logbook-entry-time">
+                  <span className="logbook-entry-time-row">
+                    <Icon size={14} strokeWidth={1.75} color="var(--color-accent)" />
+                    <span className="mono-num">
+                      {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </span>
+                  <span className="helper-text">{new Date(evt.timestamp).toLocaleDateString()}</span>
+                </div>
+                <div className="logbook-entry-body">
+                  <div className="logbook-entry-title">{evt.title}</div>
+                  <div className="row helper-text">
+                    <User size={13} />
+                    <span>{evt.author}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
