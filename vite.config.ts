@@ -12,8 +12,8 @@ export default defineConfig({
         name: '2cars2georgia',
         short_name: '2cars2georgia',
         description: 'Offline GPS & Event Tracker für 2cars2georgia',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#0b0c0e',
+        background_color: '#0b0c0e',
         display: 'standalone',
         orientation: 'portrait',
         icons: []

@@ -1,0 +1,66 @@
+/* ============================================================
+   2cars2georgia — Design Tokens
+   Ein bewusst kleines System: Farbe, Radius, Abstand, Typografie.
+   Dunkle Instrumenten-Optik mit Orange als Signalfarbe.
+   ============================================================ */
+:root {
+  /* --- Farbe: Flächen (dunkel, mehrere Helligkeitsstufen) --- */
+  --color-bg: #0b0c0e;
+  --color-bg-raised: #131519;
+  --color-surface: #1a1d22;
+  --color-surface-hover: #21252b;
+  --color-border: #2a2e35;
+  --color-border-strong: #3a3f48;
+
+  /* --- Farbe: Text --- */
+  --color-text: #f2f3f5;
+  --color-text-secondary: #a4abb6;
+  --color-text-tertiary: #676f7a;
+  --color-on-accent: #14100a;
+
+  /* --- Farbe: Akzent (verfeinertes Orange) --- */
+  --color-accent: #e2822f;
+  --color-accent-strong: #f6963e;
+  --color-accent-muted: rgba(226, 130, 47, 0.14);
+  --color-accent-border: rgba(226, 130, 47, 0.35);
+
+  /* --- Farbe: Semantisch (nur wo Bedeutung vorhanden ist) --- */
+  --color-success: #4da672;
+  --color-success-muted: rgba(77, 166, 114, 0.14);
+  --color-warning: #d1a13f;
+  --color-warning-muted: rgba(209, 161, 63, 0.14);
+  --color-danger: #e15b56;
+  --color-danger-muted: rgba(225, 91, 86, 0.14);
+  --color-info: #4c93c4;
+  --color-info-muted: rgba(76, 147, 196, 0.14);
+
+  /* --- Radius-System: bewusst 3 Stufen --- */
+  --radius-sm: 4px;   /* Badges, Inputs, kleine Controls */
+  --radius-md: 8px;   /* Buttons, ListItems, Popups */
+  --radius-lg: 12px;  /* Sections/Cards, Dialoge */
+
+  /* --- Spacing-System: 4px-Raster --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* --- Typografie --- */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+
+  --text-2xl: 1.5rem;
+  --text-xl: 1.15rem;
+  --text-lg: 1rem;
+  --text-base: 0.9rem;
+  --text-sm: 0.8rem;
+  --text-xs: 0.72rem;
+
+  /* --- Sonstiges --- */
+  --nav-height: 62px;
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --duration-fast: 0.12s;
+}

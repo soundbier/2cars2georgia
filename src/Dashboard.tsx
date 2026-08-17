@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
-import { Anchor, Coffee, AlertTriangle, MapPin, Home, Play, Square } from 'lucide-react';
+import { Anchor, Coffee, AlertTriangle, MapPin, Home, Play, Square, Satellite } from 'lucide-react';
 import { db } from './firebase';
 import { useTracking } from './useTracking';
 import { LogType, LogEvent } from './types';
+import { Button, useToast } from './components/ui';
+import './Dashboard.css';
 
 interface Props {
   user: string;
@@ -11,13 +13,22 @@ interface Props {
   setIsTracking: (val: boolean) => void;
 }
 
+const QUICK_LOGS: { type: LogType; title: string; icon: typeof Anchor; danger?: boolean }[] = [
+  { type: 'schleuse', title: 'Schleuse', icon: Anchor },
+  { type: 'pause', title: 'Pause', icon: Coffee },
+  { type: 'anlegen', title: 'Anlegen', icon: Home },
+  { type: 'grenze', title: 'Grenze', icon: MapPin },
+  { type: 'panne', title: 'Panne', icon: AlertTriangle, danger: true }
+];
+
 export default function Dashboard({ user, isTracking, setIsTracking }: Props) {
   const { currentPosition, error } = useTracking(user, isTracking);
   const [isLogging, setIsLogging] = useState(false);
+  const { notify } = useToast();
 
   const handleQuickLog = async (type: LogType, title: string) => {
     if (!currentPosition) {
-      alert('Warte auf GPS-Signal...');
+      notify('Warte auf GPS-Signal …', 'danger');
       return;
     }
     setIsLogging(true);
@@ -31,67 +42,72 @@ export default function Dashboard({ user, isTracking, setIsTracking }: Props) {
         lng: currentPosition.lng
       };
       await addDoc(collection(db, 'events'), event);
+      notify(`„${title}“ protokolliert`, 'success');
     } catch (err) {
       console.error(err);
-      alert('Fehler beim Speichern.');
+      notify('Fehler beim Speichern.', 'danger');
     }
     setIsLogging(false);
   };
 
+  const gpsStatus = error ? 'error' : currentPosition ? 'active' : 'searching';
+
   return (
     <div>
-      <h2>Hallo {user} 👋</h2>
-      
-      {/* GPS Geschwindigkeits-Widget */}
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '30px 20px' }}>
-        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-          {error ? <span style={{ color: 'var(--danger)' }}>{error}</span> : currentPosition ? <span style={{ color: 'var(--success)' }}>GPS Aktiv</span> : 'Suche Satelliten...'}
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <h1 style={{ fontSize: '4.5rem', fontWeight: '800', lineHeight: '1', color: currentPosition ? 'var(--text)' : 'var(--surface-border)' }}>
-            {currentPosition ? currentPosition.speedKmh.toFixed(1) : '0.0'}
-          </h1>
-          <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)', fontWeight: '600' }}>km/h</span>
-        </div>
-      </div>
-      
-      {/* Tracking Button */}
-      <button 
-        className="btn" 
-        style={{ 
-          width: '100%', 
-          marginBottom: '30px', 
-          background: isTracking ? 'var(--danger)' : 'var(--success)' 
-        }}
-        onClick={() => setIsTracking(!isTracking)}
-      >
-        {isTracking ? <><Square size={20} fill="currentColor" /> Tracking stoppen</> : <><Play size={20} fill="currentColor" /> Tour starten</>}
-      </button>
+      <p className="helper-text" style={{ marginBottom: 2 }}>
+        Angemeldet als
+      </p>
+      <h1 className="page-title" style={{ marginBottom: 'var(--space-5)' }}>
+        {user}
+      </h1>
 
-      {/* Schnell-Logs Grid */}
-      <h3>Schnell-Logs</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-        <button className="btn btn-log" disabled={isLogging || !currentPosition} onClick={() => handleQuickLog('schleuse', 'Schleuse')}>
-          <Anchor size={24} strokeWidth={1.5} />
-          <span>Schleuse</span>
-        </button>
-        <button className="btn btn-log" disabled={isLogging || !currentPosition} onClick={() => handleQuickLog('pause', 'Pause')}>
-          <Coffee size={24} strokeWidth={1.5} />
-          <span>Pause</span>
-        </button>
-        <button className="btn btn-log" disabled={isLogging || !currentPosition} onClick={() => handleQuickLog('anlegen', 'Anlegen')}>
-          <Home size={24} strokeWidth={1.5} />
-          <span>Anlegen</span>
-        </button>
-        <button className="btn btn-log" disabled={isLogging || !currentPosition} onClick={() => handleQuickLog('grenze', 'Landesgrenze')}>
-          <MapPin size={24} strokeWidth={1.5} />
-          <span>Grenze</span>
-        </button>
-        <button className="btn btn-log" disabled={isLogging || !currentPosition} onClick={() => handleQuickLog('panne', 'Panne')}>
-          <AlertTriangle size={24} strokeWidth={1.5} color="var(--danger)" />
-          <span>Panne</span>
-        </button>
+      {/* Bordinstrument: GPS-Status → Geschwindigkeit → Tracking */}
+      <div className="instrument">
+        <div className={`instrument-status instrument-status-${gpsStatus}`}>
+          <Satellite size={13} />
+          <span>{error ? error : currentPosition ? 'GPS aktiv' : 'Suche Satelliten …'}</span>
+        </div>
+
+        <div className="instrument-speed">
+          <span className="instrument-speed-value mono-num">
+            {currentPosition ? currentPosition.speedKmh.toFixed(1) : '—'}
+          </span>
+          <span className="instrument-speed-unit">km/h</span>
+        </div>
+
+        <Button
+          variant={isTracking ? 'destructive' : 'primary'}
+          fullWidth
+          onClick={() => setIsTracking(!isTracking)}
+        >
+          {isTracking ? (
+            <>
+              <Square size={18} fill="currentColor" /> Tour stoppen
+            </>
+          ) : (
+            <>
+              <Play size={18} fill="currentColor" /> Tour starten
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Schnell-Logs */}
+      <div className="section-title" style={{ margin: 'var(--space-5) 0 var(--space-3)' }}>
+        Schnell-Logs
+      </div>
+      <div className="quick-log-grid">
+        {QUICK_LOGS.map(({ type, title, icon: Icon, danger }) => (
+          <button
+            key={type}
+            className="quick-log-btn"
+            disabled={isLogging || !currentPosition}
+            onClick={() => handleQuickLog(type, title)}
+          >
+            <Icon size={22} strokeWidth={1.75} color={danger ? 'var(--color-danger)' : 'var(--color-accent)'} />
+            <span>{title}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

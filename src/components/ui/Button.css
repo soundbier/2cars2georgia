@@ -1,0 +1,63 @@
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 13px var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  transition: filter var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+  min-height: 46px;
+}
+
+.btn-full {
+  width: 100%;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Primary: die eine Aktion, die zählt */
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.btn-primary:active:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+/* Secondary: neutrale, ruhige Aktion */
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.btn-secondary:active:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+/* Destructive: eindeutig, aber nicht laut */
+.btn-destructive {
+  background: transparent;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.btn-destructive:active:not(:disabled) {
+  background: var(--color-danger-muted);
+}
+
+/* Quiet: Text-Aktion ohne Rahmen */
+.btn-quiet {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 10px var(--space-3);
+  min-height: auto;
+}
+.btn-quiet:active:not(:disabled) {
+  color: var(--color-text);
+}
