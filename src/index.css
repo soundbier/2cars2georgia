@@ -179,6 +179,10 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Standardgröße; einzelne Kontexte (Login, Cockpit-Chip) überschreiben sie. */
+  width: 34px;
+  height: 34px;
+  font-size: var(--text-sm);
   border-radius: var(--radius-sm);
   background: var(--color-accent-muted);
   color: var(--color-accent-strong);

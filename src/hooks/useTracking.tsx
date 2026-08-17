@@ -1,10 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { usePreferences } from './usePreferences';
 import { GpsPoint, LivePosition } from '../types';
-
-/** Mindestabstand zwischen zwei gespeicherten Trackpunkten. */
-const TRACK_WRITE_INTERVAL_MS = 30_000;
 
 interface TrackingContextValue {
   /** Letzte bekannte Position, unabhängig davon ob eine Tour läuft. */
@@ -25,6 +23,7 @@ const TrackingContext = createContext<TrackingContextValue | null>(null);
  * zurückgesetzt und es entstanden zusätzliche Trackpunkte.
  */
 export function TrackingProvider({ user, children }: { user: string; children: ReactNode }) {
+  const { preferences } = usePreferences();
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -33,11 +32,18 @@ export function TrackingProvider({ user, children }: { user: string; children: R
   // Watcher nicht neu startet.
   const isTrackingRef = useRef(false);
   const lastSavedTimestampRef = useRef(0);
+  const trackIntervalRef = useRef(preferences.trackIntervalMs);
 
   useEffect(() => {
     isTrackingRef.current = isTracking;
     if (!isTracking) lastSavedTimestampRef.current = 0;
   }, [isTracking]);
+
+  // Ebenfalls per Ref: Ein geändertes Intervall wirkt ab dem nächsten
+  // Positionsupdate, ohne den Watcher neu zu starten.
+  useEffect(() => {
+    trackIntervalRef.current = preferences.trackIntervalMs;
+  }, [preferences.trackIntervalMs]);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -57,7 +63,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
         const now = Date.now();
         if (!isTrackingRef.current || !user) return;
-        if (now - lastSavedTimestampRef.current < TRACK_WRITE_INTERVAL_MS) return;
+        if (now - lastSavedTimestampRef.current < trackIntervalRef.current) return;
 
         lastSavedTimestampRef.current = now;
         const point: GpsPoint = { timestamp: now, author: user, ...next };

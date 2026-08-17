@@ -1,21 +1,19 @@
-import { useEffect, useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove, FieldValue } from 'firebase/firestore';
-import { UserPlus, Trash2, LogOut, Wifi, WifiOff, Plus, Pencil, Check, X } from 'lucide-react';
-import { db } from '../firebase';
+import { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { Users, ListChecks, ChevronRight, Wifi, WifiOff, LogOut } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { usePreferences } from '../hooks/usePreferences';
 import { useQuickLogs } from '../hooks/useSettings';
-import { getQuickLogIcon, DEFAULT_QUICK_LOG_ICON } from '../lib/quickLogIcons';
-import { QuickLogConfig } from '../types';
+import { getUserColor } from '../lib/userColors';
+import { UnitSystem } from '../lib/units';
 import {
   Button,
-  IconButton,
-  Input,
   Section,
-  ListItem,
   Badge,
-  EmptyState,
   PageHeader,
-  ConfirmDialog,
-  useToast
+  Toggle,
+  SegmentedControl,
+  Select
 } from '../components/ui';
 import './Settings.css';
 
@@ -25,281 +23,158 @@ interface Props {
   onLogout: () => void;
 }
 
-function createQuickLogId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+const UNIT_OPTIONS: { value: UnitSystem; label: string }[] = [
+  { value: 'metric', label: 'km/h' },
+  { value: 'nautical', label: 'kn' }
+];
+
+const TRACK_INTERVALS = [
+  { value: 10_000, label: 'Alle 10 Sekunden' },
+  { value: 30_000, label: 'Alle 30 Sekunden' },
+  { value: 60_000, label: 'Jede Minute' },
+  { value: 300_000, label: 'Alle 5 Minuten' }
+];
+
+function SettingRow({
+  label,
+  description,
+  children
+}: {
+  label: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="setting-row">
+      <div className="setting-row-body">
+        <div className="setting-row-label">{label}</div>
+        {description && <div className="helper-text">{description}</div>}
+      </div>
+      <div className="setting-row-control">{children}</div>
+    </div>
+  );
 }
 
-function useOnlineStatus(): boolean {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-
-  useEffect(() => {
-    const update = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', update);
-    window.addEventListener('offline', update);
-    return () => {
-      window.removeEventListener('online', update);
-      window.removeEventListener('offline', update);
-    };
-  }, []);
-
-  return isOnline;
+function SettingLink({
+  to,
+  icon,
+  label,
+  value
+}: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Link to={to} className="setting-row setting-link">
+      <span className="setting-link-icon">{icon}</span>
+      <div className="setting-row-body">
+        <div className="setting-row-label">{label}</div>
+        <div className="helper-text">{value}</div>
+      </div>
+      <ChevronRight size={18} className="setting-link-chevron" />
+    </Link>
+  );
 }
 
 export default function Settings({ currentUser, users, onLogout }: Props) {
-  const quickLogs = useQuickLogs();
-  const { notify } = useToast();
   const isOnline = useOnlineStatus();
-
-  // --- Crew ---
-  const [newUser, setNewUser] = useState('');
-  const [pendingUserRemoval, setPendingUserRemoval] = useState<string | null>(null);
-
-  // --- Schnell-Logs ---
-  const [newLogLabel, setNewLogLabel] = useState('');
-  const [editingLogId, setEditingLogId] = useState<string | null>(null);
-  const [editingLogLabel, setEditingLogLabel] = useState('');
-  const [pendingLogRemoval, setPendingLogRemoval] = useState<string | null>(null);
-
-  /** Kapselt Firestore-Schreibzugriffe samt einheitlicher Fehlermeldung. */
-  const runWrite = async (write: () => Promise<void>, errorMessage = 'Fehler beim Speichern.') => {
-    try {
-      await write();
-      return true;
-    } catch (err) {
-      console.error(err);
-      notify(errorMessage, 'danger');
-      return false;
-    }
-  };
-
-  const saveCrew = (change: FieldValue) =>
-    updateDoc(doc(db, 'settings', 'general'), { users: change });
-
-  const saveQuickLogs = (items: QuickLogConfig[]) =>
-    updateDoc(doc(db, 'settings', 'quicklogs'), { items });
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newUser.trim();
-    if (!name) return;
-    if (users.some((u) => u.toLowerCase() === name.toLowerCase())) {
-      notify(`${name} ist bereits an Bord.`, 'danger');
-      return;
-    }
-    if (await runWrite(() => saveCrew(arrayUnion(name)))) setNewUser('');
-  };
-
-  const handleRemoveUserClick = (name: string) => {
-    if (name === currentUser) {
-      notify('Du kannst dich nicht selbst löschen.', 'danger');
-      return;
-    }
-    setPendingUserRemoval(name);
-  };
-
-  const confirmRemoveUser = async () => {
-    if (!pendingUserRemoval) return;
-    if (await runWrite(() => saveCrew(arrayRemove(pendingUserRemoval)), 'Fehler beim Löschen.')) {
-      notify(`${pendingUserRemoval} entfernt`, 'success');
-    }
-    setPendingUserRemoval(null);
-  };
-
-  const handleAddQuickLog = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const label = newLogLabel.trim();
-    if (!label) return;
-
-    const newItem: QuickLogConfig = {
-      id: createQuickLogId(),
-      label,
-      iconName: DEFAULT_QUICK_LOG_ICON
-    };
-    if (await runWrite(() => saveQuickLogs([...quickLogs, newItem]))) setNewLogLabel('');
-  };
-
-  const startEditQuickLog = (log: QuickLogConfig) => {
-    setEditingLogId(log.id);
-    setEditingLogLabel(log.label);
-  };
-
-  const handleSaveQuickLogEdit = async () => {
-    const label = editingLogLabel.trim();
-    if (!editingLogId || !label) return;
-
-    const items = quickLogs.map((q) => (q.id === editingLogId ? { ...q, label } : q));
-    if (await runWrite(() => saveQuickLogs(items))) setEditingLogId(null);
-  };
-
-  const confirmRemoveQuickLog = async () => {
-    if (!pendingLogRemoval) return;
-    const items = quickLogs.filter((q) => q.id !== pendingLogRemoval);
-    if (await runWrite(() => saveQuickLogs(items), 'Fehler beim Löschen.')) {
-      notify('Schnell-Log entfernt', 'success');
-    }
-    setPendingLogRemoval(null);
-  };
-
-  const pendingLogLabel = quickLogs.find((q) => q.id === pendingLogRemoval)?.label;
+  const quickLogs = useQuickLogs();
+  const { preferences, setPreference } = usePreferences();
 
   return (
     <div className="settings-page">
-      <PageHeader title="Crew" subtitle="Nutzer, Verbindung und Schnell-Logs verwalten" />
+      <PageHeader title="Einstellungen" subtitle="Gerät, Anzeige und Daten dieser Reise" />
 
-      <Section title="Systemstatus">
-        <ListItem
-          leading={
-            isOnline ? (
-              <Wifi size={18} strokeWidth={1.75} color="var(--color-success)" />
-            ) : (
-              <WifiOff size={18} strokeWidth={1.75} color="var(--color-danger)" />
-            )
-          }
-          title="Verbindung"
-          subtitle={
-            isOnline
-              ? 'Änderungen werden sofort mit der Crew synchronisiert.'
-              : 'Änderungen werden lokal gespeichert und später synchronisiert.'
-          }
-          trailing={
+      <Section title="Dieses Gerät">
+        <div className="setting-row">
+          <span className="avatar" style={{ background: getUserColor(currentUser), color: '#ffffff' }}>
+            {currentUser.charAt(0).toUpperCase()}
+          </span>
+          <div className="setting-row-body">
+            <div className="setting-row-label">{currentUser}</div>
+            <div className="helper-text">Angemeldetes Profil</div>
+          </div>
+          <div className="setting-row-control">
             <Badge tone={isOnline ? 'success' : 'danger'} dot>
-              {isOnline ? 'Verbunden (Live-Sync aktiv)' : 'Offline (Lokaler Modus)'}
+              {isOnline ? 'Live-Sync' : 'Offline'}
             </Badge>
-          }
-        />
+          </div>
+        </div>
+
+        <p className="helper-text setting-note">
+          {isOnline
+            ? 'Änderungen werden sofort mit der Crew synchronisiert.'
+            : 'Änderungen werden lokal gespeichert und synchronisiert, sobald wieder Empfang besteht.'}
+          {isOnline ? <Wifi size={13} className="setting-note-icon" /> : <WifiOff size={13} className="setting-note-icon" />}
+        </p>
       </Section>
 
-      <Section title="Besatzung">
-        <form onSubmit={handleAddUser} className="row settings-add-form">
-          <Input placeholder="Neuer Name" value={newUser} onChange={(e) => setNewUser(e.target.value)} />
-          <IconButton type="submit" label="Crewmitglied hinzufügen" tone="accent" disabled={!newUser.trim()}>
-            <UserPlus size={20} />
-          </IconButton>
-        </form>
+      <Section title="Anzeige">
+        <SettingRow label="Einheiten" description="Geschwindigkeit und Strecke in der ganzen App">
+          <SegmentedControl
+            label="Einheiten"
+            value={preferences.unitSystem}
+            options={UNIT_OPTIONS}
+            onChange={(value) => setPreference('unitSystem', value)}
+          />
+        </SettingRow>
 
+        <SettingRow label="Seezeichen" description="OpenSeaMap-Ebene über der Karte">
+          <Toggle
+            label="Seezeichen auf der Karte anzeigen"
+            checked={preferences.showSeamarks}
+            onChange={(value) => setPreference('showSeamarks', value)}
+          />
+        </SettingRow>
+      </Section>
+
+      <Section title="Aufzeichnung">
+        <SettingRow
+          label="Trackpunkte"
+          description="Seltener spart Akku und mobile Daten, häufiger zeichnet genauer auf."
+        >
+          <Select
+            className="setting-select"
+            aria-label="Abstand zwischen Trackpunkten"
+            value={preferences.trackIntervalMs}
+            onChange={(e) => setPreference('trackIntervalMs', Number(e.target.value))}
+          >
+            {TRACK_INTERVALS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+      </Section>
+
+      <Section title="Verwaltung">
         <div className="settings-list">
-          {users.map((u) => (
-            <ListItem
-              key={u}
-              title={
-                u === currentUser ? <span className="settings-list-self">{u} (Du)</span> : u
-              }
-              trailing={
-                <IconButton
-                  label={`${u} entfernen`}
-                  tone="danger"
-                  onClick={() => handleRemoveUserClick(u)}
-                  disabled={u === currentUser}
-                >
-                  <Trash2 size={17} />
-                </IconButton>
-              }
-            />
-          ))}
+          <SettingLink
+            to="/settings/crew"
+            icon={<Users size={18} strokeWidth={1.75} />}
+            label="Crew"
+            value={`${users.length} ${users.length === 1 ? 'Mitglied' : 'Mitglieder'}`}
+          />
+          <SettingLink
+            to="/settings/quicklogs"
+            icon={<ListChecks size={18} strokeWidth={1.75} />}
+            label="Schnell-Logs"
+            value={`${quickLogs.length} ${quickLogs.length === 1 ? 'Kategorie' : 'Kategorien'}`}
+          />
         </div>
       </Section>
 
-      <Section title="Schnell-Logs">
-        <form onSubmit={handleAddQuickLog} className="row settings-add-form">
-          <Input
-            placeholder="Neue Kategorie, z. B. Wasser tanken"
-            value={newLogLabel}
-            onChange={(e) => setNewLogLabel(e.target.value)}
-          />
-          <IconButton type="submit" label="Schnell-Log hinzufügen" tone="accent" disabled={!newLogLabel.trim()}>
-            <Plus size={20} />
-          </IconButton>
-        </form>
-
-        {quickLogs.length === 0 ? (
-          <EmptyState title="Keine Schnell-Logs" hint="Füge oben die erste Kategorie hinzu." />
-        ) : (
-          <div className="settings-list">
-            {quickLogs.map((q) => {
-              const Icon = getQuickLogIcon(q.iconName);
-              const isEditing = editingLogId === q.id;
-              return (
-                <ListItem
-                  key={q.id}
-                  leading={<Icon size={18} strokeWidth={1.75} color="var(--color-accent)" />}
-                  title={
-                    isEditing ? (
-                      <Input
-                        autoFocus
-                        value={editingLogLabel}
-                        onChange={(e) => setEditingLogLabel(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveQuickLogEdit();
-                          if (e.key === 'Escape') setEditingLogId(null);
-                        }}
-                      />
-                    ) : (
-                      q.label
-                    )
-                  }
-                  trailing={
-                    isEditing ? (
-                      <>
-                        <IconButton
-                          label="Umbenennen speichern"
-                          tone="accent"
-                          onClick={handleSaveQuickLogEdit}
-                          disabled={!editingLogLabel.trim()}
-                        >
-                          <Check size={17} />
-                        </IconButton>
-                        <IconButton label="Abbrechen" onClick={() => setEditingLogId(null)}>
-                          <X size={17} />
-                        </IconButton>
-                      </>
-                    ) : (
-                      <>
-                        <IconButton label={`${q.label} umbenennen`} onClick={() => startEditQuickLog(q)}>
-                          <Pencil size={16} />
-                        </IconButton>
-                        <IconButton
-                          label={`${q.label} löschen`}
-                          tone="danger"
-                          onClick={() => setPendingLogRemoval(q.id)}
-                        >
-                          <Trash2 size={16} />
-                        </IconButton>
-                      </>
-                    )
-                  }
-                />
-              );
-            })}
-          </div>
-        )}
-      </Section>
-
-      <Section title="Gerät">
+      <Section title="App">
+        <SettingRow label="Version" description="2cars2georgia">
+          <span className="mono-num helper-text">{__APP_VERSION__}</span>
+        </SettingRow>
         <Button variant="destructive" fullWidth onClick={onLogout}>
           <LogOut size={18} /> Profil abmelden
         </Button>
       </Section>
-
-      <ConfirmDialog
-        open={pendingUserRemoval !== null}
-        title="Crewmitglied entfernen"
-        description={`${pendingUserRemoval} wird aus der Crew-Liste gelöscht. Bereits erfasste Logs und Ausgaben bleiben erhalten.`}
-        confirmLabel="Entfernen"
-        destructive
-        onConfirm={confirmRemoveUser}
-        onCancel={() => setPendingUserRemoval(null)}
-      />
-
-      <ConfirmDialog
-        open={pendingLogRemoval !== null}
-        title="Schnell-Log entfernen"
-        description={`„${pendingLogLabel}“ wird aus den Schnell-Logs entfernt. Bereits erfasste Ereignisse bleiben erhalten.`}
-        confirmLabel="Entfernen"
-        destructive
-        onConfirm={confirmRemoveQuickLog}
-        onCancel={() => setPendingLogRemoval(null)}
-      />
     </div>
   );
 }

@@ -7,7 +7,9 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
 import { useQuickLogs } from '../hooks/useSettings';
+import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
+import { formatSpeed } from '../lib/units';
 import { GpsPoint, LogEvent, LogType, QuickLogConfig } from '../types';
 import { Button, Input, Select, useToast, ConfirmDialog } from '../components/ui';
 import 'leaflet/dist/leaflet.css';
@@ -138,6 +140,7 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
 export default function MapTab({ user }: { user: string }) {
   const { position } = useTracking();
   const quickLogs = useQuickLogs();
+  const { preferences } = usePreferences();
   const track = useCollection<GpsPoint>('track');
   const events = useCollection<LogEvent>('events');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -183,7 +186,9 @@ export default function MapTab({ user }: { user: string }) {
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <TileLayer url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" />
+        {preferences.showSeamarks && (
+          <TileLayer url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" />
+        )}
 
         {line.length > 1 && <Polyline positions={line} color={TRACK_COLOR} weight={4} />}
 
@@ -192,7 +197,7 @@ export default function MapTab({ user }: { user: string }) {
             <Popup>
               <div className="map-popup">
                 <strong>Aktuelle Position ({user})</strong>
-                <div className="helper-text">{position.speedKmh} km/h</div>
+                <div className="helper-text">{formatSpeed(position.speedKmh, preferences.unitSystem)}</div>
               </div>
             </Popup>
           </Marker>

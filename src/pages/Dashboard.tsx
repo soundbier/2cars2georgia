@@ -4,7 +4,9 @@ import { Play, Square, Satellite } from 'lucide-react';
 import { db } from '../firebase';
 import { useTracking } from '../hooks/useTracking';
 import { useQuickLogs } from '../hooks/useSettings';
+import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
+import { speedUnitLabel, toDisplaySpeed } from '../lib/units';
 import { LogType, LogEvent } from '../types';
 import { Button, EmptyState, useToast } from '../components/ui';
 import './Dashboard.css';
@@ -12,6 +14,7 @@ import './Dashboard.css';
 export default function Dashboard({ user }: { user: string }) {
   const { position, error, isTracking, setIsTracking } = useTracking();
   const quickLogs = useQuickLogs();
+  const { preferences } = usePreferences();
   const [isLogging, setIsLogging] = useState(false);
   const { notify } = useToast();
 
@@ -61,9 +64,9 @@ export default function Dashboard({ user }: { user: string }) {
 
         <div className="instrument-speed">
           <span className="instrument-speed-value mono-num">
-            {position ? position.speedKmh.toFixed(1) : '—'}
+            {position ? toDisplaySpeed(position.speedKmh, preferences.unitSystem).toFixed(1) : '—'}
           </span>
-          <span className="instrument-speed-unit">km/h</span>
+          <span className="instrument-speed-unit">{speedUnitLabel(preferences.unitSystem)}</span>
         </div>
 
         <Button
@@ -79,7 +82,10 @@ export default function Dashboard({ user }: { user: string }) {
       <h2 className="section-title section-title-spaced">Schnell-Logs</h2>
 
       {quickLogs.length === 0 ? (
-        <EmptyState title="Keine Schnell-Logs konfiguriert" hint="Unter Crew → Schnell-Logs Kategorien anlegen." />
+        <EmptyState
+          title="Keine Schnell-Logs konfiguriert"
+          hint="Unter Mehr → Schnell-Logs Kategorien anlegen."
+        />
       ) : (
         <div className="quick-log-grid">
           {quickLogs.map(({ id, label, iconName }) => {

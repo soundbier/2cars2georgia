@@ -8,3 +8,5 @@ export { EmptyState } from './EmptyState';
 export { ConfirmDialog } from './ConfirmDialog';
 export { ToastProvider, useToast } from './Toast';
 export { PageHeader } from './PageHeader';
+export { Toggle } from './Toggle';
+export { SegmentedControl } from './SegmentedControl';

@@ -4,7 +4,9 @@ import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X } from 'luc
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useQuickLogs } from '../hooks/useSettings';
+import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
+import { distanceUnitLabel, toDisplayDistance } from '../lib/units';
 import { LogEvent, GpsPoint, LogType, QuickLogConfig } from '../types';
 import { PageHeader, EmptyState, IconButton, Input, Select, ConfirmDialog, useToast } from '../components/ui';
 import './Stats.css';
@@ -139,17 +141,18 @@ export default function Stats() {
   const quickLogs = useQuickLogs();
   const events = useCollection<LogEvent>('events', 'timestamp', 'desc');
   const track = useCollection<GpsPoint>('track');
+  const { preferences } = usePreferences();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
 
   const { distance, duration } = useMemo(
     () => ({
-      distance: totalDistanceKm(track).toFixed(1),
+      distance: toDisplayDistance(totalDistanceKm(track), preferences.unitSystem).toFixed(1),
       duration: formatDuration(
         track.length > 1 ? track[track.length - 1].timestamp - track[0].timestamp : 0
       )
     }),
-    [track]
+    [track, preferences.unitSystem]
   );
 
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
@@ -184,7 +187,9 @@ export default function Stats() {
         <div className="logbook-summary-item">
           <Navigation size={16} strokeWidth={1.75} />
           <div>
-            <div className="mono-num logbook-summary-value">{distance} km</div>
+            <div className="mono-num logbook-summary-value">
+              {distance} {distanceUnitLabel(preferences.unitSystem)}
+            </div>
             <div className="label">Strecke</div>
           </div>
         </div>

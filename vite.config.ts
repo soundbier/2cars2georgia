@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json';
 
 export default defineConfig({
+  // Version für die Anzeige in den Einstellungen – hilft beim Einordnen,
+  // welcher Stand auf einem Gerät tatsächlich installiert ist.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version)
+  },
   plugins: [
     react(),
     VitePWA({
