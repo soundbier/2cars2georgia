@@ -121,6 +121,8 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
               {name === currentUser ? `Ich (${name})` : name}
             </option>
           ))}
+          {/* Crewmitglied wurde inzwischen entfernt: Wert trotzdem anzeigen statt stillschweigend zu ersetzen */}
+          {paidBy !== 'Bordkasse' && !users.includes(paidBy) && <option value={paidBy}>{paidBy}</option>}
         </Select>
         <div className="row costs-row-edit-actions">
           <Button fullWidth onClick={handleSave}>
