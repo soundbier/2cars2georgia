@@ -1,0 +1,38 @@
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.icon-btn-default:active:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.icon-btn-accent {
+  color: var(--color-accent);
+}
+.icon-btn-accent:active:not(:disabled) {
+  background: var(--color-accent-muted);
+}
+
+.icon-btn-danger {
+  color: var(--color-danger);
+}
+.icon-btn-danger:active:not(:disabled) {
+  background: var(--color-danger-muted);
+}

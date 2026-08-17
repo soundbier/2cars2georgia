@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { Pencil } from 'lucide-react';
 import { db } from './firebase';
 import { GpsPoint, LogEvent, USER_COLORS, DEFAULT_USER_COLOR, LogType } from './types';
 import { useTracking } from './useTracking';
+import { Button, Input, Select, useToast, ConfirmDialog } from './components/ui';
 import L from 'leaflet';
+import './MapTab.css';
 
 function createUserIcon(color: string) {
   return L.divIcon({
@@ -28,16 +31,20 @@ interface Props {
   isTracking: boolean;
 }
 
+const EVENT_TYPES: LogType[] = ['schleuse', 'pause', 'panne', 'grenze', 'anlegen', 'tanken', 'pegel'];
+
 export default function MapTab({ user, isTracking }: Props) {
   const { currentPosition } = useTracking(user, isTracking);
   const [points, setPoints] = useState<[number, number][]>([]);
   const [events, setEvents] = useState<LogEvent[]>([]);
+  const { notify } = useToast();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editType, setEditType] = useState<LogType>('schleuse');
   const [editLat, setEditLat] = useState('');
   const [editLng, setEditLng] = useState('');
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'track'), orderBy('timestamp', 'asc'));
@@ -76,7 +83,7 @@ export default function MapTab({ user, isTracking }: Props) {
     const latNum = parseFloat(editLat.replace(',', '.'));
     const lngNum = parseFloat(editLng.replace(',', '.'));
     if (isNaN(latNum) || isNaN(lngNum)) {
-      alert('Ungültige Koordinaten!');
+      notify('Ungültige Koordinaten.', 'danger');
       return;
     }
 
@@ -90,50 +97,38 @@ export default function MapTab({ user, isTracking }: Props) {
     setEditingId(null);
   };
 
-  const handleDeleteEvent = async (id: string) => {
-    if (window.confirm('Ereignis wirklich löschen?')) {
-      await deleteDoc(doc(db, 'events', id));
-      setEditingId(null);
-    }
+  const handleDeleteEvent = async () => {
+    if (!deleteTargetId) return;
+    await deleteDoc(doc(db, 'events', deleteTargetId));
+    setEditingId(null);
+    setDeleteTargetId(null);
   };
 
-  const center: [number, number] = currentPosition 
-    ? [currentPosition.lat, currentPosition.lng] 
-    : points.length > 0 
-      ? points[points.length - 1] 
+  const center: [number, number] = currentPosition
+    ? [currentPosition.lat, currentPosition.lng]
+    : points.length > 0
+      ? points[points.length - 1]
       : [53.5511, 9.9937];
 
-  const inputStyle = {
-    width: '100%',
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid #3a3a3c',
-    background: '#000',
-    color: '#fff',
-    fontSize: '0.9rem',
-    marginBottom: '6px',
-    outline: 'none'
-  };
-
   return (
-    <div style={{ height: 'calc(100svh - 97px)', margin: '-20px' }}>
+    <div className="map-view">
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
         <MapViewController center={center} />
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <TileLayer
-          url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
-        />
-        
-        {points.length > 1 && <Polyline positions={points} color="#f59e0b" weight={4} />}
-        
+        <TileLayer url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" />
+
+        {points.length > 1 && <Polyline positions={points} color="#e2822f" weight={4} />}
+
         {currentPosition && (
           <Marker position={[currentPosition.lat, currentPosition.lng]} icon={createUserIcon(USER_COLORS[user] || DEFAULT_USER_COLOR)}>
             <Popup>
-              <strong>Aktuelle Position ({user})</strong><br />
-              {currentPosition.speedKmh} km/h
+              <div className="map-popup">
+                <strong>Aktuelle Position ({user})</strong>
+                <div className="helper-text">{currentPosition.speedKmh} km/h</div>
+              </div>
             </Popup>
           </Marker>
         )}
@@ -144,70 +139,42 @@ export default function MapTab({ user, isTracking }: Props) {
 
           return (
             <Marker key={evt.id} position={[evt.lat, evt.lng]} icon={createUserIcon(color)}>
-              <Popup>
+              <Popup minWidth={200}>
                 {!isEditing ? (
-                  <div style={{ minWidth: '160px' }}>
-                    <strong style={{ fontSize: '1rem' }}>{evt.title}</strong>
-                    <div style={{ fontSize: '0.8rem', color: '#666', margin: '4px 0' }}>
-                      Autor: {evt.author} ({new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                  <div className="map-popup">
+                    <strong>{evt.title}</strong>
+                    <div className="helper-text">
+                      {evt.author} · {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '8px' }}>
-                      Lat: {evt.lat.toFixed(4)}, Lng: {evt.lng.toFixed(4)}
+                    <div className="helper-text">
+                      {evt.lat.toFixed(4)}, {evt.lng.toFixed(4)}
                     </div>
-                    <button 
-                      onClick={() => startEditing(evt)}
-                      style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', width: '100%', fontWeight: 'bold' }}
-                    >
-                      Bearbeiten
-                    </button>
+                    <Button variant="secondary" fullWidth onClick={() => startEditing(evt)}>
+                      <Pencil size={14} /> Bearbeiten
+                    </Button>
                   </div>
                 ) : (
-                  <div style={{ minWidth: '180px' }}>
-                    <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>Ereignis bearbeiten</div>
-                    <input 
-                      style={inputStyle}
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      placeholder="Titel"
-                    />
-                    <select 
-                      style={inputStyle}
-                      value={editType}
-                      onChange={(e) => setEditType(e.target.value as LogType)}
-                    >
-                      <option value="schleuse">Schleuse</option>
-                      <option value="pause">Pause</option>
-                      <option value="panne">Panne</option>
-                      <option value="grenze">Grenze</option>
-                      <option value="anlegen">Anlegen</option>
-                      <option value="tanken">Tanken</option>
-                      <option value="pegel">Pegel</option>
-                    </select>
-                    <input 
-                      style={inputStyle}
-                      value={editLat}
-                      onChange={(e) => setEditLat(e.target.value)}
-                      placeholder="Breitengrad (Lat)"
-                    />
-                    <input 
-                      style={inputStyle}
-                      value={editLng}
-                      onChange={(e) => setEditLng(e.target.value)}
-                      placeholder="Längengrad (Lng)"
-                    />
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        onClick={() => handleSaveEdit(evt.id!)}
-                        style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer', flex: 1, fontWeight: 'bold' }}
-                      >
+                  <div className="map-popup stack">
+                    <span className="label">Ereignis bearbeiten</span>
+                    <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Titel" />
+                    <Select value={editType} onChange={(e) => setEditType(e.target.value as LogType)}>
+                      {EVENT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </option>
+                      ))}
+                    </Select>
+                    <div className="row">
+                      <Input value={editLat} onChange={(e) => setEditLat(e.target.value)} placeholder="Breitengrad" />
+                      <Input value={editLng} onChange={(e) => setEditLng(e.target.value)} placeholder="Längengrad" />
+                    </div>
+                    <div className="row">
+                      <Button fullWidth onClick={() => handleSaveEdit(evt.id!)}>
                         Speichern
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteEvent(evt.id!)}
-                        style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
+                      </Button>
+                      <Button variant="destructive" fullWidth onClick={() => setDeleteTargetId(evt.id!)}>
                         Löschen
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -216,6 +183,16 @@ export default function MapTab({ user, isTracking }: Props) {
           );
         })}
       </MapContainer>
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="Ereignis löschen"
+        description="Dieser Log-Eintrag wird endgültig entfernt."
+        confirmLabel="Löschen"
+        destructive
+        onConfirm={handleDeleteEvent}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

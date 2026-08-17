@@ -1,0 +1,73 @@
+.logbook-summary {
+  display: flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.logbook-summary-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-accent);
+}
+
+.logbook-summary-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.logbook-summary-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border);
+  margin: 0 var(--space-3);
+}
+
+.logbook-entries {
+  display: flex;
+  flex-direction: column;
+}
+
+.logbook-entry {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logbook-entry:last-child {
+  border-bottom: none;
+}
+
+.logbook-entry-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  width: 64px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding-top: 1px;
+}
+
+.logbook-entry-body {
+  flex: 1;
+  min-width: 0;
+  border-left: 2px solid var(--color-accent-border);
+  padding-left: var(--space-3);
+}
+
+.logbook-entry-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
