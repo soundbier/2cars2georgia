@@ -1,6 +1,18 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ListChecks, ShieldCheck, ChevronRight, Wifi, WifiOff, LogOut, DoorOpen, Compass } from 'lucide-react';
+import {
+  Users,
+  ListChecks,
+  ShieldCheck,
+  ChevronRight,
+  Wifi,
+  WifiOff,
+  LogOut,
+  DoorOpen,
+  Compass,
+  Download,
+  Trash2
+} from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePreferences } from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
@@ -216,6 +228,23 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
             icon={<ListChecks size={18} strokeWidth={1.75} />}
             label="Schnell-Logs"
             value={`${quickLogs.length} ${quickLogs.length === 1 ? 'Kategorie' : 'Kategorien'}`}
+          />
+        </div>
+      </Section>
+
+      <Section title="Daten">
+        <div className="settings-list">
+          <SettingLink
+            to="/settings/export"
+            icon={<Download size={18} strokeWidth={1.75} />}
+            label="Export"
+            value="Bericht als PDF, CSV und GPX"
+          />
+          <SettingLink
+            to="/settings/papierkorb"
+            icon={<Trash2 size={18} strokeWidth={1.75} />}
+            label="Papierkorb"
+            value="Gelöschtes wiederherstellen"
           />
         </div>
       </Section>

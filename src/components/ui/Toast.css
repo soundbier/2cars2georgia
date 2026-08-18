@@ -23,6 +23,31 @@
   font-weight: 500;
   box-shadow: var(--shadow-elevated);
   animation: toast-in 0.15s ease-out;
+  /* Der Stapel selbst lässt Klicks durch; nur der Toast (und damit sein
+     Aktions-Button) nimmt sie wieder an. */
+  pointer-events: auto;
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-action {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(var(--space-1) * -1) 0;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast-action:active {
+  opacity: 0.6;
 }
 
 .toast-danger {

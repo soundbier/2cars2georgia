@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useMemo, useState } from 'react';
+import { collection, addDoc, doc, updateDoc, deleteField } from 'firebase/firestore';
 import {
   Fuel,
   UtensilsCrossed,
@@ -9,12 +9,20 @@ import {
   Plus,
   Pencil,
   Trash2,
+  ArrowRight,
   LucideIcon
 } from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { trackWrite } from '../lib/pendingWrites';
+import { activeOnly } from '../lib/trash';
+import {
+  computeSettlement,
+  formatEuro,
+  SHARED_PAYER,
+  Settlement as SettlementResult
+} from '../lib/settlement';
 import { Expense, ExpenseCategory } from '../types';
 import { Button, Input, Select, PageHeader, EmptyState, IconButton, ConfirmDialog, useToast } from '../components/ui';
 import './Costs.css';
@@ -117,14 +125,14 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
           ))}
         </Select>
         <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-          <option value="Bordkasse">Bordkasse</option>
+          <option value={SHARED_PAYER}>{SHARED_PAYER}</option>
           {users.map((name) => (
             <option key={name} value={name}>
               {name === currentUser ? `Ich (${name})` : name}
             </option>
           ))}
           {/* Crewmitglied wurde inzwischen entfernt: Wert trotzdem anzeigen statt stillschweigend zu ersetzen */}
-          {paidBy !== 'Bordkasse' && !users.includes(paidBy) && <option value={paidBy}>{paidBy}</option>}
+          {paidBy !== SHARED_PAYER && !users.includes(paidBy) && <option value={paidBy}>{paidBy}</option>}
         </Select>
         <div className="row costs-row-edit-actions">
           <Button fullWidth onClick={handleSave}>
@@ -163,15 +171,101 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
   );
 }
 
+/**
+ * „Wer schuldet wem wie viel“: Salden je Crewmitglied plus die kürzeste Folge
+ * von Zahlungen, die alles glattstellt. Ausgaben aus der Bordkasse tauchen hier
+ * nicht auf, da sie bereits gemeinsam finanziert sind.
+ */
+function Settlement({
+  settlement,
+  currentUser
+}: {
+  settlement: SettlementResult;
+  currentUser: string;
+}) {
+  const { balances, transfers, splitTotalCents, sharedTotalCents } = settlement;
+
+  if (splitTotalCents === 0 && sharedTotalCents === 0) return null;
+
+  return (
+    <section className="settlement">
+      <h2 className="section-title section-title-spaced">Ausgleich</h2>
+
+      {splitTotalCents === 0 ? (
+        <p className="helper-text">
+          Bisher wurde alles direkt aus der Bordkasse bezahlt – es gibt nichts zu verrechnen.
+        </p>
+      ) : (
+        <>
+          <div className="settlement-balances">
+            {balances.map((balance) => {
+              const tone =
+                balance.balanceCents > 0
+                  ? 'settlement-balance-positive'
+                  : balance.balanceCents < 0
+                    ? 'settlement-balance-negative'
+                    : 'settlement-balance-neutral';
+              return (
+                <div key={balance.user} className="settlement-balance">
+                  <div className="settlement-balance-body">
+                    <div className="settlement-balance-name">
+                      {balance.user === currentUser ? `Ich (${balance.user})` : balance.user}
+                    </div>
+                    <div className="helper-text">
+                      {formatEuro(balance.paidCents)} ausgelegt · {formatEuro(balance.shareCents)} Anteil
+                    </div>
+                  </div>
+                  <div className={`mono-num settlement-balance-amount ${tone}`}>
+                    {balance.balanceCents > 0 ? '+' : ''}
+                    {formatEuro(balance.balanceCents)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {transfers.length === 0 ? (
+            <p className="helper-text settlement-note">Alle Salden sind bereits ausgeglichen.</p>
+          ) : (
+            <div className="settlement-transfers">
+              {transfers.map((transfer) => (
+                <div key={`${transfer.from}-${transfer.to}`} className="settlement-transfer">
+                  <span className="settlement-transfer-party">{transfer.from}</span>
+                  <ArrowRight size={15} strokeWidth={2} />
+                  <span className="settlement-transfer-party">{transfer.to}</span>
+                  <span className="mono-num settlement-transfer-amount">
+                    {formatEuro(transfer.amountCents)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {sharedTotalCents > 0 && (
+        <p className="helper-text settlement-note">
+          {formatEuro(sharedTotalCents)} wurden direkt aus der {SHARED_PAYER} bezahlt und bleiben
+          außen vor.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default function Costs({ user, users }: Props) {
   const { tripId } = useRoadtrip();
-  const expenses = useCollection<Expense>(tripId ? tripPath(tripId, 'expenses') : null, 'timestamp', 'desc');
+  const allExpenses = useCollection<Expense>(tripId ? tripPath(tripId, 'expenses') : null, 'timestamp', 'desc');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('verpflegung');
   const [paidBy, setPaidBy] = useState(user);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
+
+  // Ausgaben im Papierkorb zählen weder im Verlauf noch im Ausgleich mit.
+  const expenses = useMemo(() => activeOnly(allExpenses), [allExpenses]);
+  const settlement = useMemo(() => computeSettlement(expenses, users), [expenses, users]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,16 +311,31 @@ export default function Costs({ user, users }: Props) {
     }
   };
 
+  const restoreExpense = async (id: string) => {
+    if (!tripId) return;
+    try {
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: deleteField() }));
+      notify('Ausgabe wiederhergestellt', 'success');
+    } catch (err) {
+      console.error(err);
+      notify('Wiederherstellen fehlgeschlagen.', 'danger');
+    }
+  };
+
   const handleDeleteExpense = async () => {
     if (!deleteTargetId || !tripId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
     try {
-      await trackWrite(deleteDoc(doc(db, tripPath(tripId, 'expenses'), deleteTargetId)));
-      notify('Ausgabe gelöscht', 'success');
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: Date.now() }));
+      notify('Ausgabe in den Papierkorb verschoben', 'success', {
+        label: 'Rückgängig',
+        onAct: () => void restoreExpense(id)
+      });
     } catch (err) {
       console.error(err);
       notify('Fehler beim Löschen.', 'danger');
     }
-    setDeleteTargetId(null);
   };
 
   const total = expenses.reduce((sum, item) => sum + item.amountEuro, 0);
@@ -265,7 +374,7 @@ export default function Costs({ user, users }: Props) {
           ))}
         </Select>
         <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-          <option value="Bordkasse">Bordkasse</option>
+          <option value={SHARED_PAYER}>{SHARED_PAYER}</option>
           {users.map((name) => (
             <option key={name} value={name}>
               {name === user ? `Ich (${name})` : name}
@@ -276,6 +385,8 @@ export default function Costs({ user, users }: Props) {
           <Plus size={18} /> Eintragen
         </Button>
       </form>
+
+      <Settlement settlement={settlement} currentUser={user} />
 
       <h2 className="section-title section-title-spaced">Verlauf</h2>
 
@@ -299,7 +410,7 @@ export default function Costs({ user, users }: Props) {
       <ConfirmDialog
         open={deleteTargetId !== null}
         title="Ausgabe löschen"
-        description="Dieser Eintrag wird endgültig aus der Reisekasse entfernt."
+        description="Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen."
         confirmLabel="Löschen"
         destructive
         onConfirm={handleDeleteExpense}

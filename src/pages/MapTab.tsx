@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { Pencil, LocateFixed } from 'lucide-react';
 import L from 'leaflet';
 // Seiteneffekt-Import: erweitert Leaflet um die Kartendrehung (map.setBearing).
@@ -16,6 +16,7 @@ import { getUserColor } from '../lib/userColors';
 import { formatSpeed } from '../lib/units';
 import { getBaseLayer, OVERLAYS, OVERLAY_IDS } from '../lib/mapLayers';
 import { readMapView, saveMapView } from '../lib/mapView';
+import { activeOnly } from '../lib/trash';
 import { GpsPoint, LivePosition, LogEvent, LogType, QuickLogConfig } from '../types';
 import { Button, Input, Select, useToast, ConfirmDialog } from '../components/ui';
 import 'leaflet/dist/leaflet.css';
@@ -294,9 +295,12 @@ export default function MapTab({ user }: { user: string }) {
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
-  const events = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null);
+  const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
+
+  // Was im Papierkorb liegt, gehört auch nicht mehr als Marker auf die Karte.
+  const events = useMemo(() => activeOnly(allEvents), [allEvents]);
 
   // Beim Einhängen einmal gelesen: MapContainer wertet center/zoom nur initial
   // aus, alles Weitere läuft über die Map-Instanz.
@@ -344,16 +348,31 @@ export default function MapTab({ user }: { user: string }) {
     }
   };
 
+  const restoreEvent = async (id: string) => {
+    if (!tripId) return;
+    try {
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }));
+      notify('Ereignis wiederhergestellt', 'success');
+    } catch (err) {
+      console.error(err);
+      notify('Wiederherstellen fehlgeschlagen.', 'danger');
+    }
+  };
+
   const handleDeleteEvent = async () => {
     if (!deleteTargetId || !tripId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
     try {
-      await trackWrite(deleteDoc(doc(db, tripPath(tripId, 'events'), deleteTargetId)));
-      notify('Ereignis gelöscht', 'success');
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }));
+      notify('Ereignis in den Papierkorb verschoben', 'success', {
+        label: 'Rückgängig',
+        onAct: () => void restoreEvent(id)
+      });
     } catch (err) {
       console.error(err);
       notify('Fehler beim Löschen.', 'danger');
     }
-    setDeleteTargetId(null);
   };
 
   return (
@@ -449,7 +468,7 @@ export default function MapTab({ user }: { user: string }) {
       <ConfirmDialog
         open={deleteTargetId !== null}
         title="Ereignis löschen"
-        description="Dieser Log-Eintrag wird endgültig entfernt."
+        description="Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen."
         confirmLabel="Löschen"
         destructive
         onConfirm={handleDeleteEvent}

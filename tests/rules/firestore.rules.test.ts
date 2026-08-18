@@ -275,6 +275,17 @@ describe('Logbuch-Ereignisse', () => {
     await assertFails(setDoc(doc(db, path), { ...validEvent, lat: 999 }));
   });
 
+  it('erlaubt das weiche Löschen über deletedAt', async () => {
+    await seed(path, validEvent);
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), { ...validEvent, deletedAt: NOW }));
+  });
+
+  it('weist ein deletedAt ab, das kein plausibler Zeitstempel ist', async () => {
+    const db = tripDb(TRIP);
+    await assertFails(setDoc(doc(db, path), { ...validEvent, deletedAt: 'gestern' }));
+    await assertFails(setDoc(doc(db, path), { ...validEvent, deletedAt: 0 }));
+  });
+
   it('erlaubt das Löschen', async () => {
     await seed(path, validEvent);
     await assertSucceeds(deleteDoc(doc(tripDb(TRIP), path)));
@@ -304,6 +315,13 @@ describe('Ausgaben', () => {
     const { paidBy, ...ohneZahler } = validExpense;
     void paidBy;
     await assertFails(setDoc(doc(db, path), ohneZahler));
+  });
+
+  it('erlaubt das weiche Löschen über deletedAt', async () => {
+    await seed(path, validExpense);
+    const db = tripDb(TRIP);
+    await assertSucceeds(setDoc(doc(db, path), { ...validExpense, deletedAt: NOW }));
+    await assertFails(setDoc(doc(db, path), { ...validExpense, deletedAt: 0 }));
   });
 
   it('erlaubt Ändern und Löschen', async () => {

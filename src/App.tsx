@@ -26,6 +26,8 @@ import Costs from './pages/Costs';
 import Settings from './pages/Settings';
 import CrewSettings from './pages/settings/CrewSettings';
 import QuickLogSettings from './pages/settings/QuickLogSettings';
+import ExportSettings from './pages/settings/ExportSettings';
+import TrashSettings from './pages/settings/TrashSettings';
 import Privacy from './pages/Privacy';
 
 const STORAGE_KEY_USER = 'boat_user';
@@ -119,6 +121,8 @@ function CrewGate() {
                 element={<CrewSettings currentUser={user} users={users} />}
               />
               <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
+              <Route path="/settings/export" element={<ExportSettings users={users} />} />
+              <Route path="/settings/papierkorb" element={<TrashSettings />} />
               <Route path="/datenschutz" element={<Privacy />} />
             </Routes>
           </div>
