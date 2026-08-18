@@ -23,8 +23,15 @@ export async function shareOrDownload(
   mimeType: string,
   content: string
 ): Promise<ExportResult> {
-  const file = new File([content], fileName, { type: mimeType });
+  return shareOrDownloadFile(new File([content], fileName, { type: mimeType }));
+}
 
+/**
+ * Wie {@link shareOrDownload}, aber für bereits fertige Dateien – etwa das
+ * Canvas-Bild der Tagesübersicht (lib/routeImage.ts), das nicht aus Text
+ * entsteht.
+ */
+export async function shareOrDownloadFile(file: File): Promise<ExportResult> {
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });

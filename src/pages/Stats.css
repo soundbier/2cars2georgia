@@ -89,3 +89,7 @@
   gap: var(--space-1);
   flex-shrink: 0;
 }
+
+.logbook-recap-button {
+  margin-bottom: var(--space-5);
+}

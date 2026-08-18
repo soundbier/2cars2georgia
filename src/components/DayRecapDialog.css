@@ -1,0 +1,47 @@
+.day-recap-dialog {
+  max-width: 480px;
+}
+
+.day-recap-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.day-recap-close {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: var(--space-1);
+  line-height: 0;
+  border-radius: var(--radius-sm);
+}
+
+.day-recap-close:hover {
+  color: var(--color-text);
+}
+
+.day-recap-select {
+  margin-bottom: var(--space-4);
+}
+
+.day-recap-preview {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.day-recap-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+}
+
+.day-recap-hint {
+  margin-bottom: var(--space-4);
+}
