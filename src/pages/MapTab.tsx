@@ -392,7 +392,32 @@ export default function MapTab({ user }: { user: string }) {
           />
         ))}
 
-        {line.length > 1 && <Polyline positions={line} color={TRACK_COLOR} weight={4} />}
+        {line.length > 1 && (
+          <>
+            {/* Heller Rand unter der eigentlichen Linie: hebt die Route auch
+                auf dunklen Kartenausschnitten (Satellit, Topo) klar ab, statt
+                nur auf hellem Untergrund gut lesbar zu sein. */}
+            <Polyline
+              positions={line}
+              pathOptions={{
+                color: '#ffffff',
+                weight: 7,
+                opacity: 0.6,
+                lineCap: 'round',
+                lineJoin: 'round'
+              }}
+            />
+            <Polyline
+              positions={line}
+              pathOptions={{
+                color: TRACK_COLOR,
+                weight: 4,
+                lineCap: 'round',
+                lineJoin: 'round'
+              }}
+            />
+          </>
+        )}
 
         {position && (
           <PositionMarker position={position} user={user}>

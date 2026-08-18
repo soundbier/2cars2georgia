@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X, Image } from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
@@ -11,10 +11,12 @@ import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { distanceUnitLabel, toDisplayDistance } from '../lib/units';
 import { formatDuration, totalDistanceKm, trackDurationMs } from '../lib/tripStats';
+import { groupByDay, mostRecentDay } from '../lib/dayRecap';
 import { activeOnly } from '../lib/trash';
 import { useI18n, useT } from '../i18n';
 import { LogEvent, GpsPoint, LogType, QuickLogConfig } from '../types';
-import { PageHeader, EmptyState, IconButton, Input, Select, ConfirmDialog, useToast } from '../components/ui';
+import { PageHeader, EmptyState, IconButton, Input, Select, ConfirmDialog, Button, useToast } from '../components/ui';
+import { DayRecapDialog } from '../components/DayRecapDialog';
 import './Stats.css';
 
 type EventChanges = Pick<LogEvent, 'title' | 'type'>;
@@ -120,7 +122,7 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
 }
 
 export default function Stats() {
-  const { tripId } = useRoadtrip();
+  const { tripId, tripName } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
@@ -132,6 +134,7 @@ export default function Stats() {
   );
   const { notify } = useToast();
   const t = useT();
+  const [recapOpen, setRecapOpen] = useState(false);
 
   // Einträge im Papierkorb bleiben in Firestore, verschwinden aber aus dem
   // Logbuch – wiederherstellbar über Einstellungen → Papierkorb.
@@ -144,6 +147,12 @@ export default function Stats() {
     }),
     [track, preferences.unitSystem]
   );
+
+  // Nach Kalendertag gruppiert für die teilbare Tagesübersicht (siehe
+  // components/DayRecapDialog) – unabhängig von der Papierkorb-Filterung
+  // oben, damit ein gelöschtes Ereignis auch dort nicht mehr auftaucht.
+  const days = useMemo(() => groupByDay(track, events), [track, events]);
+  const defaultDay = useMemo(() => mostRecentDay(days), [days]);
 
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
     if (!tripId) return false;
@@ -182,6 +191,12 @@ export default function Stats() {
         </div>
       </div>
 
+      {days.length > 0 && (
+        <Button variant="secondary" fullWidth onClick={() => setRecapOpen(true)} className="logbook-recap-button">
+          <Image size={18} /> {t('dayRecap.openButton')}
+        </Button>
+      )}
+
       <h2 className="section-title section-title-spaced">
         {t('logbook.events', { count: events.length })}
       </h2>
@@ -214,6 +229,14 @@ export default function Stats() {
         destructive
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
+      />
+
+      <DayRecapDialog
+        open={recapOpen}
+        onClose={() => setRecapOpen(false)}
+        tripName={tripName ?? t('export.defaultTripName')}
+        days={days}
+        initialDayKey={defaultDay?.key ?? null}
       />
     </div>
   );

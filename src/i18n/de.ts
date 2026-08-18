@@ -142,6 +142,11 @@ export const de = {
   'logbook.editEvent': 'Ereignis bearbeiten',
   'logbook.deleteEvent': 'Ereignis löschen',
 
+  'dayRecap.openButton': 'Tagesbild erstellen',
+  'dayRecap.title': 'Tagesübersicht',
+  'dayRecap.exportButton': 'Teilen',
+  'dayRecap.noTrackHint': 'Für diesen Tag liegt noch keine Route vor – das Bild zeigt nur die Kennzahlen.',
+
   // --- Reisekasse -------------------------------------------------------
   'costs.title': 'Reisekasse',
   'costs.subtitle': 'Ausgaben der Crew erfassen und im Blick behalten',

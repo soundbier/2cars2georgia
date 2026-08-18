@@ -137,6 +137,11 @@ export const en: Translations = {
   'logbook.editEvent': 'Edit entry',
   'logbook.deleteEvent': 'Delete entry',
 
+  'dayRecap.openButton': 'Create day recap image',
+  'dayRecap.title': 'Day recap',
+  'dayRecap.exportButton': 'Share',
+  'dayRecap.noTrackHint': 'No route recorded for this day yet – the image will only show the stats.',
+
   // --- Trip kitty -------------------------------------------------------
   'costs.title': 'Trip kitty',
   'costs.subtitle': 'Record and keep track of the crew’s spending',
