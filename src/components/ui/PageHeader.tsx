@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
+import { useT } from '../../i18n';
 import './PageHeader.css';
 
 interface PageHeaderProps {
@@ -10,13 +11,15 @@ interface PageHeaderProps {
   backLabel?: string;
 }
 
-export function PageHeader({ title, subtitle, backTo, backLabel = 'Zurück' }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, backTo, backLabel }: PageHeaderProps) {
+  const t = useT();
+
   return (
     <div className="page-header">
       {backTo && (
         <Link to={backTo} className="page-header-back">
           <ChevronLeft size={16} />
-          <span>{backLabel}</span>
+          <span>{backLabel ?? t('common.back')}</span>
         </Link>
       )}
       <h1 className="page-title">{title}</h1>

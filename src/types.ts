@@ -1,3 +1,5 @@
+import type { TranslationKey } from './i18n/translate';
+
 // Kategorie-Id eines Log-Ereignisses. Entspricht der id einer QuickLogConfig
 // oder einem der ursprünglichen, fest codierten Werte aus bereits
 // bestehenden Firestore-Dokumenten ("gps", "tanken", "pegel" …).
@@ -21,13 +23,28 @@ export interface QuickLogConfig {
   iconName: QuickLogIconName;
 }
 
-// Fallback, solange settings/quicklogs in Firestore noch nicht existiert.
-export const DEFAULT_QUICK_LOGS: QuickLogConfig[] = [
-  { id: 'schleuse', label: 'Schleuse', iconName: 'anchor' },
-  { id: 'pause', label: 'Pause', iconName: 'coffee' },
-  { id: 'anlegen', label: 'Anlegen', iconName: 'home' },
-  { id: 'grenze', label: 'Grenze', iconName: 'map-pin' },
-  { id: 'panne', label: 'Panne', iconName: 'alert-triangle' }
+/**
+ * Vorlage für settings/quicklogs, solange das Dokument in Firestore noch nicht
+ * existiert.
+ *
+ * Statt fertiger Beschriftungen steht hier ein Übersetzungsschlüssel: Legt
+ * jemand mit englischer Oberfläche einen Roadtrip an, sollen die ersten
+ * Schnell-Logs nicht auf Deutsch erscheinen. Ab dem Anlegen sind es dann
+ * normale, von der Crew änderbare Daten – ein späterer Sprachwechsel benennt
+ * bestehende Kategorien bewusst nicht um.
+ */
+export interface QuickLogSeed {
+  id: string;
+  labelKey: TranslationKey;
+  iconName: QuickLogIconName;
+}
+
+export const DEFAULT_QUICK_LOG_SEEDS: QuickLogSeed[] = [
+  { id: 'schleuse', labelKey: 'quickLogs.default.schleuse', iconName: 'anchor' },
+  { id: 'pause', labelKey: 'quickLogs.default.pause', iconName: 'coffee' },
+  { id: 'anlegen', labelKey: 'quickLogs.default.anlegen', iconName: 'home' },
+  { id: 'grenze', labelKey: 'quickLogs.default.grenze', iconName: 'map-pin' },
+  { id: 'panne', labelKey: 'quickLogs.default.panne', iconName: 'alert-triangle' }
 ];
 
 // Fallback, solange settings/general in Firestore noch nicht existiert.

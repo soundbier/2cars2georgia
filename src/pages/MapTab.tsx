@@ -17,6 +17,7 @@ import { formatSpeed } from '../lib/units';
 import { getBaseLayer, OVERLAYS, OVERLAY_IDS } from '../lib/mapLayers';
 import { readMapView, saveMapView } from '../lib/mapView';
 import { activeOnly } from '../lib/trash';
+import { useI18n, useT } from '../i18n';
 import { GpsPoint, LivePosition, LogEvent, LogType, QuickLogConfig } from '../types';
 import { Button, Input, Select, useToast, ConfirmDialog } from '../components/ui';
 import 'leaflet/dist/leaflet.css';
@@ -217,6 +218,8 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
   const [lat, setLat] = useState(String(event.lat));
   const [lng, setLng] = useState(String(event.lng));
   const { notify } = useToast();
+  const { locale } = useI18n();
+  const t = useT();
 
   const startEditing = () => {
     setTitle(event.title);
@@ -230,7 +233,7 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
     const latNum = parseFloat(lat.replace(',', '.'));
     const lngNum = parseFloat(lng.replace(',', '.'));
     if (isNaN(latNum) || isNaN(lngNum)) {
-      notify('Ungültige Koordinaten.', 'danger');
+      notify(t('map.invalidCoordinates'), 'danger');
       return;
     }
     const saved = await onSave(event.id!, {
@@ -248,13 +251,13 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
         <strong>{event.title}</strong>
         <div className="helper-text">
           {event.author} ·{' '}
-          {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {new Date(event.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
         </div>
         <div className="helper-text">
           {event.lat.toFixed(4)}, {event.lng.toFixed(4)}
         </div>
         <Button variant="secondary" fullWidth onClick={startEditing}>
-          <Pencil size={14} /> Bearbeiten
+          <Pencil size={14} /> {t('map.editButton')}
         </Button>
       </div>
     );
@@ -262,8 +265,8 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
 
   return (
     <div className="map-popup stack">
-      <span className="label">Ereignis bearbeiten</span>
-      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titel" />
+      <span className="label">{t('map.editEvent')}</span>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('logbook.titlePlaceholder')} />
       <Select value={type} onChange={(e) => setType(e.target.value as LogType)}>
         {quickLogs.map((q) => (
           <option key={q.id} value={q.id}>
@@ -274,15 +277,15 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
         {!quickLogs.some((q) => q.id === type) && <option value={type}>{type}</option>}
       </Select>
       <div className="row">
-        <Input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="Breitengrad" />
-        <Input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="Längengrad" />
+        <Input value={lat} onChange={(e) => setLat(e.target.value)} placeholder={t('map.latitude')} />
+        <Input value={lng} onChange={(e) => setLng(e.target.value)} placeholder={t('map.longitude')} />
       </div>
       <div className="row">
         <Button fullWidth onClick={handleSave}>
-          Speichern
+          {t('common.save')}
         </Button>
         <Button variant="destructive" fullWidth onClick={() => onRequestDelete(event.id!)}>
-          Löschen
+          {t('common.delete')}
         </Button>
       </div>
     </div>
@@ -298,6 +301,7 @@ export default function MapTab({ user }: { user: string }) {
   const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
+  const t = useT();
 
   // Was im Papierkorb liegt, gehört auch nicht mehr als Marker auf die Karte.
   const events = useMemo(() => activeOnly(allEvents), [allEvents]);
@@ -325,7 +329,7 @@ export default function MapTab({ user }: { user: string }) {
       return;
     }
     if (!position) {
-      notify('Noch keine GPS-Position verfügbar.', 'danger');
+      notify(t('map.noPosition'), 'danger');
       return;
     }
     // Das Zentrieren selbst übernimmt der FollowController, sobald „Folgen“
@@ -339,11 +343,11 @@ export default function MapTab({ user }: { user: string }) {
     if (!tripId) return false;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), changes));
-      notify('Ereignis aktualisiert', 'success');
+      notify(t('map.eventUpdated'), 'success');
       return true;
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
+      notify(t('common.saveError'), 'danger');
       return false;
     }
   };
@@ -352,10 +356,10 @@ export default function MapTab({ user }: { user: string }) {
     if (!tripId) return;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }));
-      notify('Ereignis wiederhergestellt', 'success');
+      notify(t('map.eventRestored'), 'success');
     } catch (err) {
       console.error(err);
-      notify('Wiederherstellen fehlgeschlagen.', 'danger');
+      notify(t('common.restoreFailed'), 'danger');
     }
   };
 
@@ -365,13 +369,13 @@ export default function MapTab({ user }: { user: string }) {
     setDeleteTargetId(null);
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }));
-      notify('Ereignis in den Papierkorb verschoben', 'success', {
-        label: 'Rückgängig',
+      notify(t('map.eventTrashed'), 'success', {
+        label: t('common.undo'),
         onAct: () => void restoreEvent(id)
       });
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Löschen.', 'danger');
+      notify(t('common.deleteError'), 'danger');
     }
   };
 
@@ -416,7 +420,7 @@ export default function MapTab({ user }: { user: string }) {
           <PositionMarker position={position} user={user}>
             <Popup>
               <div className="map-popup">
-                <strong>Aktuelle Position ({user})</strong>
+                <strong>{t('map.currentPosition', { name: user })}</strong>
                 <div className="helper-text">
                   {formatSpeed(position.speedKmh, preferences.unitSystem)}
                   {position.headingDeg !== null && ` · ${position.headingDeg}°`}
@@ -447,8 +451,8 @@ export default function MapTab({ user }: { user: string }) {
             type="button"
             className="map-control map-control-compass"
             onClick={resetNorth}
-            aria-label="Karte nach Norden ausrichten"
-            title="Karte nach Norden ausrichten"
+            aria-label={t('map.orientNorth')}
+            title={t('map.orientNorth')}
           >
             <CompassNeedle bearing={bearing} />
           </button>
@@ -458,8 +462,8 @@ export default function MapTab({ user }: { user: string }) {
           className={`map-control ${follow ? 'map-control-active' : ''}`}
           onClick={centerOnUser}
           aria-pressed={follow}
-          aria-label={follow ? 'Position nicht mehr folgen' : 'Auf eigene Position zentrieren'}
-          title={follow ? 'Position nicht mehr folgen' : 'Auf eigene Position zentrieren'}
+          aria-label={follow ? t('map.unfollow') : t('map.centerOnPosition')}
+          title={follow ? t('map.unfollow') : t('map.centerOnPosition')}
         >
           <LocateFixed size={20} />
         </button>
@@ -467,9 +471,9 @@ export default function MapTab({ user }: { user: string }) {
 
       <ConfirmDialog
         open={deleteTargetId !== null}
-        title="Ereignis löschen"
-        description="Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen."
-        confirmLabel="Löschen"
+        title={t('map.deleteEventTitle')}
+        description={t('map.deleteEventDescription')}
+        confirmLabel={t('common.delete')}
         destructive
         onConfirm={handleDeleteEvent}
         onCancel={() => setDeleteTargetId(null)}

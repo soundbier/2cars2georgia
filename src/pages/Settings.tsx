@@ -20,7 +20,8 @@ import { leaveRoadtrip } from '../lib/roadtrip';
 import { useQuickLogs } from '../hooks/useSettings';
 import { getUserColor } from '../lib/userColors';
 import { UnitSystem } from '../lib/units';
-import { BASE_LAYERS, BASE_LAYER_IDS, OVERLAYS, OVERLAY_IDS, BaseLayerId } from '../lib/mapLayers';
+import { useI18n, useT, LANGUAGES, Language, TranslationKey } from '../i18n';
+import { BASE_LAYER_IDS, OVERLAY_IDS, BaseLayerId } from '../lib/mapLayers';
 import {
   Button,
   Section,
@@ -38,16 +39,17 @@ interface Props {
   onLogout: () => void;
 }
 
+// Einheitenkürzel sind international dieselben und bleiben deshalb hier.
 const UNIT_OPTIONS: { value: UnitSystem; label: string }[] = [
   { value: 'metric', label: 'km/h' },
   { value: 'nautical', label: 'kn' }
 ];
 
-const TRACK_INTERVALS = [
-  { value: 10_000, label: 'Alle 10 Sekunden' },
-  { value: 30_000, label: 'Alle 30 Sekunden' },
-  { value: 60_000, label: 'Jede Minute' },
-  { value: 300_000, label: 'Alle 5 Minuten' }
+const TRACK_INTERVALS: { value: number; labelKey: TranslationKey }[] = [
+  { value: 10_000, labelKey: 'settings.interval10s' },
+  { value: 30_000, labelKey: 'settings.interval30s' },
+  { value: 60_000, labelKey: 'settings.interval60s' },
+  { value: 300_000, labelKey: 'settings.interval300s' }
 ];
 
 function SettingRow({
@@ -98,6 +100,8 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
   const quickLogs = useQuickLogs();
   const { preferences, setPreference } = usePreferences();
   const { tripName } = useRoadtrip();
+  const { language, setLanguage } = useI18n();
+  const t = useT();
 
   const handleLeaveRoadtrip = async () => {
     // Profil zuerst abmelden, damit das Gerät nicht mit dem Nutzernamen
@@ -112,76 +116,97 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
 
   return (
     <div className="settings-page">
-      <PageHeader title="Einstellungen" subtitle="Gerät, Anzeige und Daten dieser Reise" />
+      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
-      <Section title="Dieser Roadtrip">
+      <Section title={t('settings.thisRoadtrip')}>
         <div className="setting-row">
           <span className="setting-link-icon">
             <Compass size={18} strokeWidth={1.75} />
           </span>
           <div className="setting-row-body">
             <div className="setting-row-label">{tripName ?? '…'}</div>
-            <div className="helper-text">Nur mit Roadtrip-Passwort erreichbar</div>
+            <div className="helper-text">{t('settings.roadtripProtected')}</div>
           </div>
         </div>
       </Section>
 
-      <Section title="Dieses Gerät">
+      <Section title={t('settings.thisDevice')}>
         <div className="setting-row">
           <span className="avatar" style={{ background: getUserColor(currentUser), color: '#ffffff' }}>
             {currentUser.charAt(0).toUpperCase()}
           </span>
           <div className="setting-row-body">
             <div className="setting-row-label">{currentUser}</div>
-            <div className="helper-text">Angemeldetes Profil</div>
+            <div className="helper-text">{t('settings.signedInProfile')}</div>
           </div>
           <div className="setting-row-control">
             <Badge tone={isOnline ? 'success' : 'danger'} dot>
-              {isOnline ? 'Live-Sync' : 'Offline'}
+              {isOnline ? t('settings.liveSync') : t('settings.offline')}
             </Badge>
           </div>
         </div>
 
         <p className="helper-text setting-note">
           {isOnline
-            ? 'Änderungen werden sofort mit der Crew synchronisiert.'
-            : 'Änderungen werden lokal gespeichert und synchronisiert, sobald wieder Empfang besteht.'}
+            ? t('settings.onlineNote')
+            : t('settings.offlineNote')}
           {isOnline ? <Wifi size={13} className="setting-note-icon" /> : <WifiOff size={13} className="setting-note-icon" />}
         </p>
       </Section>
 
-      <Section title="Anzeige">
-        <SettingRow label="Einheiten" description="Geschwindigkeit und Strecke in der ganzen App">
+      <Section title={t('settings.display')}>
+        <SettingRow label={t('settings.units')} description={t('settings.unitsDescription')}>
           <SegmentedControl
-            label="Einheiten"
+            label={t('settings.units')}
             value={preferences.unitSystem}
             options={UNIT_OPTIONS}
             onChange={(value) => setPreference('unitSystem', value)}
           />
         </SettingRow>
 
-      </Section>
-
-      <Section title="Karte">
-        <SettingRow label="Grundkarte" description={BASE_LAYERS[preferences.baseLayer].description}>
+        <SettingRow label={t('settings.language')} description={t('settings.languageDescription')}>
           <Select
             className="setting-select"
-            aria-label="Grundkarte"
+            aria-label={t('settings.language')}
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as Language)}
+          >
+            {LANGUAGES.map((id) => (
+              <option key={id} value={id}>
+                {t(`language.${id}` as TranslationKey)}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+      </Section>
+
+      <Section title={t('settings.map')}>
+        <SettingRow
+          label={t('settings.baseLayer')}
+          description={t(`layer.${preferences.baseLayer}.description` as TranslationKey)}
+        >
+          <Select
+            className="setting-select"
+            aria-label={t('settings.baseLayer')}
             value={preferences.baseLayer}
             onChange={(e) => setPreference('baseLayer', e.target.value as BaseLayerId)}
           >
             {BASE_LAYER_IDS.map((id) => (
               <option key={id} value={id}>
-                {BASE_LAYERS[id].label}
+                {t(`layer.${id}` as TranslationKey)}
               </option>
             ))}
           </Select>
         </SettingRow>
 
         {OVERLAY_IDS.map((id) => (
-          <SettingRow key={id} label={OVERLAYS[id].label} description={OVERLAYS[id].description}>
+          <SettingRow
+            key={id}
+            label={t(`layer.${id}` as TranslationKey)}
+            description={t(`layer.${id}.description` as TranslationKey)}
+          >
             <Toggle
-              label={`${OVERLAYS[id].label} auf der Karte anzeigen`}
+              label={t('layer.showOnMap', { label: t(`layer.${id}` as TranslationKey) })}
               checked={preferences.overlays[id]}
               onChange={(value) =>
                 setPreference('overlays', { ...preferences.overlays, [id]: value })
@@ -191,85 +216,85 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
         ))}
 
         <p className="helper-text setting-note">
-          Ebenen liegen übereinander – die Grundkarte unten, jedes aktive Overlay darüber.
+          {t('settings.layerNote')}
         </p>
       </Section>
 
-      <Section title="Aufzeichnung">
+      <Section title={t('settings.recording')}>
         <SettingRow
-          label="Trackpunkte"
-          description="Seltener spart Akku und mobile Daten, häufiger zeichnet genauer auf."
+          label={t('settings.trackPoints')}
+          description={t('settings.trackPointsDescription')}
         >
           <Select
             className="setting-select"
-            aria-label="Abstand zwischen Trackpunkten"
+            aria-label={t('settings.trackPoints')}
             value={preferences.trackIntervalMs}
             onChange={(e) => setPreference('trackIntervalMs', Number(e.target.value))}
           >
             {TRACK_INTERVALS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </Select>
         </SettingRow>
       </Section>
 
-      <Section title="Verwaltung">
+      <Section title={t('settings.management')}>
         <div className="settings-list">
           <SettingLink
             to="/settings/crew"
             icon={<Users size={18} strokeWidth={1.75} />}
-            label="Crew"
-            value={`${users.length} ${users.length === 1 ? 'Mitglied' : 'Mitglieder'}`}
+            label={t('crew.title')}
+            value={t('settings.crewCount', { count: users.length })}
           />
           <SettingLink
             to="/settings/quicklogs"
             icon={<ListChecks size={18} strokeWidth={1.75} />}
-            label="Schnell-Logs"
-            value={`${quickLogs.length} ${quickLogs.length === 1 ? 'Kategorie' : 'Kategorien'}`}
+            label={t('quickLogs.title')}
+            value={t('settings.quickLogCount', { count: quickLogs.length })}
           />
         </div>
       </Section>
 
-      <Section title="Daten">
+      <Section title={t('settings.data')}>
         <div className="settings-list">
           <SettingLink
             to="/settings/export"
             icon={<Download size={18} strokeWidth={1.75} />}
-            label="Export"
-            value="Bericht als PDF, CSV und GPX"
+            label={t('settings.export')}
+            value={t('settings.exportValue')}
           />
           <SettingLink
             to="/settings/papierkorb"
             icon={<Trash2 size={18} strokeWidth={1.75} />}
-            label="Papierkorb"
-            value="Gelöschtes wiederherstellen"
+            label={t('settings.trash')}
+            value={t('settings.trashValue')}
           />
         </div>
       </Section>
 
-      <Section title="Rechtliches">
+      <Section title={t('settings.legal')}>
         <div className="settings-list">
           <SettingLink
             to="/datenschutz"
             icon={<ShieldCheck size={18} strokeWidth={1.75} />}
-            label="Datenschutz"
-            value="GPS, Namen und Kosten"
+            label={t('settings.privacy')}
+            value={t('settings.privacyValue')}
           />
         </div>
       </Section>
 
-      <Section title="App">
-        <SettingRow label="Version" description="2cars2georgia">
+      <Section title={t('settings.app')}>
+        <SettingRow label={t('settings.version')} description="2cars2georgia">
           <span className="mono-num helper-text">{__APP_VERSION__}</span>
         </SettingRow>
         <div className="stack">
           <Button variant="secondary" fullWidth onClick={onLogout}>
-            <LogOut size={18} /> Profil abmelden
+            <LogOut size={18} /> {t('settings.logout')}
           </Button>
           <Button variant="destructive" fullWidth onClick={handleLeaveRoadtrip}>
-            <DoorOpen size={18} /> Roadtrip verlassen
+            <DoorOpen size={18} /> {t('settings.leaveRoadtrip')}
           </Button>
         </div>
       </Section>

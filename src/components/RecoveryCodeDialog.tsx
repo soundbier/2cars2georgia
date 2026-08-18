@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy, Check, ShieldAlert } from 'lucide-react';
+import { useT } from '../i18n';
 import { Button } from './ui';
 import './RecoveryCodeDialog.css';
 
@@ -20,6 +21,7 @@ interface RecoveryCodeDialogProps {
 export function RecoveryCodeDialog({ tripName, code, onAcknowledge }: RecoveryCodeDialogProps) {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const t = useT();
 
   const handleCopy = async () => {
     try {
@@ -44,29 +46,25 @@ export function RecoveryCodeDialog({ tripName, code, onAcknowledge }: RecoveryCo
           <ShieldAlert size={22} />
         </div>
         <h2 id="recovery-dialog-title" className="dialog-title">
-          Wiederherstellungscode für „{tripName}“
+          {t('recovery.title', { tripName })}
         </h2>
-        <p className="dialog-description">
-          Falls die Crew das Roadtrip-Passwort vergisst, kommt ihr nur mit diesem Code zurück an
-          eure Daten. Er wird nirgends gespeichert und danach nie wieder angezeigt – jetzt sicher
-          notieren (z.B. Passwort-Manager oder Papier).
-        </p>
+        <p className="dialog-description">{t('recovery.description')}</p>
 
         <div className="recovery-code-box">
           <code className="recovery-code-value">{code}</code>
           <Button type="button" variant="secondary" onClick={handleCopy}>
             {copied ? <Check size={16} /> : <Copy size={16} />}
-            {copied ? 'Kopiert' : 'Kopieren'}
+            {copied ? t('recovery.copied') : t('recovery.copy')}
           </Button>
         </div>
 
         <label className="recovery-dialog-confirm">
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-          <span>Ich habe den Code sicher gespeichert.</span>
+          <span>{t('recovery.acknowledge')}</span>
         </label>
 
         <Button type="button" fullWidth disabled={!saved} onClick={onAcknowledge}>
-          Weiter
+          {t('common.continue')}
         </Button>
       </div>
     </div>,

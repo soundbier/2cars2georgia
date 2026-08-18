@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useT } from './i18n';
 import { ConfirmDialog, useToast } from './components/ui';
 
 /** Wie oft aktiv geprüft wird, ob am Repo etwas geändert und neu deployt wurde. */
@@ -17,6 +18,7 @@ const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
  */
 export function UpdatePrompt() {
   const { notify } = useToast();
+  const t = useT();
 
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -40,17 +42,17 @@ export function UpdatePrompt() {
 
   useEffect(() => {
     if (!offlineReady) return;
-    notify('App ist bereit für die Offline-Nutzung.', 'success');
+    notify(t('update.offlineReady'), 'success');
     setOfflineReady(false);
-  }, [offlineReady, notify, setOfflineReady]);
+  }, [offlineReady, notify, setOfflineReady, t]);
 
   return (
     <ConfirmDialog
       open={needRefresh}
-      title="Update verfügbar"
-      description="Es gibt eine neue Version von 2cars2georgia. Ein kurzer Neustart lädt sie – bereits erfasste Daten bleiben erhalten."
-      confirmLabel="Jetzt aktualisieren"
-      cancelLabel="Später"
+      title={t('update.title')}
+      description={t('update.description')}
+      confirmLabel={t('update.confirm')}
+      cancelLabel={t('update.later')}
       onConfirm={() => updateServiceWorker(true)}
       onCancel={() => setNeedRefresh(false)}
     />

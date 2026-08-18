@@ -5,6 +5,7 @@ import { db } from '../../firebase';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { trackWrite } from '../../lib/pendingWrites';
 import { getUserColor } from '../../lib/userColors';
+import { useT } from '../../i18n';
 import { IconButton, Input, Section, ListItem, PageHeader, ConfirmDialog, useToast } from '../../components/ui';
 import '../Settings.css';
 
@@ -18,6 +19,7 @@ export default function CrewSettings({ currentUser, users }: Props) {
   const [newUser, setNewUser] = useState('');
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const { notify } = useToast();
+  const t = useT();
 
   const saveCrew = (change: FieldValue) => {
     if (!tripId) return Promise.resolve();
@@ -29,7 +31,7 @@ export default function CrewSettings({ currentUser, users }: Props) {
     const name = newUser.trim();
     if (!name) return;
     if (users.some((u) => u.toLowerCase() === name.toLowerCase())) {
-      notify(`${name} ist bereits an Bord.`, 'danger');
+      notify(t('crew.alreadyAboard', { name }), 'danger');
       return;
     }
     try {
@@ -37,13 +39,13 @@ export default function CrewSettings({ currentUser, users }: Props) {
       setNewUser('');
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
+      notify(t('common.saveError'), 'danger');
     }
   };
 
   const handleRemoveClick = (name: string) => {
     if (name === currentUser) {
-      notify('Du kannst dich nicht selbst löschen.', 'danger');
+      notify(t('crew.cannotRemoveSelf'), 'danger');
       return;
     }
     setPendingRemoval(name);
@@ -53,10 +55,10 @@ export default function CrewSettings({ currentUser, users }: Props) {
     if (!pendingRemoval) return;
     try {
       await saveCrew(arrayRemove(pendingRemoval));
-      notify(`${pendingRemoval} entfernt`, 'success');
+      notify(t('crew.removed', { name: pendingRemoval }), 'success');
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Löschen.', 'danger');
+      notify(t('common.deleteError'), 'danger');
     }
     setPendingRemoval(null);
   };
@@ -64,16 +66,20 @@ export default function CrewSettings({ currentUser, users }: Props) {
   return (
     <div className="settings-page">
       <PageHeader
-        title="Crew"
-        subtitle="Wer an Bord ist und Logs erfassen kann"
+        title={t('crew.title')}
+        subtitle={t('crew.subtitle')}
         backTo="/settings"
-        backLabel="Einstellungen"
+        backLabel={t('settings.title')}
       />
 
-      <Section title={`Besatzung (${users.length})`}>
+      <Section title={t('crew.section', { count: users.length })}>
         <form onSubmit={handleAddUser} className="row settings-add-form">
-          <Input placeholder="Neuer Name" value={newUser} onChange={(e) => setNewUser(e.target.value)} />
-          <IconButton type="submit" label="Crewmitglied hinzufügen" tone="accent" disabled={!newUser.trim()}>
+          <Input
+            placeholder={t('crew.newNamePlaceholder')}
+            value={newUser}
+            onChange={(e) => setNewUser(e.target.value)}
+          />
+          <IconButton type="submit" label={t('crew.addMember')} tone="accent" disabled={!newUser.trim()}>
             <UserPlus size={20} />
           </IconButton>
         </form>
@@ -87,10 +93,16 @@ export default function CrewSettings({ currentUser, users }: Props) {
                   {name.charAt(0).toUpperCase()}
                 </span>
               }
-              title={name === currentUser ? <span className="settings-list-self">{name} (Du)</span> : name}
+              title={
+                name === currentUser ? (
+                  <span className="settings-list-self">{t('crew.self', { name })}</span>
+                ) : (
+                  name
+                )
+              }
               trailing={
                 <IconButton
-                  label={`${name} entfernen`}
+                  label={t('crew.removeMember', { name })}
                   tone="danger"
                   onClick={() => handleRemoveClick(name)}
                   disabled={name === currentUser}
@@ -105,9 +117,9 @@ export default function CrewSettings({ currentUser, users }: Props) {
 
       <ConfirmDialog
         open={pendingRemoval !== null}
-        title="Crewmitglied entfernen"
-        description={`${pendingRemoval} wird aus der Crew-Liste gelöscht. Bereits erfasste Logs und Ausgaben bleiben erhalten.`}
-        confirmLabel="Entfernen"
+        title={t('crew.removeTitle')}
+        description={t('crew.removeDescription', { name: pendingRemoval ?? '' })}
+        confirmLabel={t('common.remove')}
         destructive
         onConfirm={confirmRemoveUser}
         onCancel={() => setPendingRemoval(null)}

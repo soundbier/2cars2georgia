@@ -11,6 +11,7 @@ import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { distanceUnitLabel, toDisplayDistance } from '../lib/units';
 import { formatDuration, totalDistanceKm, trackDurationMs } from '../lib/tripStats';
 import { activeOnly } from '../lib/trash';
+import { useI18n, useT } from '../i18n';
 import { LogEvent, GpsPoint, LogType, QuickLogConfig } from '../types';
 import { PageHeader, EmptyState, IconButton, Input, Select, ConfirmDialog, useToast } from '../components/ui';
 import './Stats.css';
@@ -29,6 +30,8 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
   const [title, setTitle] = useState(event.title);
   const [type, setType] = useState<LogType>(event.type);
   const { notify } = useToast();
+  const { locale } = useI18n();
+  const t = useT();
   const timestamp = new Date(event.timestamp);
   const Icon = getQuickLogIcon(quickLogs.find((q) => q.id === event.type)?.iconName);
 
@@ -41,7 +44,7 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
   const handleSave = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      notify('Titel darf nicht leer sein.', 'danger');
+      notify(t('logbook.titleRequired'), 'danger');
       return;
     }
     const saved = await onSave(event.id!, { title: trimmedTitle, type });
@@ -54,10 +57,10 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
         <span className="logbook-entry-time-row">
           <Icon size={14} strokeWidth={1.75} color="var(--color-accent)" />
           <span className="mono-num">
-            {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {timestamp.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
           </span>
         </span>
-        <span className="helper-text">{timestamp.toLocaleDateString()}</span>
+        <span className="helper-text">{timestamp.toLocaleDateString(locale)}</span>
       </div>
 
       <div className="logbook-entry-body">
@@ -67,7 +70,7 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Titel"
+              placeholder={t('logbook.titlePlaceholder')}
             />
             <Select value={type} onChange={(e) => setType(e.target.value)}>
               {quickLogs.map((q) => (
@@ -93,19 +96,19 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
       <div className="logbook-entry-actions">
         {isEditing ? (
           <>
-            <IconButton label="Speichern" tone="accent" onClick={handleSave} disabled={!title.trim()}>
+            <IconButton label={t('common.save')} tone="accent" onClick={handleSave} disabled={!title.trim()}>
               <Check size={16} />
             </IconButton>
-            <IconButton label="Abbrechen" onClick={() => setIsEditing(false)}>
+            <IconButton label={t('common.cancel')} onClick={() => setIsEditing(false)}>
               <X size={16} />
             </IconButton>
           </>
         ) : (
           <>
-            <IconButton label="Ereignis bearbeiten" onClick={startEditing}>
+            <IconButton label={t('logbook.editEvent')} onClick={startEditing}>
               <Pencil size={16} />
             </IconButton>
-            <IconButton label="Ereignis löschen" tone="danger" onClick={() => onRequestDelete(event.id!)}>
+            <IconButton label={t('logbook.deleteEvent')} tone="danger" onClick={() => onRequestDelete(event.id!)}>
               <Trash2 size={16} />
             </IconButton>
           </>
@@ -123,6 +126,7 @@ export default function Stats() {
   const { preferences } = usePreferences();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
+  const t = useT();
 
   // Einträge im Papierkorb bleiben in Firestore, verschwinden aber aus dem
   // Logbuch – wiederherstellbar über Einstellungen → Papierkorb.
@@ -140,11 +144,11 @@ export default function Stats() {
     if (!tripId) return false;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), changes));
-      notify('Ereignis aktualisiert', 'success');
+      notify(t('logbook.eventUpdated'), 'success');
       return true;
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
+      notify(t('common.saveError'), 'danger');
       return false;
     }
   };
@@ -153,10 +157,10 @@ export default function Stats() {
     if (!tripId) return;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }));
-      notify('Ereignis wiederhergestellt', 'success');
+      notify(t('logbook.eventRestored'), 'success');
     } catch (err) {
       console.error(err);
-      notify('Wiederherstellen fehlgeschlagen.', 'danger');
+      notify(t('common.restoreFailed'), 'danger');
     }
   };
 
@@ -166,19 +170,19 @@ export default function Stats() {
     setDeleteTargetId(null);
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }));
-      notify('Ereignis in den Papierkorb verschoben', 'success', {
-        label: 'Rückgängig',
+      notify(t('logbook.eventTrashed'), 'success', {
+        label: t('common.undo'),
         onAct: () => void restoreEvent(id)
       });
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Löschen.', 'danger');
+      notify(t('common.deleteError'), 'danger');
     }
   };
 
   return (
     <div>
-      <PageHeader title="Logbuch" subtitle="Strecke, Dauer und Ereignisse der Reise" />
+      <PageHeader title={t('logbook.title')} subtitle={t('logbook.subtitle')} />
 
       <div className="logbook-summary">
         <div className="logbook-summary-item">
@@ -187,7 +191,7 @@ export default function Stats() {
             <div className="mono-num logbook-summary-value">
               {distance} {distanceUnitLabel(preferences.unitSystem)}
             </div>
-            <div className="label">Strecke</div>
+            <div className="label">{t('logbook.distance')}</div>
           </div>
         </div>
         <div className="logbook-summary-divider" />
@@ -195,18 +199,20 @@ export default function Stats() {
           <Clock size={16} strokeWidth={1.75} />
           <div>
             <div className="mono-num logbook-summary-value">{duration}</div>
-            <div className="label">Dauer</div>
+            <div className="label">{t('logbook.duration')}</div>
           </div>
         </div>
       </div>
 
-      <h2 className="section-title section-title-spaced">Ereignisse ({events.length})</h2>
+      <h2 className="section-title section-title-spaced">
+        {t('logbook.events', { count: events.length })}
+      </h2>
 
       {events.length === 0 ? (
         <EmptyState
           icon={<BookOpen size={26} strokeWidth={1.5} />}
-          title="Noch keine Einträge"
-          hint="Ereignisse über die Schnell-Logs im Cockpit erfassen."
+          title={t('logbook.empty')}
+          hint={t('logbook.emptyHint')}
         />
       ) : (
         <div className="logbook-entries">
@@ -224,9 +230,9 @@ export default function Stats() {
 
       <ConfirmDialog
         open={deleteTargetId !== null}
-        title="Ereignis löschen"
-        description="Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen."
-        confirmLabel="Löschen"
+        title={t('logbook.deleteTitle')}
+        description={t('logbook.deleteDescription')}
+        confirmLabel={t('common.delete')}
         destructive
         onConfirm={handleDeleteEvent}
         onCancel={() => setDeleteTargetId(null)}

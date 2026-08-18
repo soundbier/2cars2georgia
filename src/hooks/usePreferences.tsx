@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { UnitSystem } from '../lib/units';
+import { detectLanguage, Language, LANGUAGES } from '../i18n/translate';
 import { BaseLayerId, OverlayId, BASE_LAYERS, OVERLAYS } from '../lib/mapLayers';
 
 const STORAGE_KEY = 'boat_preferences';
@@ -13,13 +14,18 @@ export interface Preferences {
   overlays: Record<OverlayId, boolean>;
   /** Mindestabstand zwischen zwei gespeicherten Trackpunkten. */
   trackIntervalMs: number;
+  /** Sprache der Oberfläche auf diesem Gerät. */
+  language: Language;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   unitSystem: 'metric',
   baseLayer: 'osm',
   overlays: { seamarks: true, cycling: false, hiking: false },
-  trackIntervalMs: 30_000
+  trackIntervalMs: 30_000,
+  // Erst beim ersten Start ausgewertet: Danach steht die einmal gespeicherte
+  // Wahl im localStorage und überschreibt die Geräteeinstellung nicht mehr.
+  language: detectLanguage()
 };
 
 /** Stand vor der Ebenenauswahl: ein einzelner Schalter für die Seezeichen. */
@@ -37,6 +43,7 @@ function readStored(): Preferences {
     // älterer gespeicherter Stand die App nicht in einen kaputten Zustand bringt.
     const merged: Preferences = { ...DEFAULT_PREFERENCES, ...stored };
     if (!(merged.baseLayer in BASE_LAYERS)) merged.baseLayer = DEFAULT_PREFERENCES.baseLayer;
+    if (!LANGUAGES.includes(merged.language)) merged.language = DEFAULT_PREFERENCES.language;
 
     // Overlays einzeln zusammenführen: Neue Ebenen einer App-Version starten
     // auf ihrem Default, ohne die Auswahl des Nutzers zu überschreiben.

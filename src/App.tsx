@@ -10,6 +10,7 @@ import {
   LucideIcon
 } from 'lucide-react';
 import { ToastProvider } from './components/ui';
+import { I18nProvider, useT, TranslationKey } from './i18n';
 import { TrackingProvider } from './hooks/useTracking';
 import { PreferencesProvider } from './hooks/usePreferences';
 import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
@@ -32,12 +33,12 @@ import Privacy from './pages/Privacy';
 
 const STORAGE_KEY_USER = 'boat_user';
 
-const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: '/', label: 'Cockpit', icon: Gauge },
-  { to: '/map', label: 'Karte', icon: MapIcon },
-  { to: '/stats', label: 'Logbuch', icon: BookOpen },
-  { to: '/costs', label: 'Kasse', icon: Wallet },
-  { to: '/settings', label: 'Mehr', icon: SettingsIcon }
+const NAV_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = [
+  { to: '/', labelKey: 'nav.cockpit', icon: Gauge },
+  { to: '/map', labelKey: 'nav.map', icon: MapIcon },
+  { to: '/stats', labelKey: 'nav.logbook', icon: BookOpen },
+  { to: '/costs', labelKey: 'nav.costs', icon: Wallet },
+  { to: '/settings', labelKey: 'nav.more', icon: SettingsIcon }
 ];
 
 /**
@@ -50,6 +51,7 @@ function CrewGate() {
   const { tripId } = useRoadtrip();
   const [user, setUser] = useState<string>(() => localStorage.getItem(STORAGE_KEY_USER) ?? '');
   const { users, loading } = useCrew();
+  const t = useT();
 
   // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) dem Roadtrip und
   // Crewmitglied zu, ohne echte personenbezogene Daten zu senden – tripId
@@ -76,7 +78,7 @@ function CrewGate() {
     return (
       <div className="boot-screen">
         <Compass size={28} className="boot-screen-icon" />
-        <p className="helper-text">Verbinde mit Server …</p>
+        <p className="helper-text">{t('common.connecting')}</p>
       </div>
     );
   }
@@ -86,8 +88,8 @@ function CrewGate() {
       <div className="login-screen">
         <div className="login-screen-head">
           <Compass size={26} />
-          <h1 className="page-title">Wer ist an Bord?</h1>
-          <p className="helper-text">Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.</p>
+          <h1 className="page-title">{t('crewGate.title')}</h1>
+          <p className="helper-text">{t('crewGate.hint')}</p>
         </div>
         <div className="login-screen-list">
           {users.map((name) => (
@@ -102,47 +104,45 @@ function CrewGate() {
   }
 
   return (
-    <PreferencesProvider>
-      {/* Ein Wechsel des Nutzers setzt Tracking-Status und Watcher zurück. */}
-      <TrackingProvider key={user} user={user}>
-        <BrowserRouter>
-          <div className="content">
-            <Routes>
-              <Route path="/" element={<Dashboard user={user} />} />
-              <Route path="/map" element={<MapTab user={user} />} />
-              <Route path="/stats" element={<Stats />} />
-              <Route path="/costs" element={<Costs user={user} users={users} />} />
-              <Route
-                path="/settings"
-                element={<Settings currentUser={user} users={users} onLogout={logout} />}
-              />
-              <Route
-                path="/settings/crew"
-                element={<CrewSettings currentUser={user} users={users} />}
-              />
-              <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
-              <Route path="/settings/export" element={<ExportSettings users={users} />} />
-              <Route path="/settings/papierkorb" element={<TrashSettings />} />
-              <Route path="/datenschutz" element={<Privacy />} />
-            </Routes>
-          </div>
-          <nav className="bottom-nav">
-            {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              >
-                <Icon size={20} strokeWidth={2} />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </nav>
-          <SyncStatusBanner />
-        </BrowserRouter>
-      </TrackingProvider>
-    </PreferencesProvider>
+    // Ein Wechsel des Nutzers setzt Tracking-Status und Watcher zurück.
+    <TrackingProvider key={user} user={user}>
+      <BrowserRouter>
+        <div className="content">
+          <Routes>
+            <Route path="/" element={<Dashboard user={user} />} />
+            <Route path="/map" element={<MapTab user={user} />} />
+            <Route path="/stats" element={<Stats />} />
+            <Route path="/costs" element={<Costs user={user} users={users} />} />
+            <Route
+              path="/settings"
+              element={<Settings currentUser={user} users={users} onLogout={logout} />}
+            />
+            <Route
+              path="/settings/crew"
+              element={<CrewSettings currentUser={user} users={users} />}
+            />
+            <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
+            <Route path="/settings/export" element={<ExportSettings users={users} />} />
+            <Route path="/settings/papierkorb" element={<TrashSettings />} />
+            <Route path="/datenschutz" element={<Privacy />} />
+          </Routes>
+        </div>
+        <nav className="bottom-nav">
+          {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <Icon size={20} strokeWidth={2} />
+              <span>{t(labelKey)}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <SyncStatusBanner />
+      </BrowserRouter>
+    </TrackingProvider>
   );
 }
 
@@ -153,12 +153,13 @@ function RoadtripGateOrApp({
   onRoadtripCreated: (tripName: string, recoveryCode: string) => void;
 }) {
   const { loading, tripId } = useRoadtrip();
+  const t = useT();
 
   if (loading) {
     return (
       <div className="boot-screen">
         <Compass size={28} className="boot-screen-icon" />
-        <p className="helper-text">Verbinde mit Server …</p>
+        <p className="helper-text">{t('common.connecting')}</p>
       </div>
     );
   }
@@ -183,22 +184,29 @@ export default function App() {
   } | null>(null);
 
   return (
-    <ToastProvider>
-      {/* App-weit gemountet, unabhängig vom Anmeldestatus: Ein Deploy soll auch
-          erreichen, wer gerade erst das Roadtrip-Gate sieht. */}
-      <UpdatePrompt />
-      <RoadtripProvider>
-        <RoadtripGateOrApp
-          onRoadtripCreated={(tripName, code) => setPendingRecoveryCode({ tripName, code })}
-        />
-      </RoadtripProvider>
-      {pendingRecoveryCode && (
-        <RecoveryCodeDialog
-          tripName={pendingRecoveryCode.tripName}
-          code={pendingRecoveryCode.code}
-          onAcknowledge={() => setPendingRecoveryCode(null)}
-        />
-      )}
-    </ToastProvider>
+    /* Sprache und Geräteeinstellungen liegen ganz außen: Auch das
+       Roadtrip-Gate und der Update-Screen erscheinen schon übersetzt, lange
+       bevor jemand angemeldet ist. */
+    <PreferencesProvider>
+      <I18nProvider>
+        <ToastProvider>
+          {/* App-weit gemountet, unabhängig vom Anmeldestatus: Ein Deploy soll auch
+              erreichen, wer gerade erst das Roadtrip-Gate sieht. */}
+          <UpdatePrompt />
+          <RoadtripProvider>
+            <RoadtripGateOrApp
+              onRoadtripCreated={(tripName, code) => setPendingRecoveryCode({ tripName, code })}
+            />
+          </RoadtripProvider>
+          {pendingRecoveryCode && (
+            <RecoveryCodeDialog
+              tripName={pendingRecoveryCode.tripName}
+              code={pendingRecoveryCode.code}
+              onAcknowledge={() => setPendingRecoveryCode(null)}
+            />
+          )}
+        </ToastProvider>
+      </I18nProvider>
+    </PreferencesProvider>
   );
 }

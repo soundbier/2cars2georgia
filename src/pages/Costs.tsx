@@ -19,10 +19,11 @@ import { trackWrite } from '../lib/pendingWrites';
 import { activeOnly } from '../lib/trash';
 import {
   computeSettlement,
-  formatEuro,
+  centsToEuro,
   SHARED_PAYER,
   Settlement as SettlementResult
 } from '../lib/settlement';
+import { useI18n, useT, TranslationKey } from '../i18n';
 import { Expense, ExpenseCategory } from '../types';
 import { Button, Input, Select, PageHeader, EmptyState, IconButton, ConfirmDialog, useToast } from '../components/ui';
 import './Costs.css';
@@ -34,12 +35,12 @@ interface Props {
 
 const FALLBACK_CATEGORY: ExpenseCategory = 'sonstiges';
 
-const CATEGORIES: { value: ExpenseCategory; label: string; icon: LucideIcon }[] = [
-  { value: 'verpflegung', label: 'Verpflegung', icon: UtensilsCrossed },
-  { value: 'tanken', label: 'Tanken', icon: Fuel },
-  { value: 'liegeplatz', label: 'Liegeplatz', icon: DoorClosed },
-  { value: 'schleuse', label: 'Schleuse', icon: Anchor },
-  { value: FALLBACK_CATEGORY, label: 'Sonstiges', icon: MoreHorizontal }
+const CATEGORIES: { value: ExpenseCategory; labelKey: TranslationKey; icon: LucideIcon }[] = [
+  { value: 'verpflegung', labelKey: 'costs.category.verpflegung', icon: UtensilsCrossed },
+  { value: 'tanken', labelKey: 'costs.category.tanken', icon: Fuel },
+  { value: 'liegeplatz', labelKey: 'costs.category.liegeplatz', icon: DoorClosed },
+  { value: 'schleuse', labelKey: 'costs.category.schleuse', icon: Anchor },
+  { value: FALLBACK_CATEGORY, labelKey: 'costs.category.sonstiges', icon: MoreHorizontal }
 ];
 
 const CATEGORY_BY_VALUE = new Map(CATEGORIES.map((c) => [c.value, c]));
@@ -51,6 +52,19 @@ const categoryMeta = (category: ExpenseCategory) =>
 function parseAmount(raw: string): number | null {
   const parsed = parseFloat(raw.replace(',', '.'));
   return isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Euro-Betrag im Format der Oberflächensprache: "12,50 €" auf Deutsch,
+ * "€12.50" auf Englisch. Trennzeichen und Position folgen damit dem, was in
+ * der jeweiligen Sprache erwartet wird, statt fest deutsch zu bleiben.
+ */
+function useFormatEuro() {
+  const { locale } = useI18n();
+  return useMemo(() => {
+    const formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' });
+    return (amount: number) => formatter.format(amount);
+  }, [locale]);
 }
 
 type ExpenseChanges = Pick<Expense, 'title' | 'amountEuro' | 'category' | 'paidBy'>;
@@ -70,6 +84,8 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
   const [category, setCategory] = useState<ExpenseCategory>(expense.category);
   const [paidBy, setPaidBy] = useState(expense.paidBy);
   const { notify } = useToast();
+  const t = useT();
+  const formatEuro = useFormatEuro();
 
   const startEditing = () => {
     setTitle(expense.title);
@@ -82,12 +98,12 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
   const handleSave = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      notify('Beschreibung darf nicht leer sein.', 'danger');
+      notify(t('costs.descriptionRequired'), 'danger');
       return;
     }
     const parsedAmount = parseAmount(amount);
     if (parsedAmount === null) {
-      notify('Ungültiger Betrag.', 'danger');
+      notify(t('costs.invalidAmount'), 'danger');
       return;
     }
     const saved = await onSave(expense.id!, {
@@ -107,7 +123,7 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
           className="costs-row-edit-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Beschreibung"
+          placeholder={t('costs.descriptionShort')}
         />
         <Input
           type="number"
@@ -115,20 +131,20 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
           step="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="Betrag in €"
+          placeholder={t('costs.amountPlaceholder')}
         />
         <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
-              {c.label}
+              {t(c.labelKey)}
             </option>
           ))}
         </Select>
         <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-          <option value={SHARED_PAYER}>{SHARED_PAYER}</option>
+          <option value={SHARED_PAYER}>{t('costs.sharedPayer')}</option>
           {users.map((name) => (
             <option key={name} value={name}>
-              {name === currentUser ? `Ich (${name})` : name}
+              {name === currentUser ? t('costs.self', { name }) : name}
             </option>
           ))}
           {/* Crewmitglied wurde inzwischen entfernt: Wert trotzdem anzeigen statt stillschweigend zu ersetzen */}
@@ -136,17 +152,17 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
         </Select>
         <div className="row costs-row-edit-actions">
           <Button fullWidth onClick={handleSave}>
-            Speichern
+            {t('common.save')}
           </Button>
           <Button variant="secondary" fullWidth onClick={() => setIsEditing(false)}>
-            Abbrechen
+            {t('common.cancel')}
           </Button>
         </div>
       </div>
     );
   }
 
-  const { icon: Icon, label } = categoryMeta(expense.category);
+  const { icon: Icon, labelKey } = categoryMeta(expense.category);
   return (
     <div className="costs-row">
       <div className="costs-row-icon">
@@ -155,15 +171,15 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
       <div className="costs-row-body">
         <div className="costs-row-title">{expense.title}</div>
         <div className="helper-text">
-          {label} · {expense.paidBy}
+          {t(labelKey)} · {expense.paidBy === SHARED_PAYER ? t('costs.sharedPayer') : expense.paidBy}
         </div>
       </div>
-      <div className="mono-num costs-row-amount">{expense.amountEuro.toFixed(2)} €</div>
+      <div className="mono-num costs-row-amount">{formatEuro(expense.amountEuro)}</div>
       <div className="costs-row-actions">
-        <IconButton label="Ausgabe bearbeiten" onClick={startEditing}>
+        <IconButton label={t('costs.editExpense')} onClick={startEditing}>
           <Pencil size={16} />
         </IconButton>
-        <IconButton label="Ausgabe löschen" tone="danger" onClick={() => onRequestDelete(expense.id!)}>
+        <IconButton label={t('costs.deleteExpense')} tone="danger" onClick={() => onRequestDelete(expense.id!)}>
           <Trash2 size={16} />
         </IconButton>
       </div>
@@ -184,17 +200,18 @@ function Settlement({
   currentUser: string;
 }) {
   const { balances, transfers, splitTotalCents, sharedTotalCents } = settlement;
+  const t = useT();
+  const formatEuro = useFormatEuro();
+  const formatCents = (cents: number) => formatEuro(centsToEuro(cents));
 
   if (splitTotalCents === 0 && sharedTotalCents === 0) return null;
 
   return (
     <section className="settlement">
-      <h2 className="section-title section-title-spaced">Ausgleich</h2>
+      <h2 className="section-title section-title-spaced">{t('settlement.title')}</h2>
 
       {splitTotalCents === 0 ? (
-        <p className="helper-text">
-          Bisher wurde alles direkt aus der Bordkasse bezahlt – es gibt nichts zu verrechnen.
-        </p>
+        <p className="helper-text">{t('settlement.nothingToSettle')}</p>
       ) : (
         <>
           <div className="settlement-balances">
@@ -209,15 +226,20 @@ function Settlement({
                 <div key={balance.user} className="settlement-balance">
                   <div className="settlement-balance-body">
                     <div className="settlement-balance-name">
-                      {balance.user === currentUser ? `Ich (${balance.user})` : balance.user}
+                      {balance.user === currentUser
+                        ? t('costs.self', { name: balance.user })
+                        : balance.user}
                     </div>
                     <div className="helper-text">
-                      {formatEuro(balance.paidCents)} ausgelegt · {formatEuro(balance.shareCents)} Anteil
+                      {t('settlement.laidOutAndShare', {
+                        paid: formatCents(balance.paidCents),
+                        share: formatCents(balance.shareCents)
+                      })}
                     </div>
                   </div>
                   <div className={`mono-num settlement-balance-amount ${tone}`}>
                     {balance.balanceCents > 0 ? '+' : ''}
-                    {formatEuro(balance.balanceCents)}
+                    {formatCents(balance.balanceCents)}
                   </div>
                 </div>
               );
@@ -225,7 +247,7 @@ function Settlement({
           </div>
 
           {transfers.length === 0 ? (
-            <p className="helper-text settlement-note">Alle Salden sind bereits ausgeglichen.</p>
+            <p className="helper-text settlement-note">{t('settlement.allSettled')}</p>
           ) : (
             <div className="settlement-transfers">
               {transfers.map((transfer) => (
@@ -234,7 +256,7 @@ function Settlement({
                   <ArrowRight size={15} strokeWidth={2} />
                   <span className="settlement-transfer-party">{transfer.to}</span>
                   <span className="mono-num settlement-transfer-amount">
-                    {formatEuro(transfer.amountCents)}
+                    {formatCents(transfer.amountCents)}
                   </span>
                 </div>
               ))}
@@ -245,8 +267,10 @@ function Settlement({
 
       {sharedTotalCents > 0 && (
         <p className="helper-text settlement-note">
-          {formatEuro(sharedTotalCents)} wurden direkt aus der {SHARED_PAYER} bezahlt und bleiben
-          außen vor.
+          {t('settlement.sharedNote', {
+            amount: formatCents(sharedTotalCents),
+            payer: t('costs.sharedPayer')
+          })}
         </p>
       )}
     </section>
@@ -262,6 +286,8 @@ export default function Costs({ user, users }: Props) {
   const [paidBy, setPaidBy] = useState(user);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
+  const t = useT();
+  const formatEuro = useFormatEuro();
 
   // Ausgaben im Papierkorb zählen weder im Verlauf noch im Ausgleich mit.
   const expenses = useMemo(() => activeOnly(allExpenses), [allExpenses]);
@@ -275,7 +301,7 @@ export default function Costs({ user, users }: Props) {
     if (!trimmedTitle) return;
     const parsedAmount = parseAmount(amount);
     if (parsedAmount === null) {
-      notify('Ungültiger Betrag.', 'danger');
+      notify(t('costs.invalidAmount'), 'danger');
       return;
     }
 
@@ -294,7 +320,7 @@ export default function Costs({ user, users }: Props) {
       setAmount('');
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
+      notify(t('common.saveError'), 'danger');
     }
   };
 
@@ -302,11 +328,11 @@ export default function Costs({ user, users }: Props) {
     if (!tripId) return false;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), changes));
-      notify('Ausgabe aktualisiert', 'success');
+      notify(t('costs.expenseUpdated'), 'success');
       return true;
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
+      notify(t('common.saveError'), 'danger');
       return false;
     }
   };
@@ -315,10 +341,10 @@ export default function Costs({ user, users }: Props) {
     if (!tripId) return;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: deleteField() }));
-      notify('Ausgabe wiederhergestellt', 'success');
+      notify(t('costs.expenseRestored'), 'success');
     } catch (err) {
       console.error(err);
-      notify('Wiederherstellen fehlgeschlagen.', 'danger');
+      notify(t('common.restoreFailed'), 'danger');
     }
   };
 
@@ -328,13 +354,13 @@ export default function Costs({ user, users }: Props) {
     setDeleteTargetId(null);
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: Date.now() }));
-      notify('Ausgabe in den Papierkorb verschoben', 'success', {
-        label: 'Rückgängig',
+      notify(t('costs.expenseTrashed'), 'success', {
+        label: t('common.undo'),
         onAct: () => void restoreExpense(id)
       });
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Löschen.', 'danger');
+      notify(t('common.deleteError'), 'danger');
     }
   };
 
@@ -342,17 +368,17 @@ export default function Costs({ user, users }: Props) {
 
   return (
     <div>
-      <PageHeader title="Reisekasse" subtitle="Ausgaben der Crew erfassen und im Blick behalten" />
+      <PageHeader title={t('costs.title')} subtitle={t('costs.subtitle')} />
 
       <div className="costs-total-banner">
-        <span className="label">Gesamtausgaben</span>
-        <span className="mono-num costs-total-value">{total.toFixed(2)} €</span>
+        <span className="label">{t('costs.total')}</span>
+        <span className="mono-num costs-total-value">{formatEuro(total)}</span>
       </div>
 
       <form onSubmit={handleAdd} className="costs-form">
         <Input
           className="costs-form-title"
-          placeholder="Beschreibung, z.B. Diesel"
+          placeholder={t('costs.descriptionPlaceholder')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -361,7 +387,7 @@ export default function Costs({ user, users }: Props) {
           type="number"
           inputMode="decimal"
           step="0.01"
-          placeholder="Betrag in €"
+          placeholder={t('costs.amountPlaceholder')}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           required
@@ -369,29 +395,29 @@ export default function Costs({ user, users }: Props) {
         <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
-              {c.label}
+              {t(c.labelKey)}
             </option>
           ))}
         </Select>
         <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-          <option value={SHARED_PAYER}>{SHARED_PAYER}</option>
+          <option value={SHARED_PAYER}>{t('costs.sharedPayer')}</option>
           {users.map((name) => (
             <option key={name} value={name}>
-              {name === user ? `Ich (${name})` : name}
+              {name === user ? t('costs.self', { name }) : name}
             </option>
           ))}
         </Select>
         <Button type="submit">
-          <Plus size={18} /> Eintragen
+          <Plus size={18} /> {t('costs.submit')}
         </Button>
       </form>
 
       <Settlement settlement={settlement} currentUser={user} />
 
-      <h2 className="section-title section-title-spaced">Verlauf</h2>
+      <h2 className="section-title section-title-spaced">{t('costs.history')}</h2>
 
       {expenses.length === 0 ? (
-        <EmptyState title="Noch keine Ausgaben" hint="Die erste Ausgabe der Reise oben eintragen." />
+        <EmptyState title={t('costs.empty')} hint={t('costs.emptyHint')} />
       ) : (
         <div className="costs-list">
           {expenses.map((exp) => (
@@ -409,9 +435,9 @@ export default function Costs({ user, users }: Props) {
 
       <ConfirmDialog
         open={deleteTargetId !== null}
-        title="Ausgabe löschen"
-        description="Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen."
-        confirmLabel="Löschen"
+        title={t('costs.deleteTitle')}
+        description={t('costs.deleteDescription')}
+        confirmLabel={t('common.delete')}
         destructive
         onConfirm={handleDeleteExpense}
         onCancel={() => setDeleteTargetId(null)}
