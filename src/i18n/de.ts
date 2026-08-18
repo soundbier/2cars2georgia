@@ -106,14 +106,12 @@ export const de = {
   'cockpit.logged': '„{title}“ protokolliert',
 
   // --- Karte ------------------------------------------------------------
-  'map.follow': 'Position folgen',
   'map.currentPosition': 'Aktuelle Position ({name})',
   'map.unfollow': 'Position nicht mehr folgen',
   'map.centerOnPosition': 'Auf eigene Position zentrieren',
   'map.orientNorth': 'Karte nach Norden ausrichten',
   'map.noPosition': 'Noch keine GPS-Position verfügbar.',
   'map.editEvent': 'Ereignis bearbeiten',
-  'map.deleteEvent': 'Ereignis löschen',
   'map.editButton': 'Bearbeiten',
   'map.invalidCoordinates': 'Ungültige Koordinaten.',
   'map.latitude': 'Breitengrad',
@@ -143,7 +141,6 @@ export const de = {
     'Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen.',
   'logbook.editEvent': 'Ereignis bearbeiten',
   'logbook.deleteEvent': 'Ereignis löschen',
-  'logbook.durationFormat': '{hours}h {minutes}m',
 
   // --- Reisekasse -------------------------------------------------------
   'costs.title': 'Reisekasse',

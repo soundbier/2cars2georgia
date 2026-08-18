@@ -7,6 +7,7 @@ import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { writeOptimistically } from '../../lib/writeOutcome';
 import { deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
+import { useT } from '../../i18n';
 import { Expense, LogEvent } from '../../types';
 import {
   Button,
@@ -39,6 +40,7 @@ export default function TrashSettings() {
   const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const { notify } = useToast();
+  const t = useT();
   const [purgeTarget, setPurgeTarget] = useState<PurgeTarget | null>(null);
 
   const events = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
@@ -72,9 +74,9 @@ export default function TrashSettings() {
     if (!tripId) return;
     writeOptimistically(
       updateDoc(doc(db, tripPath(tripId, item.collectionName), item.id), { deletedAt: deleteField() }),
-      () => notify('Wiederherstellen fehlgeschlagen.', 'danger')
+      () => notify(t('trash.restoreFailed'), 'danger')
     );
-    notify('Eintrag wiederhergestellt', 'success');
+    notify(t('trash.restored'), 'success');
   };
 
   const confirmPurge = () => {
@@ -91,11 +93,11 @@ export default function TrashSettings() {
       writeOptimistically(deleteDoc(doc(db, tripPath(tripId, item.collectionName), item.id)), () => {
         if (reported) return;
         reported = true;
-        notify('Endgültiges Löschen fehlgeschlagen.', 'danger');
+        notify(t('trash.purgeFailed'), 'danger');
       });
     }
     notify(
-      toPurge.length === 1 ? 'Eintrag endgültig gelöscht' : `${toPurge.length} Einträge endgültig gelöscht`,
+      toPurge.length === 1 ? t('trash.purgedOne') : t('trash.purgedMany', { count: toPurge.length }),
       'success'
     );
   };
@@ -103,18 +105,18 @@ export default function TrashSettings() {
   return (
     <div className="settings-page">
       <PageHeader
-        title="Papierkorb"
-        subtitle="Gelöschte Ereignisse und Ausgaben wiederherstellen"
+        title={t('trash.title')}
+        subtitle={t('trash.subtitle')}
         backTo="/settings"
-        backLabel="Einstellungen"
+        backLabel={t('settings.title')}
       />
 
-      <Section title={`Gelöscht (${items.length})`}>
+      <Section title={t('trash.section', { count: items.length })}>
         {items.length === 0 ? (
           <EmptyState
             icon={<Trash2 size={26} strokeWidth={1.5} />}
-            title="Papierkorb ist leer"
-            hint={`Gelöschte Einträge landen hier und bleiben ${RETENTION_DAYS} Tage wiederherstellbar.`}
+            title={t('trash.empty')}
+            hint={t('trash.emptyHint', { count: RETENTION_DAYS })}
           />
         ) : (
           <div className="settings-list">
@@ -132,21 +134,19 @@ export default function TrashSettings() {
                   }
                   title={item.title}
                   subtitle={`${item.subtitle} · ${
-                    daysLeft > 0
-                      ? `noch ${daysLeft} ${daysLeft === 1 ? 'Tag' : 'Tage'}`
-                      : 'Aufbewahrung abgelaufen'
+                    daysLeft > 0 ? t('trash.daysLeft', { count: daysLeft }) : t('trash.expired')
                   }`}
                   trailing={
                     <>
                       <IconButton
-                        label={`„${item.title}“ wiederherstellen`}
+                        label={t('trash.restore', { title: item.title })}
                         tone="accent"
                         onClick={() => restore(item)}
                       >
                         <RotateCcw size={16} />
                       </IconButton>
                       <IconButton
-                        label={`„${item.title}“ endgültig löschen`}
+                        label={t('trash.purgeOne', { title: item.title })}
                         tone="danger"
                         onClick={() => setPurgeTarget({ kind: 'item', item })}
                       >
@@ -162,27 +162,27 @@ export default function TrashSettings() {
       </Section>
 
       {items.length > 0 && (
-        <Section title="Aufräumen">
+        <Section title={t('trash.cleanupSection')}>
           <p className="helper-text setting-note">
             {expiredCount > 0
-              ? `${expiredCount} ${expiredCount === 1 ? 'Eintrag liegt' : 'Einträge liegen'} länger als ${RETENTION_DAYS} Tage im Papierkorb.`
-              : `Einträge bleiben ${RETENTION_DAYS} Tage wiederherstellbar. Endgültiges Löschen lässt sich nicht rückgängig machen.`}
+              ? t('trash.expiredNote', { count: expiredCount, days: RETENTION_DAYS })
+              : t('trash.retentionNote', { days: RETENTION_DAYS })}
           </p>
           <Button variant="destructive" fullWidth onClick={() => setPurgeTarget({ kind: 'all' })}>
-            <Trash2 size={18} /> Papierkorb leeren
+            <Trash2 size={18} /> {t('trash.emptyTrashButton')}
           </Button>
         </Section>
       )}
 
       <ConfirmDialog
         open={purgeTarget !== null}
-        title={purgeTarget?.kind === 'all' ? 'Papierkorb leeren' : 'Endgültig löschen'}
+        title={purgeTarget?.kind === 'all' ? t('trash.purgeAllTitle') : t('trash.purgeOneTitle')}
         description={
           purgeTarget?.kind === 'all'
-            ? `Alle ${items.length} Einträge im Papierkorb werden unwiderruflich entfernt.`
-            : `„${purgeTarget?.item.title}“ wird unwiderruflich entfernt.`
+            ? t('trash.purgeAllDescription', { count: items.length })
+            : t('trash.purgeOneDescription', { title: purgeTarget?.item.title ?? '' })
         }
-        confirmLabel="Endgültig löschen"
+        confirmLabel={t('trash.purgeOneTitle')}
         destructive
         onConfirm={confirmPurge}
         onCancel={() => setPurgeTarget(null)}

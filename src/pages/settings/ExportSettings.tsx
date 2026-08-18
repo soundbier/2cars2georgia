@@ -17,6 +17,7 @@ import {
   withBom
 } from '../../lib/exportFormats';
 import { printHtmlDocument, shareOrDownload } from '../../lib/fileExport';
+import { useT } from '../../i18n';
 import { Expense, GpsPoint, LogEvent } from '../../types';
 import { Button, Section, PageHeader, useToast } from '../../components/ui';
 import '../Settings.css';
@@ -30,6 +31,7 @@ export default function ExportSettings({ users }: Props) {
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
   const { notify } = useToast();
+  const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
 
   const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'asc');
@@ -41,7 +43,7 @@ export default function ExportSettings({ users }: Props) {
   const events = useMemo(() => activeOnly(allEvents), [allEvents]);
   const expenses = useMemo(() => activeOnly(allExpenses), [allExpenses]);
 
-  const name = tripName ?? 'Roadtrip';
+  const name = tripName ?? t('export.defaultTripName');
 
   const distanceLabel = `${toDisplayDistance(totalDistanceKm(track), preferences.unitSystem).toFixed(1)} ${distanceUnitLabel(preferences.unitSystem)}`;
   const durationLabel = formatDuration(trackDurationMs(track));
@@ -53,7 +55,7 @@ export default function ExportSettings({ users }: Props) {
       await action();
     } catch (err) {
       console.error(err);
-      notify('Export fehlgeschlagen.', 'danger');
+      notify(t('export.failed'), 'danger');
     } finally {
       setBusy(null);
     }
@@ -66,8 +68,8 @@ export default function ExportSettings({ users }: Props) {
         mimeType,
         build()
       );
-      if (result === 'downloaded') notify('Datei gespeichert', 'success');
-      if (result === 'shared') notify('Datei geteilt', 'success');
+      if (result === 'downloaded') notify(t('export.saved'), 'success');
+      if (result === 'shared') notify(t('export.shared'), 'success');
     });
 
   const exportReport = () =>
@@ -88,27 +90,21 @@ export default function ExportSettings({ users }: Props) {
   return (
     <div className="settings-page">
       <PageHeader
-        title="Export"
-        subtitle="Route, Logbuch und Kosten sichern oder teilen"
+        title={t('export.title')}
+        subtitle={t('export.subtitle')}
         backTo="/settings"
-        backLabel="Einstellungen"
+        backLabel={t('settings.title')}
       />
 
-      <Section title="Reisebericht">
-        <p className="helper-text setting-note">
-          Öffnet den Druckdialog mit Logbuch, Reisekasse und Ausgleich. Dort „Als PDF sichern“
-          wählen, um den Bericht zu behalten oder zu verschicken.
-        </p>
+      <Section title={t('export.reportSection')}>
+        <p className="helper-text setting-note">{t('export.reportHint')}</p>
         <Button fullWidth disabled={busy !== null} onClick={exportReport}>
-          <FileText size={18} /> Bericht als PDF
+          <FileText size={18} /> {t('export.reportButton')}
         </Button>
       </Section>
 
-      <Section title="Rohdaten">
-        <p className="helper-text setting-note">
-          CSV öffnet sich in jeder Tabellenkalkulation, GPX in Karten-Apps wie OsmAnd, Komoot oder
-          Google Earth.
-        </p>
+      <Section title={t('export.rawDataSection')}>
+        <p className="helper-text setting-note">{t('export.rawDataHint')}</p>
         <div className="stack">
           <Button
             variant="secondary"
@@ -120,7 +116,7 @@ export default function ExportSettings({ users }: Props) {
               )
             }
           >
-            <FileSpreadsheet size={18} /> Logbuch als CSV ({events.length})
+            <FileSpreadsheet size={18} /> {t('export.eventsButton', { count: events.length })}
           </Button>
           <Button
             variant="secondary"
@@ -132,7 +128,7 @@ export default function ExportSettings({ users }: Props) {
               )
             }
           >
-            <FileSpreadsheet size={18} /> Reisekasse als CSV ({expenses.length})
+            <FileSpreadsheet size={18} /> {t('export.expensesButton', { count: expenses.length })}
           </Button>
           <Button
             variant="secondary"
@@ -144,17 +140,15 @@ export default function ExportSettings({ users }: Props) {
               )
             }
           >
-            <Route size={18} /> Route als GPX ({track.length} Punkte)
+            <Route size={18} /> {t('export.trackButton', { count: track.length })}
           </Button>
         </div>
       </Section>
 
-      <Section title="Hinweis">
+      <Section title={t('export.noteSection')}>
         <p className="helper-text setting-note">
           <Share2 size={13} className="setting-note-icon" />
-          Auf dem Handy öffnet sich das Teilen-Menü des Systems, am Rechner wird die Datei
-          heruntergeladen. Exportierte Dateien enthalten Namen, Positionen und Beträge der Crew –
-          nur weitergeben, wenn alle einverstanden sind.
+          {t('export.noteText')}
         </p>
       </Section>
     </div>
