@@ -1,21 +1,19 @@
-import { ButtonHTMLAttributes, forwardRef } from 'react';
+import { ButtonHTMLAttributes } from 'react';
 import './IconButton.css';
 
 type IconButtonTone = 'default' | 'danger' | 'accent';
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: IconButtonTone;
-  label: string; // für aria-label, Pflicht bei icon-only Buttons
+  /** Pflicht bei icon-only Buttons: dient als aria-label und Tooltip. */
+  label: string;
 }
 
-export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ tone = 'default', label, className, children, ...rest }, ref) => {
-    const classes = ['icon-btn', `icon-btn-${tone}`, className].filter(Boolean).join(' ');
-    return (
-      <button ref={ref} className={classes} aria-label={label} title={label} {...rest}>
-        {children}
-      </button>
-    );
-  }
-);
-IconButton.displayName = 'IconButton';
+export function IconButton({ tone = 'default', label, className, children, ...rest }: IconButtonProps) {
+  const classes = ['icon-btn', `icon-btn-${tone}`, className].filter(Boolean).join(' ');
+  return (
+    <button className={classes} aria-label={label} title={label} {...rest}>
+      {children}
+    </button>
+  );
+}

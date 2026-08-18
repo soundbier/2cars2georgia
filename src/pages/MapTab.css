@@ -7,6 +7,20 @@
   z-index: 1;
 }
 
+.map-canvas {
+  height: 100%;
+  width: 100%;
+}
+
+/* Positionsmarker: von L.divIcon in userIcon() eingehängt. */
+.map-marker-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
 .map-popup {
   display: flex;
   flex-direction: column;

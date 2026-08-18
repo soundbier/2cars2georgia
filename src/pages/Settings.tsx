@@ -1,0 +1,180 @@
+import { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { Users, ListChecks, ChevronRight, Wifi, WifiOff, LogOut } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { usePreferences } from '../hooks/usePreferences';
+import { useQuickLogs } from '../hooks/useSettings';
+import { getUserColor } from '../lib/userColors';
+import { UnitSystem } from '../lib/units';
+import {
+  Button,
+  Section,
+  Badge,
+  PageHeader,
+  Toggle,
+  SegmentedControl,
+  Select
+} from '../components/ui';
+import './Settings.css';
+
+interface Props {
+  currentUser: string;
+  users: string[];
+  onLogout: () => void;
+}
+
+const UNIT_OPTIONS: { value: UnitSystem; label: string }[] = [
+  { value: 'metric', label: 'km/h' },
+  { value: 'nautical', label: 'kn' }
+];
+
+const TRACK_INTERVALS = [
+  { value: 10_000, label: 'Alle 10 Sekunden' },
+  { value: 30_000, label: 'Alle 30 Sekunden' },
+  { value: 60_000, label: 'Jede Minute' },
+  { value: 300_000, label: 'Alle 5 Minuten' }
+];
+
+function SettingRow({
+  label,
+  description,
+  children
+}: {
+  label: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="setting-row">
+      <div className="setting-row-body">
+        <div className="setting-row-label">{label}</div>
+        {description && <div className="helper-text">{description}</div>}
+      </div>
+      <div className="setting-row-control">{children}</div>
+    </div>
+  );
+}
+
+function SettingLink({
+  to,
+  icon,
+  label,
+  value
+}: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Link to={to} className="setting-row setting-link">
+      <span className="setting-link-icon">{icon}</span>
+      <div className="setting-row-body">
+        <div className="setting-row-label">{label}</div>
+        <div className="helper-text">{value}</div>
+      </div>
+      <ChevronRight size={18} className="setting-link-chevron" />
+    </Link>
+  );
+}
+
+export default function Settings({ currentUser, users, onLogout }: Props) {
+  const isOnline = useOnlineStatus();
+  const quickLogs = useQuickLogs();
+  const { preferences, setPreference } = usePreferences();
+
+  return (
+    <div className="settings-page">
+      <PageHeader title="Einstellungen" subtitle="Gerät, Anzeige und Daten dieser Reise" />
+
+      <Section title="Dieses Gerät">
+        <div className="setting-row">
+          <span className="avatar" style={{ background: getUserColor(currentUser), color: '#ffffff' }}>
+            {currentUser.charAt(0).toUpperCase()}
+          </span>
+          <div className="setting-row-body">
+            <div className="setting-row-label">{currentUser}</div>
+            <div className="helper-text">Angemeldetes Profil</div>
+          </div>
+          <div className="setting-row-control">
+            <Badge tone={isOnline ? 'success' : 'danger'} dot>
+              {isOnline ? 'Live-Sync' : 'Offline'}
+            </Badge>
+          </div>
+        </div>
+
+        <p className="helper-text setting-note">
+          {isOnline
+            ? 'Änderungen werden sofort mit der Crew synchronisiert.'
+            : 'Änderungen werden lokal gespeichert und synchronisiert, sobald wieder Empfang besteht.'}
+          {isOnline ? <Wifi size={13} className="setting-note-icon" /> : <WifiOff size={13} className="setting-note-icon" />}
+        </p>
+      </Section>
+
+      <Section title="Anzeige">
+        <SettingRow label="Einheiten" description="Geschwindigkeit und Strecke in der ganzen App">
+          <SegmentedControl
+            label="Einheiten"
+            value={preferences.unitSystem}
+            options={UNIT_OPTIONS}
+            onChange={(value) => setPreference('unitSystem', value)}
+          />
+        </SettingRow>
+
+        <SettingRow label="Seezeichen" description="OpenSeaMap-Ebene über der Karte">
+          <Toggle
+            label="Seezeichen auf der Karte anzeigen"
+            checked={preferences.showSeamarks}
+            onChange={(value) => setPreference('showSeamarks', value)}
+          />
+        </SettingRow>
+      </Section>
+
+      <Section title="Aufzeichnung">
+        <SettingRow
+          label="Trackpunkte"
+          description="Seltener spart Akku und mobile Daten, häufiger zeichnet genauer auf."
+        >
+          <Select
+            className="setting-select"
+            aria-label="Abstand zwischen Trackpunkten"
+            value={preferences.trackIntervalMs}
+            onChange={(e) => setPreference('trackIntervalMs', Number(e.target.value))}
+          >
+            {TRACK_INTERVALS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+      </Section>
+
+      <Section title="Verwaltung">
+        <div className="settings-list">
+          <SettingLink
+            to="/settings/crew"
+            icon={<Users size={18} strokeWidth={1.75} />}
+            label="Crew"
+            value={`${users.length} ${users.length === 1 ? 'Mitglied' : 'Mitglieder'}`}
+          />
+          <SettingLink
+            to="/settings/quicklogs"
+            icon={<ListChecks size={18} strokeWidth={1.75} />}
+            label="Schnell-Logs"
+            value={`${quickLogs.length} ${quickLogs.length === 1 ? 'Kategorie' : 'Kategorien'}`}
+          />
+        </div>
+      </Section>
+
+      <Section title="App">
+        <SettingRow label="Version" description="2cars2georgia">
+          <span className="mono-num helper-text">{__APP_VERSION__}</span>
+        </SettingRow>
+        <Button variant="destructive" fullWidth onClick={onLogout}>
+          <LogOut size={18} /> Profil abmelden
+        </Button>
+      </Section>
+    </div>
+  );
+}

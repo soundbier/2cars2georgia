@@ -50,14 +50,3 @@
 .btn-destructive:active:not(:disabled) {
   background: var(--color-danger-muted);
 }
-
-/* Quiet: Text-Aktion ohne Rahmen */
-.btn-quiet {
-  background: transparent;
-  color: var(--color-text-secondary);
-  padding: 10px var(--space-3);
-  min-height: auto;
-}
-.btn-quiet:active:not(:disabled) {
-  color: var(--color-text);
-}

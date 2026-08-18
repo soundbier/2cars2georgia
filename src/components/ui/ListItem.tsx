@@ -6,19 +6,17 @@ interface ListItemProps {
   title: ReactNode;
   subtitle?: ReactNode;
   trailing?: ReactNode;
-  onClick?: () => void;
 }
 
-export function ListItem({ leading, title, subtitle, trailing, onClick }: ListItemProps) {
-  const Tag = onClick ? 'button' : 'div';
+export function ListItem({ leading, title, subtitle, trailing }: ListItemProps) {
   return (
-    <Tag className="list-item" onClick={onClick} type={onClick ? 'button' : undefined}>
+    <div className="list-item">
       {leading && <div className="list-item-leading">{leading}</div>}
       <div className="list-item-body">
         <div className="list-item-title">{title}</div>
         {subtitle && <div className="list-item-subtitle">{subtitle}</div>}
       </div>
       {trailing && <div className="list-item-trailing">{trailing}</div>}
-    </Tag>
+    </div>
   );
 }
