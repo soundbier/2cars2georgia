@@ -12,8 +12,10 @@ import {
 import { ToastProvider } from './components/ui';
 import { TrackingProvider } from './hooks/useTracking';
 import { PreferencesProvider } from './hooks/usePreferences';
+import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
 import { useCrew } from './hooks/useSettings';
 import { UpdatePrompt } from './UpdatePrompt';
+import RoadtripGate from './pages/RoadtripGate';
 import Dashboard from './pages/Dashboard';
 import MapTab from './pages/MapTab';
 import Stats from './pages/Stats';
@@ -32,7 +34,13 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/settings', label: 'Mehr', icon: SettingsIcon }
 ];
 
-export default function App() {
+/**
+ * Crew-Anmeldung innerhalb eines bereits authentifizierten Roadtrips: Ordnet
+ * das Gerät einem der Crew-Namen zu. Der eigentliche Zugriffsschutz sitzt
+ * eine Ebene höher in RoadtripGate/RoadtripProvider – hier geht es nur noch
+ * um "wer bist du innerhalb der Crew", nicht "darfst du überhaupt rein".
+ */
+function CrewGate() {
   const [user, setUser] = useState<string>(() => localStorage.getItem(STORAGE_KEY_USER) ?? '');
   const { users, loading } = useCrew();
 
@@ -50,72 +58,103 @@ export default function App() {
   // startet sofort – die App ist offline-fähig und darf nicht auf Firestore warten.
   const bootstrapping = loading && !user;
 
+  if (bootstrapping) {
+    return (
+      <div className="boot-screen">
+        <Compass size={28} className="boot-screen-icon" />
+        <p className="helper-text">Verbinde mit Server …</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="login-screen">
+        <div className="login-screen-head">
+          <Compass size={26} />
+          <h1 className="page-title">Wer ist an Bord?</h1>
+          <p className="helper-text">Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.</p>
+        </div>
+        <div className="login-screen-list">
+          {users.map((name) => (
+            <button key={name} className="login-user" onClick={() => login(name)}>
+              <span className="avatar">{name.charAt(0).toUpperCase()}</span>
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <PreferencesProvider>
+      {/* Ein Wechsel des Nutzers setzt Tracking-Status und Watcher zurück. */}
+      <TrackingProvider key={user} user={user}>
+        <BrowserRouter>
+          <div className="content">
+            <Routes>
+              <Route path="/" element={<Dashboard user={user} />} />
+              <Route path="/map" element={<MapTab user={user} />} />
+              <Route path="/stats" element={<Stats />} />
+              <Route path="/costs" element={<Costs user={user} users={users} />} />
+              <Route
+                path="/settings"
+                element={<Settings currentUser={user} users={users} onLogout={logout} />}
+              />
+              <Route
+                path="/settings/crew"
+                element={<CrewSettings currentUser={user} users={users} />}
+              />
+              <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
+            </Routes>
+          </div>
+          <nav className="bottom-nav">
+            {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
+                <Icon size={20} strokeWidth={2} />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </BrowserRouter>
+      </TrackingProvider>
+    </PreferencesProvider>
+  );
+}
+
+/** Blendet zwischen dem Roadtrip-Gate und der eigentlichen App um. */
+function RoadtripGateOrApp() {
+  const { loading, tripId } = useRoadtrip();
+
+  if (loading) {
+    return (
+      <div className="boot-screen">
+        <Compass size={28} className="boot-screen-icon" />
+        <p className="helper-text">Verbinde mit Server …</p>
+      </div>
+    );
+  }
+
+  // key={tripId} erzwingt einen frischen CrewGate-Baum bei Roadtrip-Wechsel,
+  // damit kein Zustand (z.B. ein Crew-Name) aus dem vorigen Trip übrig bleibt.
+  return tripId ? <CrewGate key={tripId} /> : <RoadtripGate />;
+}
+
+export default function App() {
   return (
     <ToastProvider>
-      {/* App-weit gemountet, unabhängig vom Login-Status: Ein Deploy soll auch
-          erreichen, wer gerade erst den Login-Screen sieht. */}
+      {/* App-weit gemountet, unabhängig vom Anmeldestatus: Ein Deploy soll auch
+          erreichen, wer gerade erst das Roadtrip-Gate sieht. */}
       <UpdatePrompt />
-
-      {bootstrapping ? (
-        <div className="boot-screen">
-          <Compass size={28} className="boot-screen-icon" />
-          <p className="helper-text">Verbinde mit Server …</p>
-        </div>
-      ) : !user ? (
-        <div className="login-screen">
-          <div className="login-screen-head">
-            <Compass size={26} />
-            <h1 className="page-title">Wer ist an Bord?</h1>
-            <p className="helper-text">Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.</p>
-          </div>
-          <div className="login-screen-list">
-            {users.map((name) => (
-              <button key={name} className="login-user" onClick={() => login(name)}>
-                <span className="avatar">{name.charAt(0).toUpperCase()}</span>
-                <span>{name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <PreferencesProvider>
-          {/* Ein Wechsel des Nutzers setzt Tracking-Status und Watcher zurück. */}
-          <TrackingProvider key={user} user={user}>
-            <BrowserRouter>
-              <div className="content">
-                <Routes>
-                  <Route path="/" element={<Dashboard user={user} />} />
-                  <Route path="/map" element={<MapTab user={user} />} />
-                  <Route path="/stats" element={<Stats />} />
-                  <Route path="/costs" element={<Costs user={user} users={users} />} />
-                  <Route
-                    path="/settings"
-                    element={<Settings currentUser={user} users={users} onLogout={logout} />}
-                  />
-                  <Route
-                    path="/settings/crew"
-                    element={<CrewSettings currentUser={user} users={users} />}
-                  />
-                  <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
-                </Routes>
-              </div>
-              <nav className="bottom-nav">
-                {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end={to === '/'}
-                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  >
-                    <Icon size={20} strokeWidth={2} />
-                    <span>{label}</span>
-                  </NavLink>
-                ))}
-              </nav>
-            </BrowserRouter>
-          </TrackingProvider>
-        </PreferencesProvider>
-      )}
+      <RoadtripProvider>
+        <RoadtripGateOrApp />
+      </RoadtripProvider>
     </ToastProvider>
   );
 }

@@ -8,6 +8,7 @@ import 'leaflet-rotate';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
+import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
@@ -288,10 +289,11 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
 
 export default function MapTab({ user }: { user: string }) {
   const { position } = useTracking();
+  const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
-  const track = useCollection<GpsPoint>('track');
-  const events = useCollection<LogEvent>('events');
+  const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
+  const events = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
 
@@ -329,8 +331,9 @@ export default function MapTab({ user }: { user: string }) {
   const resetNorth = () => map?.setBearing(0);
 
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
+    if (!tripId) return false;
     try {
-      await updateDoc(doc(db, 'events', id), changes);
+      await updateDoc(doc(db, tripPath(tripId, 'events'), id), changes);
       notify('Ereignis aktualisiert', 'success');
       return true;
     } catch (err) {
@@ -341,9 +344,9 @@ export default function MapTab({ user }: { user: string }) {
   };
 
   const handleDeleteEvent = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteTargetId || !tripId) return;
     try {
-      await deleteDoc(doc(db, 'events', deleteTargetId));
+      await deleteDoc(doc(db, tripPath(tripId, 'events'), deleteTargetId));
       notify('Ereignis gelöscht', 'success');
     } catch (err) {
       console.error(err);

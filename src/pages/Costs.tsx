@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
+import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { Expense, ExpenseCategory } from '../types';
 import { Button, Input, Select, PageHeader, EmptyState, IconButton, ConfirmDialog, useToast } from '../components/ui';
 import './Costs.css';
@@ -162,7 +163,8 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
 }
 
 export default function Costs({ user, users }: Props) {
-  const expenses = useCollection<Expense>('expenses', 'timestamp', 'desc');
+  const { tripId } = useRoadtrip();
+  const expenses = useCollection<Expense>(tripId ? tripPath(tripId, 'expenses') : null, 'timestamp', 'desc');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('verpflegung');
@@ -172,6 +174,7 @@ export default function Costs({ user, users }: Props) {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tripId) return;
 
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
@@ -191,7 +194,7 @@ export default function Costs({ user, users }: Props) {
     };
 
     try {
-      await addDoc(collection(db, 'expenses'), newExpense);
+      await addDoc(collection(db, tripPath(tripId, 'expenses')), newExpense);
       setTitle('');
       setAmount('');
     } catch (err) {
@@ -201,8 +204,9 @@ export default function Costs({ user, users }: Props) {
   };
 
   const handleSaveEdit = async (id: string, changes: ExpenseChanges) => {
+    if (!tripId) return false;
     try {
-      await updateDoc(doc(db, 'expenses', id), changes);
+      await updateDoc(doc(db, tripPath(tripId, 'expenses'), id), changes);
       notify('Ausgabe aktualisiert', 'success');
       return true;
     } catch (err) {
@@ -213,9 +217,9 @@ export default function Costs({ user, users }: Props) {
   };
 
   const handleDeleteExpense = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteTargetId || !tripId) return;
     try {
-      await deleteDoc(doc(db, 'expenses', deleteTargetId));
+      await deleteDoc(doc(db, tripPath(tripId, 'expenses'), deleteTargetId));
       notify('Ausgabe gelöscht', 'success');
     } catch (err) {
       console.error(err);

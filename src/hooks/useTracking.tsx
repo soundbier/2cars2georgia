@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactN
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePreferences } from './usePreferences';
+import { useRoadtrip, tripPath } from './useRoadtrip';
 import { bearingDegrees, distanceMeters } from '../lib/geo';
 import { Coordinates, GpsPoint, LivePosition } from '../types';
 
@@ -33,6 +34,7 @@ const TrackingContext = createContext<TrackingContextValue | null>(null);
  */
 export function TrackingProvider({ user, children }: { user: string; children: ReactNode }) {
   const { preferences } = usePreferences();
+  const { tripId } = useRoadtrip();
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -91,12 +93,12 @@ export function TrackingProvider({ user, children }: { user: string; children: R
         setError(null);
 
         const now = Date.now();
-        if (!isTrackingRef.current || !user) return;
+        if (!isTrackingRef.current || !user || !tripId) return;
         if (now - lastSavedTimestampRef.current < trackIntervalRef.current) return;
 
         lastSavedTimestampRef.current = now;
         const point: GpsPoint = { timestamp: now, author: user, ...next };
-        addDoc(collection(db, 'track'), point).catch((err) => {
+        addDoc(collection(db, tripPath(tripId, 'track')), point).catch((err) => {
           console.error('GPS-Speicherfehler:', err);
         });
       },
@@ -105,7 +107,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [user]);
+  }, [user, tripId]);
 
   const value = useMemo(
     () => ({ position, error, isTracking, setIsTracking }),

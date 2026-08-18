@@ -3,6 +3,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { Play, Square, Satellite } from 'lucide-react';
 import { db } from '../firebase';
 import { useTracking } from '../hooks/useTracking';
+import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
@@ -13,6 +14,7 @@ import './Dashboard.css';
 
 export default function Dashboard({ user }: { user: string }) {
   const { position, error, isTracking, setIsTracking } = useTracking();
+  const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
   const [isLogging, setIsLogging] = useState(false);
@@ -23,6 +25,7 @@ export default function Dashboard({ user }: { user: string }) {
       notify('Warte auf GPS-Signal …', 'danger');
       return;
     }
+    if (!tripId) return;
     setIsLogging(true);
     try {
       const event: LogEvent = {
@@ -33,7 +36,7 @@ export default function Dashboard({ user }: { user: string }) {
         lat: position.lat,
         lng: position.lng
       };
-      await addDoc(collection(db, 'events'), event);
+      await addDoc(collection(db, tripPath(tripId, 'events')), event);
       notify(`„${title}“ protokolliert`, 'success');
     } catch (err) {
       console.error(err);
