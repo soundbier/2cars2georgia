@@ -141,6 +141,10 @@ export const en: Translations = {
   'dayRecap.title': 'Day recap',
   'dayRecap.exportButton': 'Share',
   'dayRecap.noTrackHint': 'No route recorded for this day yet – the image will only show the stats.',
+  'dayRecap.background': 'Background',
+  'dayRecap.background.reduced': 'Reduced',
+  'dayRecap.background.standard': 'Standard',
+  'dayRecap.background.satellite': 'Satellite',
 
   // --- Trip kitty -------------------------------------------------------
   'costs.title': 'Trip kitty',
