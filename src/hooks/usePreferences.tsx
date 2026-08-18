@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, R
 import { UnitSystem } from '../lib/units';
 import { detectLanguage, Language, LANGUAGES } from '../i18n/translate';
 import { BaseLayerId, OverlayId, BASE_LAYERS, OVERLAYS } from '../lib/mapLayers';
+import { BackgroundStyle } from '../lib/routeImage';
 
 const STORAGE_KEY = 'boat_preferences';
 
@@ -16,7 +17,11 @@ export interface Preferences {
   trackIntervalMs: number;
   /** Sprache der Oberfläche auf diesem Gerät. */
   language: Language;
+  /** Hintergrundstil des Tagesbilds (Logbuch-Export für Instagram & Co.). */
+  dayRecapBackground: BackgroundStyle;
 }
+
+const BACKGROUND_STYLES: BackgroundStyle[] = ['reduced', 'standard', 'satellite'];
 
 export const DEFAULT_PREFERENCES: Preferences = {
   unitSystem: 'metric',
@@ -25,7 +30,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   trackIntervalMs: 30_000,
   // Erst beim ersten Start ausgewertet: Danach steht die einmal gespeicherte
   // Wahl im localStorage und überschreibt die Geräteeinstellung nicht mehr.
-  language: detectLanguage()
+  language: detectLanguage(),
+  dayRecapBackground: 'reduced'
 };
 
 /** Stand vor der Ebenenauswahl: ein einzelner Schalter für die Seezeichen. */
@@ -44,6 +50,9 @@ function readStored(): Preferences {
     const merged: Preferences = { ...DEFAULT_PREFERENCES, ...stored };
     if (!(merged.baseLayer in BASE_LAYERS)) merged.baseLayer = DEFAULT_PREFERENCES.baseLayer;
     if (!LANGUAGES.includes(merged.language)) merged.language = DEFAULT_PREFERENCES.language;
+    if (!BACKGROUND_STYLES.includes(merged.dayRecapBackground)) {
+      merged.dayRecapBackground = DEFAULT_PREFERENCES.dayRecapBackground;
+    }
 
     // Overlays einzeln zusammenführen: Neue Ebenen einer App-Version starten
     // auf ihrem Default, ohne die Auswahl des Nutzers zu überschreiben.

@@ -146,6 +146,10 @@ export const de = {
   'dayRecap.title': 'Tagesübersicht',
   'dayRecap.exportButton': 'Teilen',
   'dayRecap.noTrackHint': 'Für diesen Tag liegt noch keine Route vor – das Bild zeigt nur die Kennzahlen.',
+  'dayRecap.background': 'Hintergrund',
+  'dayRecap.background.reduced': 'Reduziert',
+  'dayRecap.background.standard': 'Standard',
+  'dayRecap.background.satellite': 'Satellit',
 
   // --- Reisekasse -------------------------------------------------------
   'costs.title': 'Reisekasse',

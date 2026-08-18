@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, Share2, X } from 'lucide-react';
 import { DayRecap } from '../lib/dayRecap';
-import { drawRouteImage, canvasToPngFile } from '../lib/routeImage';
+import { drawRouteImage, canvasToPngFile, BackgroundStyle } from '../lib/routeImage';
 import { shareOrDownloadFile } from '../lib/fileExport';
 import { exportFileName } from '../lib/exportFormats';
 import { formatDuration } from '../lib/tripStats';
@@ -33,7 +33,7 @@ export function DayRecapDialog({ open, onClose, tripName, days, initialDayKey }:
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dayKey, setDayKey] = useState(initialDayKey ?? days[0]?.key ?? '');
   const [busy, setBusy] = useState(false);
-  const { preferences } = usePreferences();
+  const { preferences, setPreference } = usePreferences();
   const { locale } = useI18n();
   const { notify } = useToast();
   const t = useT();
@@ -67,9 +67,10 @@ export function DayRecapDialog({ open, onClose, tripName, days, initialDayKey }:
       distanceLabel,
       durationLabel,
       track: day.track,
-      events: day.events
+      events: day.events,
+      backgroundStyle: preferences.dayRecapBackground
     });
-  }, [open, day, tripName, dateLabel, distanceLabel, durationLabel]);
+  }, [open, day, tripName, dateLabel, distanceLabel, durationLabel, preferences.dayRecapBackground]);
 
   if (!open) return null;
 
@@ -110,15 +111,27 @@ export function DayRecapDialog({ open, onClose, tripName, days, initialDayKey }:
           </button>
         </div>
 
-        {days.length > 1 && (
-          <Select value={dayKey} onChange={(e) => setDayKey(e.target.value)} className="day-recap-select">
-            {days.map((d) => (
-              <option key={d.key} value={d.key}>
-                {d.date.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' })}
-              </option>
-            ))}
+        <div className="day-recap-controls">
+          {days.length > 1 && (
+            <Select value={dayKey} onChange={(e) => setDayKey(e.target.value)} className="day-recap-select">
+              {days.map((d) => (
+                <option key={d.key} value={d.key}>
+                  {d.date.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' })}
+                </option>
+              ))}
+            </Select>
+          )}
+          <Select
+            value={preferences.dayRecapBackground}
+            onChange={(e) => setPreference('dayRecapBackground', e.target.value as BackgroundStyle)}
+            className="day-recap-select"
+            aria-label={t('dayRecap.background')}
+          >
+            <option value="reduced">{t('dayRecap.background.reduced')}</option>
+            <option value="standard">{t('dayRecap.background.standard')}</option>
+            <option value="satellite">{t('dayRecap.background.satellite')}</option>
           </Select>
-        )}
+        </div>
 
         <div className="day-recap-preview">
           <canvas ref={canvasRef} className="day-recap-canvas" />
