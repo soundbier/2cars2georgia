@@ -15,6 +15,7 @@ import { TrackingProvider } from './hooks/useTracking';
 import { PreferencesProvider } from './hooks/usePreferences';
 import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
 import { setSentryContext } from './lib/sentry';
+import { setErrorLogContext } from './lib/errorLog';
 import { useCrew } from './hooks/useSettings';
 import { UpdatePrompt } from './UpdatePrompt';
 import { RecoveryCodeDialog } from './components/RecoveryCodeDialog';
@@ -58,6 +59,7 @@ function CrewGate() {
   // ist bereits ein anonymer Slug, kein Klarname oder Kontaktdaten.
   useEffect(() => {
     setSentryContext(tripId, user || null);
+    setErrorLogContext(tripId, user || null);
   }, [tripId, user]);
 
   const login = (name: string) => {

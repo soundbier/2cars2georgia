@@ -10,6 +10,7 @@ import {
   Pencil,
   Trash2,
   ArrowRight,
+  ChevronDown,
   LucideIcon
 } from 'lucide-react';
 import { db } from '../firebase';
@@ -189,9 +190,9 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
 }
 
 /**
- * „Wer schuldet wem wie viel“: Salden je Crewmitglied plus die kürzeste Folge
- * von Zahlungen, die alles glattstellt. Ausgaben aus der Bordkasse tauchen hier
- * nicht auf, da sie bereits gemeinsam finanziert sind.
+ * „Wer schuldet wem wie viel“: kompakte Zusammenfassung mit dem eigenen Saldo,
+ * Details (alle Salden und die kürzeste Zahlungsfolge) erst auf Tippen. Ausgaben
+ * aus der Bordkasse tauchen hier nicht auf, da sie bereits gemeinsam finanziert sind.
  */
 function Settlement({
   settlement,
@@ -201,78 +202,112 @@ function Settlement({
   currentUser: string;
 }) {
   const { balances, transfers, splitTotalCents, sharedTotalCents } = settlement;
+  const [isOpen, setIsOpen] = useState(false);
   const t = useT();
   const formatEuro = useFormatEuro();
   const formatCents = (cents: number) => formatEuro(centsToEuro(cents));
 
   if (splitTotalCents === 0 && sharedTotalCents === 0) return null;
 
+  const ownBalanceCents = balances.find((b) => b.user === currentUser)?.balanceCents ?? 0;
+  const summary =
+    splitTotalCents === 0
+      ? t('settlement.nothingToSettleShort')
+      : ownBalanceCents > 0
+        ? t('settlement.youGet', { amount: formatCents(ownBalanceCents) })
+        : ownBalanceCents < 0
+          ? t('settlement.youOwe', { amount: formatCents(-ownBalanceCents) })
+          : t('settlement.youAreEven');
+  const summaryTone =
+    splitTotalCents === 0 || ownBalanceCents === 0
+      ? 'settlement-summary-neutral'
+      : ownBalanceCents > 0
+        ? 'settlement-summary-positive'
+        : 'settlement-summary-negative';
+
   return (
     <section className="settlement">
-      <h2 className="section-title section-title-spaced">{t('settlement.title')}</h2>
+      <button
+        type="button"
+        className="settlement-header"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span className="settlement-header-title">{t('settlement.title')}</span>
+        <span className={`settlement-summary ${summaryTone}`}>{summary}</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={2}
+          className={`settlement-chevron ${isOpen ? 'settlement-chevron-open' : ''}`}
+        />
+      </button>
 
-      {splitTotalCents === 0 ? (
-        <p className="helper-text">{t('settlement.nothingToSettle')}</p>
-      ) : (
-        <>
-          <div className="settlement-balances">
-            {balances.map((balance) => {
-              const tone =
-                balance.balanceCents > 0
-                  ? 'settlement-balance-positive'
-                  : balance.balanceCents < 0
-                    ? 'settlement-balance-negative'
-                    : 'settlement-balance-neutral';
-              return (
-                <div key={balance.user} className="settlement-balance">
-                  <div className="settlement-balance-body">
-                    <div className="settlement-balance-name">
-                      {balance.user === currentUser
-                        ? t('costs.self', { name: balance.user })
-                        : balance.user}
-                    </div>
-                    <div className="helper-text">
-                      {t('settlement.laidOutAndShare', {
-                        paid: formatCents(balance.paidCents),
-                        share: formatCents(balance.shareCents)
-                      })}
-                    </div>
-                  </div>
-                  <div className={`mono-num settlement-balance-amount ${tone}`}>
-                    {balance.balanceCents > 0 ? '+' : ''}
-                    {formatCents(balance.balanceCents)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {transfers.length === 0 ? (
-            <p className="helper-text settlement-note">{t('settlement.allSettled')}</p>
+      {isOpen && (
+        <div className="settlement-details">
+          {splitTotalCents === 0 ? (
+            <p className="helper-text">{t('settlement.nothingToSettle')}</p>
           ) : (
-            <div className="settlement-transfers">
-              {transfers.map((transfer) => (
-                <div key={`${transfer.from}-${transfer.to}`} className="settlement-transfer">
-                  <span className="settlement-transfer-party">{transfer.from}</span>
-                  <ArrowRight size={15} strokeWidth={2} />
-                  <span className="settlement-transfer-party">{transfer.to}</span>
-                  <span className="mono-num settlement-transfer-amount">
-                    {formatCents(transfer.amountCents)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+            <>
+              <div className="settlement-balances">
+                {balances.map((balance) => {
+                  const tone =
+                    balance.balanceCents > 0
+                      ? 'settlement-balance-positive'
+                      : balance.balanceCents < 0
+                        ? 'settlement-balance-negative'
+                        : 'settlement-balance-neutral';
+                  return (
+                    <div key={balance.user} className="settlement-balance">
+                      <div className="settlement-balance-body">
+                        <div className="settlement-balance-name">
+                          {balance.user === currentUser
+                            ? t('costs.self', { name: balance.user })
+                            : balance.user}
+                        </div>
+                        <div className="helper-text settlement-balance-meta">
+                          {t('settlement.laidOutAndShare', {
+                            paid: formatCents(balance.paidCents),
+                            share: formatCents(balance.shareCents)
+                          })}
+                        </div>
+                      </div>
+                      <div className={`mono-num settlement-balance-amount ${tone}`}>
+                        {balance.balanceCents > 0 ? '+' : ''}
+                        {formatCents(balance.balanceCents)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-      {sharedTotalCents > 0 && (
-        <p className="helper-text settlement-note">
-          {t('settlement.sharedNote', {
-            amount: formatCents(sharedTotalCents),
-            payer: t('costs.sharedPayer')
-          })}
-        </p>
+              {transfers.length === 0 ? (
+                <p className="helper-text settlement-note">{t('settlement.allSettled')}</p>
+              ) : (
+                <div className="settlement-transfers">
+                  {transfers.map((transfer) => (
+                    <div key={`${transfer.from}-${transfer.to}`} className="settlement-transfer">
+                      <span className="settlement-transfer-party">{transfer.from}</span>
+                      <ArrowRight size={13} strokeWidth={2} />
+                      <span className="settlement-transfer-party">{transfer.to}</span>
+                      <span className="mono-num settlement-transfer-amount">
+                        {formatCents(transfer.amountCents)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {sharedTotalCents > 0 && (
+            <p className="helper-text settlement-note">
+              {t('settlement.sharedNote', {
+                amount: formatCents(sharedTotalCents),
+                payer: t('costs.sharedPayer')
+              })}
+            </p>
+          )}
+        </div>
       )}
     </section>
   );

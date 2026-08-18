@@ -171,6 +171,10 @@ export const en: Translations = {
   // --- Settlement (trip kitty) -------------------------------------------
   'settlement.title': 'Settlement',
   'settlement.nothingToSettle': 'So far everything was paid directly from the shared kitty – nothing to settle.',
+  'settlement.nothingToSettleShort': 'Nothing to settle',
+  'settlement.youGet': 'You get {amount}',
+  'settlement.youOwe': 'You owe {amount}',
+  'settlement.youAreEven': 'All even',
   'settlement.laidOutAndShare': '{paid} paid · {share} share',
   'settlement.allSettled': 'All balances are already settled.',
   'settlement.sharedNote': '{amount} was paid directly from the {payer} and is not included.',
