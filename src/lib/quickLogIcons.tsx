@@ -1,4 +1,22 @@
-import { Anchor, Coffee, AlertTriangle, MapPin, Home, Fuel, Gauge, Tag, LucideIcon } from 'lucide-react';
+import {
+  Anchor,
+  Coffee,
+  AlertTriangle,
+  MapPin,
+  Home,
+  Fuel,
+  Gauge,
+  Tag,
+  Ship,
+  Utensils,
+  Camera,
+  Wrench,
+  ShoppingCart,
+  Compass,
+  Sun,
+  Users,
+  LucideIcon
+} from 'lucide-react';
 import { QuickLogIconName } from '../types';
 
 export const QUICK_LOG_ICONS: Record<QuickLogIconName, LucideIcon> = {
@@ -9,7 +27,15 @@ export const QUICK_LOG_ICONS: Record<QuickLogIconName, LucideIcon> = {
   home: Home,
   fuel: Fuel,
   gauge: Gauge,
-  tag: Tag
+  tag: Tag,
+  ship: Ship,
+  utensils: Utensils,
+  camera: Camera,
+  wrench: Wrench,
+  'shopping-cart': ShoppingCart,
+  compass: Compass,
+  sun: Sun,
+  users: Users
 };
 
 export const DEFAULT_QUICK_LOG_ICON: QuickLogIconName = 'tag';

@@ -23,6 +23,13 @@ interface TrackingContextValue {
   /** true, solange die Tour aufgezeichnet wird. */
   isTracking: boolean;
   setIsTracking: (value: boolean) => void;
+  /**
+   * true, solange die Tour zwar läuft, aber gerade pausiert ist – z.B. für
+   * eine kurze Pause, ohne die Tour komplett zu beenden. Wird beim Stoppen
+   * der Tour automatisch zurückgesetzt.
+   */
+  isPaused: boolean;
+  setIsPaused: (value: boolean) => void;
 }
 
 const TrackingContext = createContext<TrackingContextValue | null>(null);
@@ -41,10 +48,12 @@ export function TrackingProvider({ user, children }: { user: string; children: R
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [isPaused, setIsPausedState] = useState(false);
 
   // Über Refs gelesen, damit das Umschalten der Aufzeichnung den laufenden
   // Watcher nicht neu startet.
   const isTrackingRef = useRef(false);
+  const isPausedRef = useRef(false);
   const lastSavedTimestampRef = useRef(0);
   const trackIntervalRef = useRef(preferences.trackIntervalMs);
   // Letzter bekannter Kurs und der Punkt, von dem aus er gemessen wurde.
@@ -53,8 +62,20 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
   useEffect(() => {
     isTrackingRef.current = isTracking;
-    if (!isTracking) lastSavedTimestampRef.current = 0;
+    if (!isTracking) {
+      lastSavedTimestampRef.current = 0;
+      isPausedRef.current = false;
+      setIsPausedState(false);
+    }
   }, [isTracking]);
+
+  // Pause hält die Aufzeichnung an, ohne die Tour zu beenden – etwa für eine
+  // kurze Rast. Nur wirksam, solange die Tour überhaupt läuft.
+  const setIsPaused = (value: boolean) => {
+    if (!isTrackingRef.current) return;
+    isPausedRef.current = value;
+    setIsPausedState(value);
+  };
 
   // Ebenfalls per Ref: Ein geändertes Intervall wirkt ab dem nächsten
   // Positionsupdate, ohne den Watcher neu zu starten.
@@ -96,7 +117,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
         setError(null);
 
         const now = Date.now();
-        if (!isTrackingRef.current || !user || !tripId) return;
+        if (!isTrackingRef.current || isPausedRef.current || !user || !tripId) return;
         if (now - lastSavedTimestampRef.current < trackIntervalRef.current) return;
 
         lastSavedTimestampRef.current = now;
@@ -113,8 +134,8 @@ export function TrackingProvider({ user, children }: { user: string; children: R
   }, [user, tripId, t]);
 
   const value = useMemo(
-    () => ({ position, error, isTracking, setIsTracking }),
-    [position, error, isTracking]
+    () => ({ position, error, isTracking, setIsTracking, isPaused, setIsPaused }),
+    [position, error, isTracking, isPaused]
   );
 
   return <TrackingContext.Provider value={value}>{children}</TrackingContext.Provider>;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
-import { Play, Square, Satellite } from 'lucide-react';
+import { Play, Pause, Square, Satellite } from 'lucide-react';
 import { db } from '../firebase';
 import { useTracking } from '../hooks/useTracking';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
@@ -15,7 +15,7 @@ import { Button, EmptyState, useToast } from '../components/ui';
 import './Dashboard.css';
 
 export default function Dashboard({ user }: { user: string }) {
-  const { position, error, isTracking, setIsTracking } = useTracking();
+  const { position, error, isTracking, setIsTracking, isPaused, setIsPaused } = useTracking();
   const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
@@ -67,9 +67,13 @@ export default function Dashboard({ user }: { user: string }) {
 
       {/* Bordinstrument: GPS-Status → Geschwindigkeit → Tracking */}
       <div className="instrument">
-        <div className={`instrument-status instrument-status-${gpsStatus}`}>
+        <div className={`instrument-status instrument-status-${isTracking && isPaused ? 'paused' : gpsStatus}`}>
           <Satellite size={13} />
-          <span>{error ?? (position ? t('cockpit.gpsActive') : t('cockpit.gpsSearching'))}</span>
+          <span>
+            {isTracking && isPaused
+              ? t('cockpit.tourPaused')
+              : (error ?? (position ? t('cockpit.gpsActive') : t('cockpit.gpsSearching')))}
+          </span>
         </div>
 
         <div className="instrument-speed">
@@ -79,14 +83,27 @@ export default function Dashboard({ user }: { user: string }) {
           <span className="instrument-speed-unit">{speedUnitLabel(preferences.unitSystem)}</span>
         </div>
 
-        <Button
-          variant={isTracking ? 'destructive' : 'primary'}
-          fullWidth
-          onClick={() => setIsTracking(!isTracking)}
-        >
-          {isTracking ? <Square size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-          {isTracking ? t('cockpit.stopTour') : t('cockpit.startTour')}
-        </Button>
+        {isTracking ? (
+          <div className="instrument-actions">
+            <Button variant="secondary" fullWidth onClick={() => setIsPaused(!isPaused)}>
+              {isPaused ? (
+                <Play size={18} fill="currentColor" />
+              ) : (
+                <Pause size={18} fill="currentColor" />
+              )}
+              {isPaused ? t('cockpit.resumeTour') : t('cockpit.pauseTour')}
+            </Button>
+            <Button variant="destructive" fullWidth onClick={() => setIsTracking(false)}>
+              <Square size={18} fill="currentColor" />
+              {t('cockpit.stopTour')}
+            </Button>
+          </div>
+        ) : (
+          <Button variant="primary" fullWidth onClick={() => setIsTracking(true)}>
+            <Play size={18} fill="currentColor" />
+            {t('cockpit.startTour')}
+          </Button>
+        )}
       </div>
 
       <h2 className="section-title section-title-spaced">{t('cockpit.quickLogs')}</h2>
