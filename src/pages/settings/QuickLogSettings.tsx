@@ -3,6 +3,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { db } from '../../firebase';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
+import { usePermissions } from '../../hooks/usePermissions';
 import { trackWrite } from '../../lib/pendingWrites';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { QUICK_LOG_ICONS, DEFAULT_QUICK_LOG_ICON, getQuickLogIcon } from '../../lib/quickLogIcons';
@@ -57,8 +58,9 @@ function IconPicker({ value, onChange }: IconPickerProps) {
   );
 }
 
-export default function QuickLogSettings() {
+export default function QuickLogSettings({ currentUser }: { currentUser: string }) {
   const { tripId } = useRoadtrip();
+  const { canEdit } = usePermissions(currentUser);
   const quickLogs = useQuickLogs();
   const { notify } = useToast();
   const t = useT();
@@ -71,7 +73,7 @@ export default function QuickLogSettings() {
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   const saveQuickLogs = async (items: QuickLogConfig[], errorMessage = t('common.saveError')) => {
-    if (!tripId) return false;
+    if (!tripId || !canEdit) return false;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'settings', 'quicklogs')), { items }));
       return true;
@@ -128,27 +130,31 @@ export default function QuickLogSettings() {
         backLabel={t('settings.title')}
       />
 
-      <Section title={t('quickLogs.newCategory')}>
-        <form onSubmit={handleAdd} className="stack">
-          <Input
-            placeholder={t('quickLogs.labelPlaceholder')}
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-          />
-          <IconPicker value={newIcon} onChange={setNewIcon} />
-          <div className="row">
-            <IconButton
-              type="submit"
-              label={t('quickLogs.addCategory')}
-              tone="accent"
-              disabled={!newLabel.trim()}
-            >
-              <Plus size={20} />
-            </IconButton>
-            <span className="helper-text">{t('quickLogs.addHint')}</span>
-          </div>
-        </form>
-      </Section>
+      {canEdit ? (
+        <Section title={t('quickLogs.newCategory')}>
+          <form onSubmit={handleAdd} className="stack">
+            <Input
+              placeholder={t('quickLogs.labelPlaceholder')}
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+            />
+            <IconPicker value={newIcon} onChange={setNewIcon} />
+            <div className="row">
+              <IconButton
+                type="submit"
+                label={t('quickLogs.addCategory')}
+                tone="accent"
+                disabled={!newLabel.trim()}
+              >
+                <Plus size={20} />
+              </IconButton>
+              <span className="helper-text">{t('quickLogs.addHint')}</span>
+            </div>
+          </form>
+        </Section>
+      ) : (
+        <p className="helper-text">{t('crew.readonlyHint')}</p>
+      )}
 
       <Section title={t('quickLogs.categories', { count: quickLogs.length })}>
         {quickLogs.length === 0 ? (
@@ -195,21 +201,23 @@ export default function QuickLogSettings() {
                   leading={<Icon size={18} strokeWidth={1.75} color="var(--color-accent)" />}
                   title={log.label}
                   trailing={
-                    <>
-                      <IconButton
-                        label={t('quickLogs.edit', { label: log.label })}
-                        onClick={() => startEditing(log)}
-                      >
-                        <Pencil size={16} />
-                      </IconButton>
-                      <IconButton
-                        label={t('quickLogs.delete', { label: log.label })}
-                        tone="danger"
-                        onClick={() => setPendingRemoval(log.id)}
-                      >
-                        <Trash2 size={16} />
-                      </IconButton>
-                    </>
+                    canEdit ? (
+                      <>
+                        <IconButton
+                          label={t('quickLogs.edit', { label: log.label })}
+                          onClick={() => startEditing(log)}
+                        >
+                          <Pencil size={16} />
+                        </IconButton>
+                        <IconButton
+                          label={t('quickLogs.delete', { label: log.label })}
+                          tone="danger"
+                          onClick={() => setPendingRemoval(log.id)}
+                        >
+                          <Trash2 size={16} />
+                        </IconButton>
+                      </>
+                    ) : undefined
                   }
                 />
               );

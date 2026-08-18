@@ -382,6 +382,39 @@ describe('Einstellungen', () => {
     await seed(`roadtrips/${TRIP}/settings/general`, { users: ['Lukas'] });
     await assertFails(deleteDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`)));
   });
+
+  it('erlaubt eine Rollenzuordnung mit bekannten Werten', async () => {
+    await assertSucceeds(
+      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
+        users: ['Lukas', 'Leon'],
+        roles: { Lukas: 'owner', Leon: 'readonly' }
+      })
+    );
+  });
+
+  it('erlaubt die Crew-Liste weiterhin ganz ohne roles-Feld', async () => {
+    await assertSucceeds(
+      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), { users: ['Lukas'] })
+    );
+  });
+
+  it('weist eine unbekannte Rolle ab', async () => {
+    await assertFails(
+      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
+        users: ['Lukas'],
+        roles: { Lukas: 'admin' }
+      })
+    );
+  });
+
+  it('weist roles als falschen Typ ab', async () => {
+    await assertFails(
+      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
+        users: ['Lukas'],
+        roles: ['owner']
+      })
+    );
+  });
 });
 
 describe('Fehlerprotokoll', () => {

@@ -159,14 +159,29 @@ service cloud.firestore {
       }
 
       // --- Roadtrip-weite Einstellungen ------------------------------------
-      // Genau zwei Dokumente: "general" (Crew-Liste) und "quicklogs"
+      // Genau zwei Dokumente: "general" (Crew-Liste + Rollen) und "quicklogs"
       // (Schnell-Log-Kategorien), siehe src/hooks/useSettings.ts.
       match /settings/{docId} {
+        // Rollenzuordnung ist optional (siehe src/lib/permissions.ts):
+        // Solange niemand explizit eine Rolle vergeben hat, fehlt das Feld
+        // ganz. Wer/was das im Client wie "Owner darf verwalten" durchsetzt,
+        // ist UI-Konvention, keine serverseitige Autorisierung – dafür fehlt
+        // dem Roadtrip-weiten Auth-User die nötige Einzelidentität pro
+        // Crewmitglied (siehe Kommentar am Dateianfang). Geprüft wird hier
+        // nur die Form: eine Map von Name auf einen der drei bekannten Werte.
+        function isValidRolesMap() {
+          return !('roles' in data())
+            || (data().roles is map
+                && data().roles.size() <= 50
+                && data().roles.values().hasOnly(['owner', 'member', 'readonly']));
+        }
+
         function isSettingsDoc() {
           return (docId == 'general'
-                  && fieldsAre(['users'], [])
+                  && fieldsAre(['users'], ['roles'])
                   && data().users is list
-                  && data().users.size() <= 50)
+                  && data().users.size() <= 50
+                  && isValidRolesMap())
               || (docId == 'quicklogs'
                   && fieldsAre(['items'], [])
                   && data().items is list

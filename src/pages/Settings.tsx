@@ -16,8 +16,10 @@ import {
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePreferences } from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
+import { usePermissions } from '../hooks/usePermissions';
 import { leaveRoadtrip } from '../lib/roadtrip';
 import { useQuickLogs } from '../hooks/useSettings';
+import { ROLE_LABEL_KEY } from '../lib/permissions';
 import { getUserColor } from '../lib/userColors';
 import { UnitSystem } from '../lib/units';
 import { useI18n, useT, LANGUAGES, Language, TranslationKey } from '../i18n';
@@ -100,6 +102,7 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
   const quickLogs = useQuickLogs();
   const { preferences, setPreference } = usePreferences();
   const { tripName } = useRoadtrip();
+  const { role } = usePermissions(currentUser);
   const { language, setLanguage } = useI18n();
   const t = useT();
 
@@ -139,7 +142,8 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
             <div className="setting-row-label">{currentUser}</div>
             <div className="helper-text">{t('settings.signedInProfile')}</div>
           </div>
-          <div className="setting-row-control">
+          <div className="setting-row-control row">
+            <Badge tone={role === 'owner' ? 'success' : 'neutral'}>{t(ROLE_LABEL_KEY[role])}</Badge>
             <Badge tone={isOnline ? 'success' : 'danger'} dot>
               {isOnline ? t('settings.liveSync') : t('settings.offline')}
             </Badge>

@@ -249,6 +249,14 @@ export const en: Translations = {
   'crew.removeTitle': 'Remove crew member',
   'crew.removeDescription':
     '{name} will be removed from the crew list. Entries and expenses already recorded are kept.',
+  'crew.role.owner': 'Owner',
+  'crew.role.member': 'Crew member',
+  'crew.role.readonly': 'Read-only',
+  'crew.roleLabel': 'Role of {name}',
+  'crew.roleUpdated': '{name} is now {role}.',
+  'crew.onlyOwnerCanManage': 'Only owners can invite or remove crew members, or change roles.',
+  'crew.lastOwnerRequired': 'At least one owner must remain.',
+  'crew.readonlyHint': 'Read-only access: viewing works, changes do not.',
 
   // --- Quick logs -------------------------------------------------------
   'quickLogs.title': 'Quick logs',

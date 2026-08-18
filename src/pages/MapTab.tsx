@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { usePermissions } from '../hooks/usePermissions';
 import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
 import { useQuickLogs } from '../hooks/useSettings';
@@ -207,12 +208,13 @@ type EventChanges = Pick<LogEvent, 'title' | 'type' | 'lat' | 'lng'>;
 interface EventPopupProps {
   event: LogEvent;
   quickLogs: QuickLogConfig[];
+  canEdit: boolean;
   /** Liefert true, wenn gespeichert werden konnte. */
   onSave: (id: string, changes: EventChanges) => Promise<boolean>;
   onRequestDelete: (id: string) => void;
 }
 
-function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupProps) {
+function EventPopup({ event, quickLogs, canEdit, onSave, onRequestDelete }: EventPopupProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(event.title);
   const [type, setType] = useState<LogType>(event.type);
@@ -257,9 +259,11 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
         <div className="helper-text">
           {event.lat.toFixed(4)}, {event.lng.toFixed(4)}
         </div>
-        <Button variant="secondary" fullWidth onClick={startEditing}>
-          <Pencil size={14} /> {t('map.editButton')}
-        </Button>
+        {canEdit && (
+          <Button variant="secondary" fullWidth onClick={startEditing}>
+            <Pencil size={14} /> {t('map.editButton')}
+          </Button>
+        )}
       </div>
     );
   }
@@ -296,6 +300,7 @@ function EventPopup({ event, quickLogs, onSave, onRequestDelete }: EventPopupPro
 export default function MapTab({ user }: { user: string }) {
   const { position } = useTracking();
   const { tripId } = useRoadtrip();
+  const { canEdit } = usePermissions(user);
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
@@ -439,6 +444,7 @@ export default function MapTab({ user }: { user: string }) {
               <EventPopup
                 event={evt}
                 quickLogs={quickLogs}
+                canEdit={canEdit}
                 onSave={handleSaveEdit}
                 onRequestDelete={requestDelete}
               />

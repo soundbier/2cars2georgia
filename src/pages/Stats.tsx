@@ -4,6 +4,7 @@ import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X, Image } fr
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { usePermissions } from '../hooks/usePermissions';
 import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
 import { useQuickLogs } from '../hooks/useSettings';
@@ -24,11 +25,12 @@ type EventChanges = Pick<LogEvent, 'title' | 'type'>;
 interface LogbookEntryProps {
   event: LogEvent;
   quickLogs: QuickLogConfig[];
+  canEdit: boolean;
   onSave: (id: string, changes: EventChanges) => Promise<boolean>;
   onRequestDelete: (id: string) => void;
 }
 
-function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntryProps) {
+function LogbookEntry({ event, quickLogs, canEdit, onSave, onRequestDelete }: LogbookEntryProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(event.title);
   const [type, setType] = useState<LogType>(event.type);
@@ -107,22 +109,25 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
             </IconButton>
           </>
         ) : (
-          <>
-            <IconButton label={t('logbook.editEvent')} onClick={startEditing}>
-              <Pencil size={16} />
-            </IconButton>
-            <IconButton label={t('logbook.deleteEvent')} tone="danger" onClick={() => onRequestDelete(event.id!)}>
-              <Trash2 size={16} />
-            </IconButton>
-          </>
+          canEdit && (
+            <>
+              <IconButton label={t('logbook.editEvent')} onClick={startEditing}>
+                <Pencil size={16} />
+              </IconButton>
+              <IconButton label={t('logbook.deleteEvent')} tone="danger" onClick={() => onRequestDelete(event.id!)}>
+                <Trash2 size={16} />
+              </IconButton>
+            </>
+          )
         )}
       </div>
     </div>
   );
 }
 
-export default function Stats() {
+export default function Stats({ user }: { user: string }) {
   const { tripId, tripName } = useRoadtrip();
+  const { canEdit } = usePermissions(user);
   const quickLogs = useQuickLogs();
   const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
@@ -214,6 +219,7 @@ export default function Stats() {
               key={evt.id}
               event={evt}
               quickLogs={quickLogs}
+              canEdit={canEdit}
               onSave={handleSaveEdit}
               onRequestDelete={requestDelete}
             />

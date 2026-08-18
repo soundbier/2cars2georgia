@@ -256,6 +256,14 @@ export const de = {
   'crew.removeTitle': 'Crewmitglied entfernen',
   'crew.removeDescription':
     '{name} wird aus der Crew-Liste gelöscht. Bereits erfasste Logs und Ausgaben bleiben erhalten.',
+  'crew.role.owner': 'Owner',
+  'crew.role.member': 'Mitfahrer',
+  'crew.role.readonly': 'Nur Lesen',
+  'crew.roleLabel': 'Rolle von {name}',
+  'crew.roleUpdated': '{name} ist jetzt {role}.',
+  'crew.onlyOwnerCanManage': 'Nur Owner können Crewmitglieder einladen, entfernen oder Rollen vergeben.',
+  'crew.lastOwnerRequired': 'Mindestens ein Owner muss übrig bleiben.',
+  'crew.readonlyHint': 'Nur-Lesen-Zugriff: Ansehen ist möglich, Ändern nicht.',
 
   // --- Schnell-Logs -----------------------------------------------------
   'quickLogs.title': 'Schnell-Logs',
