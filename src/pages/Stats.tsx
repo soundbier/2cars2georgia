@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { doc, deleteField, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X } from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
-import { writeErrorKey, writeOptimistically } from '../lib/writeOutcome';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
@@ -125,7 +125,11 @@ export default function Stats() {
   const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
   const { preferences } = usePreferences();
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const { deleteTargetId, requestDelete, cancelDelete, confirmDelete } = useSoftDelete(
+    'events',
+    'logbook.eventTrashed',
+    'logbook.eventRestored'
+  );
   const { notify } = useToast();
   const t = useT();
 
@@ -152,29 +156,6 @@ export default function Stats() {
       notify(t('common.saveError'), 'danger');
       return false;
     }
-  };
-
-  const restoreEvent = (id: string) => {
-    if (!tripId) return;
-    writeOptimistically(
-      updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }),
-      (err) => notify(t(writeErrorKey(err, 'common.restoreFailed')), 'danger')
-    );
-    notify(t('logbook.eventRestored'), 'success');
-  };
-
-  const handleDeleteEvent = () => {
-    if (!deleteTargetId || !tripId) return;
-    const id = deleteTargetId;
-    setDeleteTargetId(null);
-    writeOptimistically(
-      updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }),
-      (err) => notify(t(writeErrorKey(err, 'common.deleteError')), 'danger')
-    );
-    notify(t('logbook.eventTrashed'), 'success', {
-      label: t('common.undo'),
-      onAct: () => restoreEvent(id)
-    });
   };
 
   return (
@@ -219,7 +200,7 @@ export default function Stats() {
               event={evt}
               quickLogs={quickLogs}
               onSave={handleSaveEdit}
-              onRequestDelete={setDeleteTargetId}
+              onRequestDelete={requestDelete}
             />
           ))}
         </div>
@@ -231,8 +212,8 @@ export default function Stats() {
         description={t('logbook.deleteDescription')}
         confirmLabel={t('common.delete')}
         destructive
-        onConfirm={handleDeleteEvent}
-        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
       />
     </div>
   );

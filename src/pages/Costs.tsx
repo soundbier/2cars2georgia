@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { collection, addDoc, doc, updateDoc, deleteField } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import {
   Fuel,
   UtensilsCrossed,
@@ -16,8 +16,8 @@ import {
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
-import { writeErrorKey, writeOptimistically } from '../lib/writeOutcome';
 import { activeOnly } from '../lib/trash';
 import {
   computeSettlement,
@@ -320,7 +320,11 @@ export default function Costs({ user, users }: Props) {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('verpflegung');
   const [paidBy, setPaidBy] = useState(user);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const { deleteTargetId, requestDelete, cancelDelete, confirmDelete } = useSoftDelete(
+    'expenses',
+    'costs.expenseTrashed',
+    'costs.expenseRestored'
+  );
   const { notify } = useToast();
   const t = useT();
   const formatEuro = useFormatEuro();
@@ -371,29 +375,6 @@ export default function Costs({ user, users }: Props) {
       notify(t('common.saveError'), 'danger');
       return false;
     }
-  };
-
-  const restoreExpense = (id: string) => {
-    if (!tripId) return;
-    writeOptimistically(
-      updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: deleteField() }),
-      (err) => notify(t(writeErrorKey(err, 'common.restoreFailed')), 'danger')
-    );
-    notify(t('costs.expenseRestored'), 'success');
-  };
-
-  const handleDeleteExpense = () => {
-    if (!deleteTargetId || !tripId) return;
-    const id = deleteTargetId;
-    setDeleteTargetId(null);
-    writeOptimistically(
-      updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: Date.now() }),
-      (err) => notify(t(writeErrorKey(err, 'common.deleteError')), 'danger')
-    );
-    notify(t('costs.expenseTrashed'), 'success', {
-      label: t('common.undo'),
-      onAct: () => restoreExpense(id)
-    });
   };
 
   const total = expenses.reduce((sum, item) => sum + item.amountEuro, 0);
@@ -459,7 +440,7 @@ export default function Costs({ user, users }: Props) {
               users={users}
               currentUser={user}
               onSave={handleSaveEdit}
-              onRequestDelete={setDeleteTargetId}
+              onRequestDelete={requestDelete}
             />
           ))}
         </div>
@@ -471,8 +452,8 @@ export default function Costs({ user, users }: Props) {
         description={t('costs.deleteDescription')}
         confirmLabel={t('common.delete')}
         destructive
-        onConfirm={handleDeleteExpense}
-        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
       />
     </div>
   );

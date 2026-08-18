@@ -101,14 +101,12 @@ export const en: Translations = {
   'cockpit.logged': '“{title}” logged',
 
   // --- Map --------------------------------------------------------------
-  'map.follow': 'Follow position',
   'map.currentPosition': 'Current position ({name})',
   'map.unfollow': 'Stop following position',
   'map.centerOnPosition': 'Center on my position',
   'map.orientNorth': 'Point the map north',
   'map.noPosition': 'No GPS position available yet.',
   'map.editEvent': 'Edit entry',
-  'map.deleteEvent': 'Delete entry',
   'map.editButton': 'Edit',
   'map.invalidCoordinates': 'Invalid coordinates.',
   'map.latitude': 'Latitude',
@@ -138,7 +136,6 @@ export const en: Translations = {
     'The entry moves to the trash and can be restored under More → Trash.',
   'logbook.editEvent': 'Edit entry',
   'logbook.deleteEvent': 'Delete entry',
-  'logbook.durationFormat': '{hours}h {minutes}m',
 
   // --- Trip kitty -------------------------------------------------------
   'costs.title': 'Trip kitty',

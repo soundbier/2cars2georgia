@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
-import { doc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Pencil, LocateFixed } from 'lucide-react';
 import L from 'leaflet';
 // Seiteneffekt-Import: erweitert Leaflet um die Kartendrehung (map.setBearing).
@@ -9,8 +9,8 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
-import { writeErrorKey, writeOptimistically } from '../lib/writeOutcome';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
@@ -300,7 +300,11 @@ export default function MapTab({ user }: { user: string }) {
   const { preferences } = usePreferences();
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
   const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const { deleteTargetId, requestDelete, cancelDelete, confirmDelete } = useSoftDelete(
+    'events',
+    'map.eventTrashed',
+    'map.eventRestored'
+  );
   const { notify } = useToast();
   const t = useT();
 
@@ -351,29 +355,6 @@ export default function MapTab({ user }: { user: string }) {
       notify(t('common.saveError'), 'danger');
       return false;
     }
-  };
-
-  const restoreEvent = (id: string) => {
-    if (!tripId) return;
-    writeOptimistically(
-      updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }),
-      (err) => notify(t(writeErrorKey(err, 'common.restoreFailed')), 'danger')
-    );
-    notify(t('map.eventRestored'), 'success');
-  };
-
-  const handleDeleteEvent = () => {
-    if (!deleteTargetId || !tripId) return;
-    const id = deleteTargetId;
-    setDeleteTargetId(null);
-    writeOptimistically(
-      updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }),
-      (err) => notify(t(writeErrorKey(err, 'common.deleteError')), 'danger')
-    );
-    notify(t('map.eventTrashed'), 'success', {
-      label: t('common.undo'),
-      onAct: () => restoreEvent(id)
-    });
   };
 
   return (
@@ -434,7 +415,7 @@ export default function MapTab({ user }: { user: string }) {
                 event={evt}
                 quickLogs={quickLogs}
                 onSave={handleSaveEdit}
-                onRequestDelete={setDeleteTargetId}
+                onRequestDelete={requestDelete}
               />
             </Popup>
           </Marker>
@@ -472,8 +453,8 @@ export default function MapTab({ user }: { user: string }) {
         description={t('map.deleteEventDescription')}
         confirmLabel={t('common.delete')}
         destructive
-        onConfirm={handleDeleteEvent}
-        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
       />
     </div>
   );
