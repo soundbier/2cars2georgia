@@ -4,6 +4,7 @@ import { Play, Pause, Square, Satellite } from 'lucide-react';
 import { db } from '../firebase';
 import { useTracking } from '../hooks/useTracking';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { usePermissions } from '../hooks/usePermissions';
 import { trackWrite } from '../lib/pendingWrites';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
@@ -17,6 +18,7 @@ import './Dashboard.css';
 export default function Dashboard({ user }: { user: string }) {
   const { position, error, isTracking, setIsTracking, isPaused, setIsPaused } = useTracking();
   const { tripId } = useRoadtrip();
+  const { canEdit } = usePermissions(user);
   const quickLogs = useQuickLogs();
   const { preferences } = usePreferences();
   const [isLogging, setIsLogging] = useState(false);
@@ -24,6 +26,7 @@ export default function Dashboard({ user }: { user: string }) {
   const t = useT();
 
   const handleQuickLog = async (type: LogType, title: string) => {
+    if (!canEdit) return;
     if (!position) {
       notify(t('cockpit.waitingForGps'), 'danger');
       return;
@@ -99,12 +102,14 @@ export default function Dashboard({ user }: { user: string }) {
             </Button>
           </div>
         ) : (
-          <Button variant="primary" fullWidth onClick={() => setIsTracking(true)}>
+          <Button variant="primary" fullWidth disabled={!canEdit} onClick={() => setIsTracking(true)}>
             <Play size={18} fill="currentColor" />
             {t('cockpit.startTour')}
           </Button>
         )}
       </div>
+
+      {!canEdit && <p className="helper-text">{t('crew.readonlyHint')}</p>}
 
       <h2 className="section-title section-title-spaced">{t('cockpit.quickLogs')}</h2>
 
@@ -122,7 +127,7 @@ export default function Dashboard({ user }: { user: string }) {
               <button
                 key={id}
                 className="quick-log-btn"
-                disabled={isLogging || !position}
+                disabled={isLogging || !position || !canEdit}
                 onClick={() => handleQuickLog(id, label)}
               >
                 <Icon

@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { useT } from '../i18n';
-import { DEFAULT_QUICK_LOG_SEEDS, DEFAULT_USERS, QuickLogConfig } from '../types';
+import { DEFAULT_QUICK_LOG_SEEDS, DEFAULT_USERS, CrewRoles, QuickLogConfig } from '../types';
 
 /**
  * Abonniert eine Liste aus der settings-Collection des aktuellen Roadtrips
@@ -74,8 +74,53 @@ export function useQuickLogs(): QuickLogConfig[] {
   return useSettingsList<QuickLogConfig>('quicklogs', 'items', defaults).items;
 }
 
-/** Roadtrip-weit synchronisierte Crew-Liste. */
+/**
+ * Roadtrip-weit synchronisierte Crew-Liste inklusive Rollen
+ * (settings/general, Felder "users" und optional "roles" – siehe
+ * firestore.rules und lib/permissions.ts für die effektive Rolle).
+ *
+ * Eigenständig statt über useSettingsList: Die Rollenzuordnung ist eine Map
+ * ohne Standardwerte, die beim ersten Start bewusst NICHT mitgeschrieben
+ * wird – ein Roadtrip ohne "roles"-Feld ist kein Fehlerfall, sondern der
+ * Normalzustand vor der ersten expliziten Rollenvergabe.
+ */
 export function useCrew() {
-  const { items, loading } = useSettingsList<string>('general', 'users', DEFAULT_USERS);
-  return { users: items, loading };
+  const { tripId } = useRoadtrip();
+  const [users, setUsers] = useState<string[]>(DEFAULT_USERS);
+  const [roles, setRoles] = useState<CrewRoles>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tripId) {
+      setUsers(DEFAULT_USERS);
+      setRoles({});
+      setLoading(false);
+      return;
+    }
+    const docRef = doc(db, tripPath(tripId, 'settings', 'general'));
+    return onSnapshot(
+      docRef,
+      (docSnap) => {
+        const data = docSnap.exists() ? docSnap.data() : undefined;
+        const storedUsers = data?.users as string[] | undefined;
+        if (storedUsers && storedUsers.length > 0) {
+          setUsers(storedUsers);
+        } else {
+          setUsers(DEFAULT_USERS);
+          // merge: true, damit ein bereits vorhandenes roles-Feld dabei nicht verloren geht.
+          setDoc(docRef, { users: DEFAULT_USERS }, { merge: true }).catch((err) =>
+            console.error('settings/general konnte nicht angelegt werden:', err)
+          );
+        }
+        setRoles((data?.roles as CrewRoles | undefined) ?? {});
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Firestore-Fehler (settings/general):', err);
+        setLoading(false);
+      }
+    );
+  }, [tripId]);
+
+  return { users, roles, loading };
 }

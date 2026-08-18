@@ -113,7 +113,7 @@ function CrewGate() {
           <Routes>
             <Route path="/" element={<Dashboard user={user} />} />
             <Route path="/map" element={<MapTab user={user} />} />
-            <Route path="/stats" element={<Stats />} />
+            <Route path="/stats" element={<Stats user={user} />} />
             <Route path="/costs" element={<Costs user={user} users={users} />} />
             <Route
               path="/settings"
@@ -123,9 +123,9 @@ function CrewGate() {
               path="/settings/crew"
               element={<CrewSettings currentUser={user} users={users} />}
             />
-            <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
+            <Route path="/settings/quicklogs" element={<QuickLogSettings currentUser={user} />} />
             <Route path="/settings/export" element={<ExportSettings users={users} />} />
-            <Route path="/settings/papierkorb" element={<TrashSettings />} />
+            <Route path="/settings/papierkorb" element={<TrashSettings currentUser={user} />} />
             <Route path="/datenschutz" element={<Privacy />} />
           </Routes>
         </div>

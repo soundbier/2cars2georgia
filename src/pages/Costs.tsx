@@ -16,6 +16,7 @@ import {
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { usePermissions } from '../hooks/usePermissions';
 import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
 import { activeOnly } from '../lib/trash';
@@ -75,11 +76,12 @@ interface ExpenseRowProps {
   expense: Expense;
   users: string[];
   currentUser: string;
+  canEdit: boolean;
   onSave: (id: string, changes: ExpenseChanges) => Promise<boolean>;
   onRequestDelete: (id: string) => void;
 }
 
-function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: ExpenseRowProps) {
+function ExpenseRow({ expense, users, currentUser, canEdit, onSave, onRequestDelete }: ExpenseRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(expense.title);
   const [amount, setAmount] = useState(String(expense.amountEuro));
@@ -177,14 +179,16 @@ function ExpenseRow({ expense, users, currentUser, onSave, onRequestDelete }: Ex
         </div>
       </div>
       <div className="mono-num costs-row-amount">{formatEuro(expense.amountEuro)}</div>
-      <div className="costs-row-actions">
-        <IconButton label={t('costs.editExpense')} onClick={startEditing}>
-          <Pencil size={16} />
-        </IconButton>
-        <IconButton label={t('costs.deleteExpense')} tone="danger" onClick={() => onRequestDelete(expense.id!)}>
-          <Trash2 size={16} />
-        </IconButton>
-      </div>
+      {canEdit && (
+        <div className="costs-row-actions">
+          <IconButton label={t('costs.editExpense')} onClick={startEditing}>
+            <Pencil size={16} />
+          </IconButton>
+          <IconButton label={t('costs.deleteExpense')} tone="danger" onClick={() => onRequestDelete(expense.id!)}>
+            <Trash2 size={16} />
+          </IconButton>
+        </div>
+      )}
     </div>
   );
 }
@@ -315,6 +319,7 @@ function Settlement({
 
 export default function Costs({ user, users }: Props) {
   const { tripId } = useRoadtrip();
+  const { canEdit } = usePermissions(user);
   const allExpenses = useCollection<Expense>(tripId ? tripPath(tripId, 'expenses') : null, 'timestamp', 'desc');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -335,7 +340,7 @@ export default function Costs({ user, users }: Props) {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tripId) return;
+    if (!tripId || !canEdit) return;
 
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
@@ -388,42 +393,46 @@ export default function Costs({ user, users }: Props) {
         <span className="mono-num costs-total-value">{formatEuro(total)}</span>
       </div>
 
-      <form onSubmit={handleAdd} className="costs-form">
-        <Input
-          className="costs-form-title"
-          placeholder={t('costs.descriptionPlaceholder')}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <Input
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          placeholder={t('costs.amountPlaceholder')}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-        />
-        <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {t(c.labelKey)}
-            </option>
-          ))}
-        </Select>
-        <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-          <option value={SHARED_PAYER}>{t('costs.sharedPayer')}</option>
-          {users.map((name) => (
-            <option key={name} value={name}>
-              {name === user ? t('costs.self', { name }) : name}
-            </option>
-          ))}
-        </Select>
-        <Button type="submit">
-          <Plus size={18} /> {t('costs.submit')}
-        </Button>
-      </form>
+      {canEdit ? (
+        <form onSubmit={handleAdd} className="costs-form">
+          <Input
+            className="costs-form-title"
+            placeholder={t('costs.descriptionPlaceholder')}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            placeholder={t('costs.amountPlaceholder')}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {t(c.labelKey)}
+              </option>
+            ))}
+          </Select>
+          <Select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+            <option value={SHARED_PAYER}>{t('costs.sharedPayer')}</option>
+            {users.map((name) => (
+              <option key={name} value={name}>
+                {name === user ? t('costs.self', { name }) : name}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit">
+            <Plus size={18} /> {t('costs.submit')}
+          </Button>
+        </form>
+      ) : (
+        <p className="helper-text">{t('crew.readonlyHint')}</p>
+      )}
 
       <Settlement settlement={settlement} currentUser={user} />
 
@@ -439,6 +448,7 @@ export default function Costs({ user, users }: Props) {
               expense={exp}
               users={users}
               currentUser={user}
+              canEdit={canEdit}
               onSave={handleSaveEdit}
               onRequestDelete={requestDelete}
             />

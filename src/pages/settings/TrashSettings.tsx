@@ -4,6 +4,7 @@ import { RotateCcw, Trash2, BookOpen, Wallet } from 'lucide-react';
 import { db } from '../../firebase';
 import { useCollection } from '../../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
+import { usePermissions } from '../../hooks/usePermissions';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { writeOptimistically } from '../../lib/writeOutcome';
 import { deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
@@ -36,8 +37,9 @@ interface TrashItem {
 /** Was der Papierkorb löschen soll: einen einzelnen Eintrag oder alles. */
 type PurgeTarget = { kind: 'item'; item: TrashItem } | { kind: 'all' };
 
-export default function TrashSettings() {
+export default function TrashSettings({ currentUser }: { currentUser: string }) {
   const { tripId } = useRoadtrip();
+  const { canEdit } = usePermissions(currentUser);
   const quickLogs = useQuickLogs();
   const { notify } = useToast();
   const t = useT();
@@ -71,7 +73,7 @@ export default function TrashSettings() {
   const expiredCount = useMemo(() => items.filter((item) => isExpired(item)).length, [items]);
 
   const restore = (item: TrashItem) => {
-    if (!tripId) return;
+    if (!tripId || !canEdit) return;
     writeOptimistically(
       updateDoc(doc(db, tripPath(tripId, item.collectionName), item.id), { deletedAt: deleteField() }),
       () => notify(t('trash.restoreFailed'), 'danger')
@@ -82,7 +84,7 @@ export default function TrashSettings() {
   const confirmPurge = () => {
     const target = purgeTarget;
     setPurgeTarget(null);
-    if (!target || !tripId) return;
+    if (!target || !tripId || !canEdit) return;
 
     const toPurge = target.kind === 'all' ? items : [target.item];
     // Bewusst einzeln statt als Batch: Die Schreibvorgänge laufen auch offline
@@ -137,22 +139,24 @@ export default function TrashSettings() {
                     daysLeft > 0 ? t('trash.daysLeft', { count: daysLeft }) : t('trash.expired')
                   }`}
                   trailing={
-                    <>
-                      <IconButton
-                        label={t('trash.restore', { title: item.title })}
-                        tone="accent"
-                        onClick={() => restore(item)}
-                      >
-                        <RotateCcw size={16} />
-                      </IconButton>
-                      <IconButton
-                        label={t('trash.purgeOne', { title: item.title })}
-                        tone="danger"
-                        onClick={() => setPurgeTarget({ kind: 'item', item })}
-                      >
-                        <Trash2 size={16} />
-                      </IconButton>
-                    </>
+                    canEdit ? (
+                      <>
+                        <IconButton
+                          label={t('trash.restore', { title: item.title })}
+                          tone="accent"
+                          onClick={() => restore(item)}
+                        >
+                          <RotateCcw size={16} />
+                        </IconButton>
+                        <IconButton
+                          label={t('trash.purgeOne', { title: item.title })}
+                          tone="danger"
+                          onClick={() => setPurgeTarget({ kind: 'item', item })}
+                        >
+                          <Trash2 size={16} />
+                        </IconButton>
+                      </>
+                    ) : undefined
                   }
                 />
               );
@@ -168,9 +172,11 @@ export default function TrashSettings() {
               ? t('trash.expiredNote', { count: expiredCount, days: RETENTION_DAYS })
               : t('trash.retentionNote', { days: RETENTION_DAYS })}
           </p>
-          <Button variant="destructive" fullWidth onClick={() => setPurgeTarget({ kind: 'all' })}>
-            <Trash2 size={18} /> {t('trash.emptyTrashButton')}
-          </Button>
+          {canEdit && (
+            <Button variant="destructive" fullWidth onClick={() => setPurgeTarget({ kind: 'all' })}>
+              <Trash2 size={18} /> {t('trash.emptyTrashButton')}
+            </Button>
+          )}
         </Section>
       )}
 

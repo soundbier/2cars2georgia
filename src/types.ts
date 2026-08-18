@@ -58,6 +58,22 @@ export const DEFAULT_QUICK_LOG_SEEDS: QuickLogSeed[] = [
 // Fallback, solange settings/general in Firestore noch nicht existiert.
 export const DEFAULT_USERS = ['Lukas', 'Leon', 'Niklas', 'Elias'];
 
+/**
+ * Rolle eines Crewmitglieds innerhalb des Roadtrips, siehe lib/permissions.ts:
+ * - owner: darf die Crew verwalten (einladen, entfernen, Rollen vergeben).
+ * - member: normales Crewmitglied ("Mitfahrer"), erfasst/bearbeitet Einträge.
+ * - readonly: sieht alles, kann aber nichts anlegen, ändern oder löschen.
+ */
+export type CrewRole = 'owner' | 'member' | 'readonly';
+
+/**
+ * Rollenzuordnung im settings/general-Dokument. Ein fehlender Eintrag ist
+ * kein Fehler – getEffectiveRole() in lib/permissions.ts liefert dafür einen
+ * sinnvollen Standard, damit bestehende Roadtrips ohne dieses Feld weiter
+ * funktionieren.
+ */
+export type CrewRoles = Partial<Record<string, CrewRole>>;
+
 export interface Coordinates {
   lat: number;
   lng: number;
