@@ -39,8 +39,24 @@ const {
   leaveRoadtrip,
   slugifyTripName,
   tripIdFromUser,
-  generateRecoveryCode
+  generateRecoveryCode,
+  RoadtripAuthError
 } = await import('./roadtrip');
+
+/**
+ * Der Fehlercode eines fehlgeschlagenen Aufrufs. Geprüft wird der Code, nicht
+ * der angezeigte Satz – der lebt seit der Mehrsprachigkeit in src/i18n und
+ * hängt an der eingestellten Sprache.
+ */
+async function errorCode(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+    return 'kein Fehler';
+  } catch (err) {
+    if (err instanceof RoadtripAuthError) return err.code;
+    throw err;
+  }
+}
 
 /** Firebase-Fehler tragen ihren Grund im `code`-Feld, nicht in der Message. */
 function authError(code: string) {
@@ -171,20 +187,20 @@ describe('createRoadtrip', () => {
   });
 
   it('lehnt einen Namen ohne verwertbare Zeichen ab', async () => {
-    await expect(createRoadtrip('###', 'geheim123')).rejects.toThrow(/Namen/);
+    await expect(errorCode(createRoadtrip('###', 'geheim123'))).resolves.toBe('missingName');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
   it('lehnt zu kurze Passwörter ab, bevor Firebase überhaupt gefragt wird', async () => {
-    await expect(createRoadtrip('Ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1))).rejects.toThrow(
-      new RegExp(`${MIN_PASSWORD_LENGTH} Zeichen`)
-    );
+    const code = await errorCode(createRoadtrip('Ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1)));
+
+    expect(code).toBe('passwordTooShort');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
-  it('übersetzt einen belegten Namen in eine verständliche Meldung', async () => {
+  it('übersetzt einen belegten Namen in einen eigenen Fehlercode', async () => {
     createUserWithEmailAndPassword.mockRejectedValueOnce(authError('auth/email-already-in-use'));
-    await expect(createRoadtrip('Ostsee', 'geheim123')).rejects.toThrow(/bereits vergeben/);
+    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123'))).resolves.toBe('nameTaken');
   });
 
   it('räumt den Hauptaccount auf, wenn der Wiederherstellungs-Account nicht angelegt werden kann', async () => {
@@ -194,7 +210,7 @@ describe('createRoadtrip', () => {
     });
     createUserWithEmailAndPassword.mockRejectedValueOnce(new Error('netzwerk kaputt'));
 
-    await expect(createRoadtrip('Ostsee', 'geheim123')).rejects.toThrow(/schiefgelaufen/);
+    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123'))).resolves.toBe('unknown');
 
     // Zum Zeitpunkt des Fehlers war der Hauptaccount currentUser – der wird
     // best-effort wieder gelöscht, damit der Name nicht dauerhaft blockiert.
@@ -228,21 +244,22 @@ describe('joinRoadtrip', () => {
     // Getrennte Meldungen für "Name unbekannt" und "Passwort falsch" wären ein
     // Orakel, mit dem sich vorhandene Roadtrip-Namen durchprobieren ließen.
     signInWithEmailAndPassword.mockRejectedValueOnce(authError('auth/wrong-password'));
-    const wrongPassword = await joinRoadtrip('Ostsee', 'falsch1').catch((e: Error) => e.message);
+    const wrongPassword = await errorCode(joinRoadtrip('Ostsee', 'falsch1'));
 
     signInWithEmailAndPassword.mockRejectedValueOnce(authError('auth/user-not-found'));
-    const unknownTrip = await joinRoadtrip('Gibtsnicht', 'falsch1').catch((e: Error) => e.message);
+    const unknownTrip = await errorCode(joinRoadtrip('Gibtsnicht', 'falsch1'));
 
+    expect(wrongPassword).toBe('wrongCredentials');
     expect(wrongPassword).toBe(unknownTrip);
   });
 
   it('meldet zu viele Fehlversuche gesondert', async () => {
     signInWithEmailAndPassword.mockRejectedValueOnce(authError('auth/too-many-requests'));
-    await expect(joinRoadtrip('Ostsee', 'falsch1')).rejects.toThrow(/Zu viele Versuche/);
+    await expect(errorCode(joinRoadtrip('Ostsee', 'falsch1'))).resolves.toBe('tooManyAttempts');
   });
 
   it('lehnt einen leeren Namen ab', async () => {
-    await expect(joinRoadtrip('  ', 'geheim123')).rejects.toThrow(/Namen/);
+    await expect(errorCode(joinRoadtrip('  ', 'geheim123'))).resolves.toBe('missingName');
     expect(signInWithEmailAndPassword).not.toHaveBeenCalled();
   });
 });
@@ -262,13 +279,17 @@ describe('recoverRoadtrip', () => {
   });
 
   it('lehnt einen leeren Namen ab', async () => {
-    await expect(recoverRoadtrip('  ', 'XJ3K9-7QRTY-ABCDE-FGHJK')).rejects.toThrow(/Namen/);
+    await expect(errorCode(recoverRoadtrip('  ', 'XJ3K9-7QRTY-ABCDE-FGHJK'))).resolves.toBe(
+      'missingName'
+    );
     expect(signInWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
-  it('übersetzt einen falschen Code in dieselbe generische Meldung wie ein falsches Passwort', async () => {
+  it('übersetzt einen falschen Code in denselben Fehlercode wie ein falsches Passwort', async () => {
     signInWithEmailAndPassword.mockRejectedValueOnce(authError('auth/invalid-credential'));
-    await expect(recoverRoadtrip('Ostsee', 'falscher-code')).rejects.toThrow(/falsch/);
+    await expect(errorCode(recoverRoadtrip('Ostsee', 'falscher-code'))).resolves.toBe(
+      'wrongCredentials'
+    );
   });
 });
 

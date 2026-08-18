@@ -5,6 +5,7 @@ import { usePreferences } from './usePreferences';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { trackWrite } from '../lib/pendingWrites';
 import { bearingDegrees, distanceMeters } from '../lib/geo';
+import { useT } from '../i18n';
 import { Coordinates, GpsPoint, LivePosition } from '../types';
 
 /**
@@ -36,6 +37,7 @@ const TrackingContext = createContext<TrackingContextValue | null>(null);
 export function TrackingProvider({ user, children }: { user: string; children: ReactNode }) {
   const { preferences } = usePreferences();
   const { tripId } = useRoadtrip();
+  const t = useT();
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -62,7 +64,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setError('Geolocation nicht unterstützt');
+      setError(t('cockpit.gpsUnsupported'));
       return;
     }
 
@@ -108,7 +110,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [user, tripId]);
+  }, [user, tripId, t]);
 
   const value = useMemo(
     () => ({ position, error, isTracking, setIsTracking }),

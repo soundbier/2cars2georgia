@@ -10,6 +10,7 @@ import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { speedUnitLabel, toDisplaySpeed } from '../lib/units';
 import { LogType, LogEvent } from '../types';
+import { useT } from '../i18n';
 import { Button, EmptyState, useToast } from '../components/ui';
 import './Dashboard.css';
 
@@ -20,10 +21,11 @@ export default function Dashboard({ user }: { user: string }) {
   const { preferences } = usePreferences();
   const [isLogging, setIsLogging] = useState(false);
   const { notify } = useToast();
+  const t = useT();
 
   const handleQuickLog = async (type: LogType, title: string) => {
     if (!position) {
-      notify('Warte auf GPS-Signal …', 'danger');
+      notify(t('cockpit.waitingForGps'), 'danger');
       return;
     }
     if (!tripId) return;
@@ -38,10 +40,10 @@ export default function Dashboard({ user }: { user: string }) {
         lng: position.lng
       };
       await trackWrite(addDoc(collection(db, tripPath(tripId, 'events')), event));
-      notify(`„${title}“ protokolliert`, 'success');
+      notify(t('cockpit.logged', { title }), 'success');
     } catch (err) {
       console.error(err);
-      notify('Fehler beim Speichern.', 'danger');
+      notify(t('common.saveError'), 'danger');
     } finally {
       setIsLogging(false);
     }
@@ -52,8 +54,12 @@ export default function Dashboard({ user }: { user: string }) {
   return (
     <div>
       <div className="cockpit-header">
-        <h1 className="page-title">Cockpit</h1>
-        <div className="profile-chip" title={`Angemeldet als ${user}`} aria-label={`Angemeldet als ${user}`}>
+        <h1 className="page-title">{t('cockpit.title')}</h1>
+        <div
+          className="profile-chip"
+          title={t('cockpit.signedInAs', { name: user })}
+          aria-label={t('cockpit.signedInAs', { name: user })}
+        >
           <span className="avatar">{user.charAt(0).toUpperCase()}</span>
           <span className="profile-chip-name">{user}</span>
         </div>
@@ -63,7 +69,7 @@ export default function Dashboard({ user }: { user: string }) {
       <div className="instrument">
         <div className={`instrument-status instrument-status-${gpsStatus}`}>
           <Satellite size={13} />
-          <span>{error ?? (position ? 'GPS aktiv' : 'Suche Satelliten …')}</span>
+          <span>{error ?? (position ? t('cockpit.gpsActive') : t('cockpit.gpsSearching'))}</span>
         </div>
 
         <div className="instrument-speed">
@@ -79,16 +85,16 @@ export default function Dashboard({ user }: { user: string }) {
           onClick={() => setIsTracking(!isTracking)}
         >
           {isTracking ? <Square size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-          {isTracking ? 'Tour stoppen' : 'Tour starten'}
+          {isTracking ? t('cockpit.stopTour') : t('cockpit.startTour')}
         </Button>
       </div>
 
-      <h2 className="section-title section-title-spaced">Schnell-Logs</h2>
+      <h2 className="section-title section-title-spaced">{t('cockpit.quickLogs')}</h2>
 
       {quickLogs.length === 0 ? (
         <EmptyState
-          title="Keine Schnell-Logs konfiguriert"
-          hint="Unter Mehr → Schnell-Logs Kategorien anlegen."
+          title={t('cockpit.noQuickLogs')}
+          hint={t('cockpit.noQuickLogsHint')}
         />
       ) : (
         <div className="quick-log-grid">

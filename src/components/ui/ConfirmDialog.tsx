@@ -1,5 +1,6 @@
 import { useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useT } from '../../i18n';
 import { Button } from './Button';
 import './ConfirmDialog.css';
 
@@ -18,13 +19,14 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = 'Bestätigen',
-  cancelLabel = 'Abbrechen',
+  confirmLabel,
+  cancelLabel,
   destructive,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
   const titleId = useId();
+  const t = useT();
 
   useEffect(() => {
     if (!open) return;
@@ -52,7 +54,7 @@ export function ConfirmDialog({
         {description && <p className="dialog-description">{description}</p>}
         <div className="dialog-actions">
           <Button variant="secondary" fullWidth onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </Button>
           <Button
             variant={destructive ? 'destructive' : 'primary'}
@@ -60,7 +62,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             autoFocus
           >
-            {confirmLabel}
+            {confirmLabel ?? t('common.confirm')}
           </Button>
         </div>
       </div>

@@ -80,21 +80,47 @@ export function generateRecoveryCode(): string {
   return groups.join('-');
 }
 
-function friendlyAuthError(err: unknown): string {
+/**
+ * Gründe, aus denen eine Anmeldung scheitern kann – als Code statt als fertig
+ * formulierter Satz.
+ *
+ * Diese Datei kennt keine Sprache: Welcher Text daraus wird, entscheidet die
+ * Oberfläche über die Schlüssel `authError.{code}` in src/i18n. Vorher standen
+ * hier deutsche Meldungen, die sich nicht übersetzen ließen, ohne die
+ * Fehlerbehandlung anzufassen.
+ */
+export type RoadtripErrorCode =
+  | 'nameTaken'
+  | 'passwordTooShort'
+  | 'wrongCredentials'
+  | 'tooManyAttempts'
+  | 'missingName'
+  | 'unknown';
+
+export class RoadtripAuthError extends Error {
+  constructor(readonly code: RoadtripErrorCode) {
+    // Die Message ist nur für Logs und Fehlerberichte gedacht, nie für die
+    // Anzeige – deshalb bewusst der nackte Code.
+    super(`roadtrip auth failed: ${code}`);
+    this.name = 'RoadtripAuthError';
+  }
+}
+
+function authErrorCode(err: unknown): RoadtripErrorCode {
   const code = (err as { code?: string })?.code;
   switch (code) {
     case 'auth/email-already-in-use':
-      return 'Dieser Roadtrip-Name ist bereits vergeben. Wähle einen anderen Namen oder tritt dem bestehenden Roadtrip bei.';
+      return 'nameTaken';
     case 'auth/weak-password':
-      return `Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen haben.`;
+      return 'passwordTooShort';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
-      return 'Roadtrip-Name oder Passwort ist falsch.';
+      return 'wrongCredentials';
     case 'auth/too-many-requests':
-      return 'Zu viele Versuche. Bitte kurz warten und erneut probieren.';
+      return 'tooManyAttempts';
     default:
-      return 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.';
+      return 'unknown';
   }
 }
 
@@ -118,10 +144,8 @@ async function resolveTripName(tripId: string, fallback: string): Promise<string
 export async function createRoadtrip(name: string, password: string): Promise<CreateRoadtripResult> {
   const trimmedName = name.trim();
   const tripId = slugifyTripName(trimmedName);
-  if (!tripId) throw new Error('Bitte einen Namen für den Roadtrip eingeben.');
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen haben.`);
-  }
+  if (!tripId) throw new RoadtripAuthError('missingName');
+  if (password.length < MIN_PASSWORD_LENGTH) throw new RoadtripAuthError('passwordTooShort');
 
   const recoveryCode = generateRecoveryCode();
 
@@ -143,20 +167,20 @@ export async function createRoadtrip(name: string, password: string): Promise<Cr
     if (auth.currentUser) {
       await deleteUser(auth.currentUser).catch(() => undefined);
     }
-    throw new Error(friendlyAuthError(err));
+    throw new RoadtripAuthError(authErrorCode(err));
   }
 }
 
 /** Meldet das Gerät mit dem normalen Roadtrip-Passwort an. */
 export async function joinRoadtrip(name: string, password: string): Promise<RoadtripAuthResult> {
   const tripId = slugifyTripName(name);
-  if (!tripId) throw new Error('Bitte den Namen des Roadtrips eingeben.');
+  if (!tripId) throw new RoadtripAuthError('missingName');
 
   try {
     await signInWithEmailAndPassword(auth, tripEmail(tripId), password);
     return { tripId, tripName: await resolveTripName(tripId, name.trim()) };
   } catch (err) {
-    throw new Error(friendlyAuthError(err));
+    throw new RoadtripAuthError(authErrorCode(err));
   }
 }
 
@@ -167,13 +191,13 @@ export async function joinRoadtrip(name: string, password: string): Promise<Road
  */
 export async function recoverRoadtrip(name: string, recoveryCode: string): Promise<RoadtripAuthResult> {
   const tripId = slugifyTripName(name);
-  if (!tripId) throw new Error('Bitte den Namen des Roadtrips eingeben.');
+  if (!tripId) throw new RoadtripAuthError('missingName');
 
   try {
     await signInWithEmailAndPassword(auth, recoveryEmail(tripId), recoveryCode.trim());
     return { tripId, tripName: await resolveTripName(tripId, name.trim()) };
   } catch (err) {
-    throw new Error(friendlyAuthError(err));
+    throw new RoadtripAuthError(authErrorCode(err));
   }
 }
 

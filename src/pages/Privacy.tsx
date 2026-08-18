@@ -1,3 +1,4 @@
+import { useI18n, useT } from '../i18n';
 import { PageHeader, Section } from '../components/ui';
 import './Settings.css';
 import './Privacy.css';
@@ -9,101 +10,63 @@ import './Privacy.css';
  * verwendet werden kann.
  */
 export function PrivacyContent() {
+  const t = useT();
+  const { language } = useI18n();
+  const translationNote = t('privacy.translationNote');
+
   return (
     <div className="privacy-content">
-      <p className="helper-text privacy-intro">
-        Diese App wird privat im Freundeskreis betrieben, nicht gewerblich. Trotzdem verarbeitet
-        sie Standort-, Namens- und Kostendaten der Crew – deshalb hier transparent, was womit
-        passiert.
-      </p>
+      <p className="helper-text privacy-intro">{t('privacy.intro')}</p>
 
-      <Section title="Verantwortliche Stelle">
-        <p className="helper-text privacy-placeholder">
-          [Name/Kontakt der Person eintragen, die diesen Roadtrip bzw. das Firebase-Projekt
-          betreibt – z.B. „Vorname Nachname, E-Mail“.]
-        </p>
+      {/* Nur in übersetzten Fassungen sichtbar: Die deutsche Fassung ist die
+          rechtlich maßgebliche, siehe Datenschutz-Abschnitt README. */}
+      {translationNote && language !== 'de' && (
+        <p className="helper-text privacy-placeholder">{translationNote}</p>
+      )}
+
+      <Section title={t('privacy.controller')}>
+        <p className="helper-text privacy-placeholder">{t('privacy.controllerPlaceholder')}</p>
       </Section>
 
-      <Section title="Welche Daten werden verarbeitet">
+      <Section title={t('privacy.dataTitle')}>
         <ul className="privacy-list">
           <li>
-            <strong>Standort (GPS):</strong> nur während eine Tour aktiv aufgezeichnet wird
-            („Tour starten“ im Cockpit) – Koordinaten, Geschwindigkeit und Kurs, jeweils mit
-            Zeitstempel und dem Namen des Geräts/Crewmitglieds.
+            <strong>{t('privacy.dataGps')}</strong> {t('privacy.dataGpsText')}
           </li>
           <li>
-            <strong>Ereignis-Logbuch:</strong> Ort, Zeitpunkt, Kategorie (z.B. Schleuse, Pause)
-            und der Name, wer den Eintrag angelegt hat.
+            <strong>{t('privacy.dataLog')}</strong> {t('privacy.dataLogText')}
           </li>
           <li>
-            <strong>Kosten:</strong> Beträge, Beschreibung, Kategorie und wer bezahlt bzw.
-            eingetragen hat.
+            <strong>{t('privacy.dataCosts')}</strong> {t('privacy.dataCostsText')}
           </li>
           <li>
-            <strong>Crew-Namen:</strong> selbst gewählte Namen der Mitfahrenden, keine
-            E-Mail-Adressen oder sonstigen Kontaktdaten.
+            <strong>{t('privacy.dataNames')}</strong> {t('privacy.dataNamesText')}
           </li>
           <li>
-            <strong>Technisch, lokal auf dem Gerät:</strong> der gewählte Crew-Name
-            (`localStorage`) und die Firebase-Anmeldesitzung des Roadtrips – keine
-            Werbe-/Tracking-Cookies.
+            <strong>{t('privacy.dataLocal')}</strong> {t('privacy.dataLocalText')}
           </li>
         </ul>
       </Section>
 
-      <Section title="Zweck und Rechtsgrundlage">
-        <p className="helper-text">
-          Die Verarbeitung dient ausschließlich der gemeinsamen Organisation und Dokumentation
-          dieser Reise durch die Crew selbst (Art. 6 Abs. 1 lit. b bzw. lit. f DSGVO – Erfüllung
-          der gemeinsam vereinbarten Nutzung bzw. berechtigtes Interesse an der Reiseplanung). Bei
-          rein privater, familiärer Nutzung im engen Freundeskreis kann zusätzlich die
-          Haushaltsausnahme (Art. 2 Abs. 2 lit. c DSGVO) einschlägig sein. Diese Einschätzung
-          ersetzt keine Rechtsberatung – bei Nutzung außerhalb eines engen, privaten Kreises
-          empfiehlt sich eine anwaltliche Prüfung.
-        </p>
+      <Section title={t('privacy.purposeTitle')}>
+        <p className="helper-text">{t('privacy.purposeText')}</p>
       </Section>
 
-      <Section title="Wer die Daten sonst noch sieht">
-        <p className="helper-text">
-          Die Daten liegen bei <strong>Google Firebase</strong> (Firestore-Datenbank,
-          Authentifizierung) als technischem Auftragsverarbeiter; je nach gewählter
-          Firestore-Region können Server auch außerhalb der EU (z.B. USA) stehen. Ist Sentry für
-          Fehler-Monitoring konfiguriert (siehe README), erhält auch Sentry technische
-          Fehlerberichte – dabei bewusst ohne Standort-, Namens- oder Kostendaten, nur die
-          anonyme Roadtrip-ID als Kontext.
-        </p>
+      <Section title={t('privacy.processorsTitle')}>
+        <p className="helper-text">{t('privacy.processorsText')}</p>
       </Section>
 
-      <Section title="Speicherdauer">
-        <p className="helper-text">
-          Daten bleiben gespeichert, solange der Roadtrip in Firebase besteht – es gibt aktuell
-          keine automatische Löschung. Auf Wunsch löscht die verantwortliche Stelle (siehe oben)
-          einzelne Einträge oder den gesamten Roadtrip manuell.
-        </p>
-        <p className="helper-text">
-          Gelöschte Logbuch-Einträge und Ausgaben landen zunächst im Papierkorb
-          (Mehr&nbsp;→&nbsp;Papierkorb) und sind dort weiterhin gespeichert, damit ein Fehlgriff
-          rückgängig gemacht werden kann. Endgültig entfernt werden sie erst, wenn sie dort
-          gelöscht oder der Papierkorb geleert wird.
-        </p>
+      <Section title={t('privacy.retentionTitle')}>
+        <p className="helper-text">{t('privacy.retentionText')}</p>
+        <p className="helper-text">{t('privacy.retentionTrashText')}</p>
       </Section>
 
-      <Section title="Export und Weitergabe">
-        <p className="helper-text">
-          Über Mehr&nbsp;→&nbsp;Export lassen sich Logbuch, Kosten und Route als PDF, CSV oder GPX
-          aus der App holen. Diese Dateien enthalten Namen, Positionen und Beträge der Crew und
-          verlassen mit dem Teilen den Schutzbereich der App – die Weitergabe an Dritte sollte
-          deshalb mit allen Betroffenen abgestimmt sein.
-        </p>
+      <Section title={t('privacy.exportTitle')}>
+        <p className="helper-text">{t('privacy.exportText')}</p>
       </Section>
 
-      <Section title="Eure Rechte">
-        <p className="helper-text">
-          Ihr habt das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der
-          Verarbeitung eurer Daten sowie auf Datenübertragbarkeit und Widerspruch. Wendet euch
-          dafür an die oben genannte verantwortliche Stelle. Außerdem besteht ein
-          Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde.
-        </p>
+      <Section title={t('privacy.rightsTitle')}>
+        <p className="helper-text">{t('privacy.rightsText')}</p>
       </Section>
     </div>
   );
@@ -111,9 +74,11 @@ export function PrivacyContent() {
 
 /** Innerhalb des Routers verwendete Variante mit Zurück-Navigation, siehe App.tsx. */
 export default function Privacy() {
+  const t = useT();
+
   return (
     <div className="settings-page">
-      <PageHeader title="Datenschutz" subtitle="Was diese App speichert und warum" backTo="/settings" />
+      <PageHeader title={t('privacy.title')} subtitle={t('privacy.subtitle')} backTo="/settings" />
       <PrivacyContent />
     </div>
   );

@@ -5,12 +5,13 @@
  * auf jedem Gerät der Crew sofort funktionieren, auch wenn unterwegs niemand
  * einen Account anlegen kann. Jede Quelle bringt ihre eigene Attribution mit,
  * die Leaflet unten rechts einblendet.
+ *
+ * Beschriftungen stehen hier bewusst nicht mehr drin, sondern unter den
+ * Schlüsseln `layer.{id}` und `layer.{id}.description` in src/i18n – diese
+ * Datei beschreibt die technischen Quellen, nicht ihre Darstellung.
  */
 
 export interface TileLayerSpec {
-  label: string;
-  /** Kurzbeschreibung für die Einstellungen. */
-  description: string;
   url: string;
   attribution: string;
   /** Bis hierhin darf gezoomt werden. */
@@ -21,30 +22,22 @@ export interface TileLayerSpec {
 
 export const BASE_LAYERS = {
   osm: {
-    label: 'Standard',
-    description: 'OpenStreetMap – Orte, Straßen, Wasserwege',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   },
   topo: {
-    label: 'Topografisch',
-    description: 'OpenTopoMap – Höhenlinien und Gelände',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)',
     maxZoom: 19,
     maxNativeZoom: 17
   },
   satellite: {
-    label: 'Satellit',
-    description: 'Esri World Imagery – Luftbild ohne Beschriftung',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; Esri, Maxar, Earthstar Geographics',
     maxZoom: 19
   },
   light: {
-    label: 'Reduziert',
-    description: 'Heller, kontrastarmer Hintergrund – Track und Marker treten hervor',
     url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
     attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
     maxZoom: 20
@@ -55,24 +48,18 @@ export type BaseLayerId = keyof typeof BASE_LAYERS;
 
 export const OVERLAYS = {
   seamarks: {
-    label: 'Seezeichen',
-    description: 'Tonnen, Leuchtfeuer und Fahrwasser (OpenSeaMap)',
     url: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
     attribution: '&copy; OpenSeaMap contributors',
     maxZoom: 19,
     maxNativeZoom: 18
   },
   cycling: {
-    label: 'Radrouten',
-    description: 'Ausgeschilderte Radfernwege (Waymarked Trails)',
     url: 'https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png',
     attribution: '&copy; waymarkedtrails.org (CC-BY-SA)',
     maxZoom: 19,
     maxNativeZoom: 18
   },
   hiking: {
-    label: 'Wanderwege',
-    description: 'Markierte Wanderwege an Land (Waymarked Trails)',
     url: 'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
     attribution: '&copy; waymarkedtrails.org (CC-BY-SA)',
     maxZoom: 19,

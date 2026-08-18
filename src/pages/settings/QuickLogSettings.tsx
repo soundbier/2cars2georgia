@@ -6,6 +6,7 @@ import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { trackWrite } from '../../lib/pendingWrites';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { QUICK_LOG_ICONS, DEFAULT_QUICK_LOG_ICON, getQuickLogIcon } from '../../lib/quickLogIcons';
+import { useT } from '../../i18n';
 import { QuickLogConfig, QuickLogIconName } from '../../types';
 import {
   IconButton,
@@ -32,8 +33,9 @@ interface IconPickerProps {
 }
 
 function IconPicker({ value, onChange }: IconPickerProps) {
+  const t = useT();
   return (
-    <div className="icon-picker" role="radiogroup" aria-label="Symbol wählen">
+    <div className="icon-picker" role="radiogroup" aria-label={t('quickLogs.chooseIcon')}>
       {ICON_NAMES.map((name) => {
         const Icon = QUICK_LOG_ICONS[name];
         const isActive = name === value;
@@ -43,7 +45,7 @@ function IconPicker({ value, onChange }: IconPickerProps) {
             type="button"
             role="radio"
             aria-checked={isActive}
-            aria-label={`Symbol ${name}`}
+            aria-label={t('quickLogs.iconLabel', { name })}
             className={`icon-picker-option ${isActive ? 'icon-picker-option-active' : ''}`}
             onClick={() => onChange(name)}
           >
@@ -59,6 +61,7 @@ export default function QuickLogSettings() {
   const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const { notify } = useToast();
+  const t = useT();
 
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState<QuickLogIconName>(DEFAULT_QUICK_LOG_ICON);
@@ -67,7 +70,7 @@ export default function QuickLogSettings() {
   const [editingIcon, setEditingIcon] = useState<QuickLogIconName>(DEFAULT_QUICK_LOG_ICON);
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
-  const saveQuickLogs = async (items: QuickLogConfig[], errorMessage = 'Fehler beim Speichern.') => {
+  const saveQuickLogs = async (items: QuickLogConfig[], errorMessage = t('common.saveError')) => {
     if (!tripId) return false;
     try {
       await trackWrite(updateDoc(doc(db, tripPath(tripId, 'settings', 'quicklogs')), { items }));
@@ -110,7 +113,7 @@ export default function QuickLogSettings() {
   const confirmRemove = async () => {
     if (!pendingRemoval) return;
     const items = quickLogs.filter((q) => q.id !== pendingRemoval);
-    if (await saveQuickLogs(items, 'Fehler beim Löschen.')) notify('Schnell-Log entfernt', 'success');
+    if (await saveQuickLogs(items, t('common.deleteError'))) notify(t('quickLogs.removed'), 'success');
     setPendingRemoval(null);
   };
 
@@ -119,32 +122,37 @@ export default function QuickLogSettings() {
   return (
     <div className="settings-page">
       <PageHeader
-        title="Schnell-Logs"
-        subtitle="Kategorien für die Ereignis-Buttons im Cockpit"
+        title={t('quickLogs.title')}
+        subtitle={t('quickLogs.subtitle')}
         backTo="/settings"
-        backLabel="Einstellungen"
+        backLabel={t('settings.title')}
       />
 
-      <Section title="Neue Kategorie">
+      <Section title={t('quickLogs.newCategory')}>
         <form onSubmit={handleAdd} className="stack">
           <Input
-            placeholder="Bezeichnung, z. B. Wasser tanken"
+            placeholder={t('quickLogs.labelPlaceholder')}
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
           />
           <IconPicker value={newIcon} onChange={setNewIcon} />
           <div className="row">
-            <IconButton type="submit" label="Kategorie hinzufügen" tone="accent" disabled={!newLabel.trim()}>
+            <IconButton
+              type="submit"
+              label={t('quickLogs.addCategory')}
+              tone="accent"
+              disabled={!newLabel.trim()}
+            >
               <Plus size={20} />
             </IconButton>
-            <span className="helper-text">Symbol und Bezeichnung erscheinen im Cockpit und im Logbuch.</span>
+            <span className="helper-text">{t('quickLogs.addHint')}</span>
           </div>
         </form>
       </Section>
 
-      <Section title={`Kategorien (${quickLogs.length})`}>
+      <Section title={t('quickLogs.categories', { count: quickLogs.length })}>
         {quickLogs.length === 0 ? (
-          <EmptyState title="Keine Schnell-Logs" hint="Füge oben die erste Kategorie hinzu." />
+          <EmptyState title={t('quickLogs.empty')} hint={t('quickLogs.emptyHint')} />
         ) : (
           <div className="settings-list">
             {quickLogs.map((log) => {
@@ -166,14 +174,14 @@ export default function QuickLogSettings() {
                     <IconPicker value={editingIcon} onChange={setEditingIcon} />
                     <div className="row">
                       <IconButton
-                        label="Änderung speichern"
+                        label={t('quickLogs.saveEdit')}
                         tone="accent"
                         onClick={handleSaveEdit}
                         disabled={!editingLabel.trim()}
                       >
                         <Check size={18} />
                       </IconButton>
-                      <IconButton label="Abbrechen" onClick={() => setEditingId(null)}>
+                      <IconButton label={t('common.cancel')} onClick={() => setEditingId(null)}>
                         <X size={18} />
                       </IconButton>
                     </div>
@@ -188,11 +196,14 @@ export default function QuickLogSettings() {
                   title={log.label}
                   trailing={
                     <>
-                      <IconButton label={`${log.label} bearbeiten`} onClick={() => startEditing(log)}>
+                      <IconButton
+                        label={t('quickLogs.edit', { label: log.label })}
+                        onClick={() => startEditing(log)}
+                      >
                         <Pencil size={16} />
                       </IconButton>
                       <IconButton
-                        label={`${log.label} löschen`}
+                        label={t('quickLogs.delete', { label: log.label })}
                         tone="danger"
                         onClick={() => setPendingRemoval(log.id)}
                       >
@@ -209,9 +220,9 @@ export default function QuickLogSettings() {
 
       <ConfirmDialog
         open={pendingRemoval !== null}
-        title="Schnell-Log entfernen"
-        description={`„${pendingLabel}“ wird aus den Schnell-Logs entfernt. Bereits erfasste Ereignisse bleiben erhalten.`}
-        confirmLabel="Entfernen"
+        title={t('quickLogs.removeTitle')}
+        description={t('quickLogs.removeDescription', { label: pendingLabel ?? '' })}
+        confirmLabel={t('common.remove')}
         destructive
         onConfirm={confirmRemove}
         onCancel={() => setPendingRemoval(null)}
