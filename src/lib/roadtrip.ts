@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  deleteUser,
   User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -14,7 +15,20 @@ import { auth, db } from '../firebase';
 // Firestore-Regeln vergleichen anschließend `request.auth.token.email` mit
 // dem angefragten Pfad `roadtrips/{tripId}/…` – das ist der eigentliche
 // Zugriffsschutz, nicht die UI.
+//
+// Zusätzlich zum normalen Auth-User legt createRoadtrip einen zweiten,
+// unabhängigen Auth-User unter einer anderen Domain an: den
+// Wiederherstellungs-Account. Sein Passwort ist ein einmalig angezeigter,
+// zufälliger Code. Da beide E-Mail-Adressen denselben lokalen Teil (die
+// tripId) tragen, liefert tripIdFromUser() für beide dasselbe Ergebnis –
+// die Firestore-Regeln (die nur den lokalen Teil vergleichen) und der Rest
+// der App unterscheiden nicht, über welchen der beiden Wege ein Gerät
+// angemeldet ist. Ohne eigenes Backend lässt sich das Passwort eines
+// bestehenden Firebase-Auth-Users nicht "zurücksetzen" – der
+// Wiederherstellungscode ist deshalb technisch ein zweites, dauerhaft
+// gültiges Passwort fürs Comeback, kein Reset-Mechanismus.
 const TRIP_EMAIL_DOMAIN = '2cars2georgia.trip';
+const RECOVERY_EMAIL_DOMAIN = '2cars2georgia.recovery';
 
 export const MIN_PASSWORD_LENGTH = 6;
 
@@ -33,11 +47,37 @@ function tripEmail(tripId: string): string {
   return `${tripId}@${TRIP_EMAIL_DOMAIN}`;
 }
 
+function recoveryEmail(tripId: string): string {
+  return `${tripId}@${RECOVERY_EMAIL_DOMAIN}`;
+}
+
 /** Liest die Roadtrip-ID aus dem eingeloggten Auth-User (Präfix der Kunst-E-Mail). */
 export function tripIdFromUser(user: User | null): string | null {
   if (!user?.email) return null;
   const [id] = user.email.split('@');
   return id || null;
+}
+
+// Alphabet ohne leicht verwechselbare Zeichen (0/O, 1/I/L) – der Code wird
+// von Hand abgetippt oder abfotografiert, nicht per Copy-paste weitergegeben.
+const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const RECOVERY_GROUP_COUNT = 4;
+const RECOVERY_GROUP_LENGTH = 5;
+
+/**
+ * Erzeugt einen zufälligen Wiederherstellungscode, z.B. "XJ3K9-7QRTY-…".
+ * 20 Zeichen aus einem 32er-Alphabet ergeben ~100 Bit Entropie – deutlich
+ * mehr, als sich ohne Rate-Limit-Umgehung praktisch erraten lässt.
+ */
+export function generateRecoveryCode(): string {
+  const bytes = new Uint8Array(RECOVERY_GROUP_COUNT * RECOVERY_GROUP_LENGTH);
+  crypto.getRandomValues(bytes);
+  const chars = Array.from(bytes, (b) => RECOVERY_ALPHABET[b % RECOVERY_ALPHABET.length]);
+  const groups: string[] = [];
+  for (let i = 0; i < chars.length; i += RECOVERY_GROUP_LENGTH) {
+    groups.push(chars.slice(i, i + RECOVERY_GROUP_LENGTH).join(''));
+  }
+  return groups.join('-');
 }
 
 function friendlyAuthError(err: unknown): string {
@@ -63,8 +103,19 @@ export interface RoadtripAuthResult {
   tripName: string;
 }
 
-/** Legt einen neuen Roadtrip an und meldet das Gerät direkt darin an. */
-export async function createRoadtrip(name: string, password: string): Promise<RoadtripAuthResult> {
+export interface CreateRoadtripResult extends RoadtripAuthResult {
+  /** Nur bei der Erstellung verfügbar – wird danach nirgends gespeichert. */
+  recoveryCode: string;
+}
+
+async function resolveTripName(tripId: string, fallback: string): Promise<string> {
+  const snap = await getDoc(doc(db, 'roadtrips', tripId));
+  const storedName = snap.exists() ? (snap.data().name as string | undefined) : undefined;
+  return storedName ?? fallback;
+}
+
+/** Legt einen neuen Roadtrip an, meldet das Gerät darin an und liefert den Wiederherstellungscode. */
+export async function createRoadtrip(name: string, password: string): Promise<CreateRoadtripResult> {
   const trimmedName = name.trim();
   const tripId = slugifyTripName(trimmedName);
   if (!tripId) throw new Error('Bitte einen Namen für den Roadtrip eingeben.');
@@ -72,28 +123,55 @@ export async function createRoadtrip(name: string, password: string): Promise<Ro
     throw new Error(`Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen haben.`);
   }
 
+  const recoveryCode = generateRecoveryCode();
+
   try {
     await createUserWithEmailAndPassword(auth, tripEmail(tripId), password);
     await setDoc(doc(db, 'roadtrips', tripId), {
       name: trimmedName,
       createdAt: serverTimestamp()
     });
-    return { tripId, tripName: trimmedName };
+    // Erzeugt den zweiten Auth-User; wechselt dabei die aktive Sitzung auf ihn.
+    await createUserWithEmailAndPassword(auth, recoveryEmail(tripId), recoveryCode);
+    // Gerät soll nach dem Anlegen wie gewohnt über den Hauptzugang angemeldet sein.
+    await signInWithEmailAndPassword(auth, tripEmail(tripId), password);
+    return { tripId, tripName: trimmedName, recoveryCode };
   } catch (err) {
+    // Best effort: den zuletzt angelegten Auth-User wieder loswerden, damit
+    // kein halb fertiger Roadtrip den Namen dauerhaft blockiert. Schlägt das
+    // fehl (z.B. weil noch gar kein User angelegt wurde), wird das ignoriert.
+    if (auth.currentUser) {
+      await deleteUser(auth.currentUser).catch(() => undefined);
+    }
     throw new Error(friendlyAuthError(err));
   }
 }
 
-/** Meldet das Gerät an einem bestehenden Roadtrip an. */
+/** Meldet das Gerät mit dem normalen Roadtrip-Passwort an. */
 export async function joinRoadtrip(name: string, password: string): Promise<RoadtripAuthResult> {
   const tripId = slugifyTripName(name);
   if (!tripId) throw new Error('Bitte den Namen des Roadtrips eingeben.');
 
   try {
     await signInWithEmailAndPassword(auth, tripEmail(tripId), password);
-    const snap = await getDoc(doc(db, 'roadtrips', tripId));
-    const storedName = snap.exists() ? (snap.data().name as string | undefined) : undefined;
-    return { tripId, tripName: storedName ?? name.trim() };
+    return { tripId, tripName: await resolveTripName(tripId, name.trim()) };
+  } catch (err) {
+    throw new Error(friendlyAuthError(err));
+  }
+}
+
+/**
+ * Meldet das Gerät über den Wiederherstellungscode an – der Weg zurück, wenn
+ * das normale Roadtrip-Passwort vergessen wurde. Der Code bleibt danach
+ * weiterhin gültig, es handelt sich nicht um einen einmaligen Reset.
+ */
+export async function recoverRoadtrip(name: string, recoveryCode: string): Promise<RoadtripAuthResult> {
+  const tripId = slugifyTripName(name);
+  if (!tripId) throw new Error('Bitte den Namen des Roadtrips eingeben.');
+
+  try {
+    await signInWithEmailAndPassword(auth, recoveryEmail(tripId), recoveryCode.trim());
+    return { tripId, tripName: await resolveTripName(tripId, name.trim()) };
   } catch (err) {
     throw new Error(friendlyAuthError(err));
   }

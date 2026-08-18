@@ -3,6 +3,7 @@ import { doc, updateDoc, arrayUnion, arrayRemove, FieldValue } from 'firebase/fi
 import { UserPlus, Trash2 } from 'lucide-react';
 import { db } from '../../firebase';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
+import { trackWrite } from '../../lib/pendingWrites';
 import { getUserColor } from '../../lib/userColors';
 import { IconButton, Input, Section, ListItem, PageHeader, ConfirmDialog, useToast } from '../../components/ui';
 import '../Settings.css';
@@ -20,7 +21,7 @@ export default function CrewSettings({ currentUser, users }: Props) {
 
   const saveCrew = (change: FieldValue) => {
     if (!tripId) return Promise.resolve();
-    return updateDoc(doc(db, tripPath(tripId, 'settings', 'general')), { users: change });
+    return trackWrite(updateDoc(doc(db, tripPath(tripId, 'settings', 'general')), { users: change }));
   };
 
   const handleAddUser = async (e: React.FormEvent) => {

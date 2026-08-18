@@ -50,6 +50,47 @@ Eine Progressive Web App (PWA) zur Live-GPS-Verfolgung, ereignisbasierten Dokume
 
 Zum lokalen Testen der Regeln ohne echtes Firebase-Projekt: `firebase emulators:start --only auth,firestore --project demo-2cars2georgia`.
 
+### Wiederherstellungscode statt Passwort-Reset
+
+Die technischen Auth-User (siehe oben) nutzen erfundene E-Mail-Adressen, Firebases
+"Passwort vergessen"-Mail kann sie also nicht erreichen. Deshalb erzeugt `createRoadtrip`
+zusätzlich einen **Wiederherstellungscode** – technisch ein zweiter, unabhängiger Auth-User mit
+eigenem Zufallspasswort. Der Code wird einmalig direkt nach dem Anlegen angezeigt und nirgends
+gespeichert; wer ihn notiert hat, kann sich damit dauerhaft anmelden, falls das normale
+Roadtrip-Passwort vergessen wird (Link "Passwort vergessen?" auf dem Beitreten-Tab). Es ist kein
+Reset-Mechanismus – das alte Passwort bleibt weiterhin gültig, der Code ist ein zusätzlicher,
+dauerhaft gültiger Zweitschlüssel.
+
+## Brute-Force-/Bot-Schutz (optional)
+
+Firebase Auth drosselt Anmeldeversuche bereits von sich aus (`auth/too-many-requests`), und
+`src/lib/attemptThrottle.ts` bremst wiederholte Fehlversuche zusätzlich im Browser – beides ist
+aber kein Ersatz für einen echten, serverseitigen Schutz gegen ein Skript, das systematisch
+Roadtrip-Namen und Passwörter durchprobiert. Dafür eignet sich **Firebase App Check**, kostenlos
+auf dem Spark-Tarif nutzbar:
+
+1. Firebase Console → *App Check* → Web-App registrieren → Anbieter **reCAPTCHA v3** → Site-Key
+   erzeugen (dabei automatisch bei Google reCAPTCHA registriert).
+2. Site-Key als `VITE_RECAPTCHA_SITE_KEY` in die `.env` eintragen – `src/firebase.ts`
+   initialisiert App Check dann automatisch beim Start.
+3. **Erst nach ein paar Tagen Beobachtung** in der Console unter *App Check* für
+   *Authentication* und *Cloud Firestore* auf „Erzwingen" umstellen. Vorher zeigt die Console nur
+   an, wie viele Anfragen einen gültigen Token hätten – das schützt davor, sich mit einer falschen
+   Konfiguration versehentlich selbst auszusperren.
+
+Ohne diese Variable bleibt App Check inaktiv, App und Regeln verhalten sich unverändert.
+
+## Monitoring (optional)
+
+Ohne weitere Konfiguration läuft die App wie zuvor, aber Fehler/Abstürze in Produktion bleiben
+unsichtbar. Für [Sentry](https://sentry.io)-Fehlerberichte:
+
+1. Kostenloses Sentry-Projekt anlegen (Plattform "React").
+2. DSN aus *Project Settings → Client Keys (DSN)* als `VITE_SENTRY_DSN` in die `.env` eintragen.
+3. Fertig – `src/lib/sentry.ts` initialisiert sich beim Start selbst, sobald die Variable gesetzt
+   ist. Jeder Fehlerbericht trägt die (anonyme) Roadtrip-ID und den Crew-Namen als Kontext, siehe
+   `setSentryContext` in `src/App.tsx`.
+
 ## Projektstruktur
 
 ```text

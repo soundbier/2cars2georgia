@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -16,6 +17,27 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// Zusätzliche Bremse gegen automatisiertes Durchprobieren von
+// Roadtrip-Namen/-Passwörtern (siehe lib/attemptThrottle.ts für die rein
+// clientseitige Variante): App Check bestätigt serverseitig, dass Anfragen
+// von der echten App kommen statt von einem Skript, und blockt den Rest ab –
+// sobald in der Firebase Console für Auth/Firestore aktiviert (siehe
+// README). Ohne VITE_RECAPTCHA_SITE_KEY bleibt es inaktiv, App und Rules
+// verhalten sich dann exakt wie zuvor.
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+if (recaptchaSiteKey) {
+  if (import.meta.env.DEV) {
+    // Erlaubt lokale Entwicklung/Emulator trotz aktivierter Enforcement in
+    // der Console – Firebase loggt beim Start einen Debug-Token, der einmalig
+    // in der Console unter App Check → Apps → Debug-Tokens hinterlegt wird.
+    (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
