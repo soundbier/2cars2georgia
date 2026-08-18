@@ -178,6 +178,10 @@ export const de = {
   'settlement.title': 'Ausgleich',
   'settlement.nothingToSettle':
     'Bisher wurde alles direkt aus der Bordkasse bezahlt – es gibt nichts zu verrechnen.',
+  'settlement.nothingToSettleShort': 'Nichts zu verrechnen',
+  'settlement.youGet': 'Du bekommst {amount}',
+  'settlement.youOwe': 'Du schuldest {amount}',
+  'settlement.youAreEven': 'Ausgeglichen',
   'settlement.laidOutAndShare': '{paid} ausgelegt · {share} Anteil',
   'settlement.allSettled': 'Alle Salden sind bereits ausgeglichen.',
   'settlement.sharedNote': '{amount} wurden direkt aus der {payer} bezahlt und bleiben außen vor.',

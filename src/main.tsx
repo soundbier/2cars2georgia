@@ -3,10 +3,14 @@ import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import App from './App';
 import { initSentry } from './lib/sentry';
+import { installGlobalErrorLogging, logError } from './lib/errorLog';
 import { detectLanguage, translate } from './i18n/translate';
 import './index.css';
 
 initSentry();
+// Protokolliert Abstürze zusätzlich im Roadtrip selbst – anders als Sentry
+// auch dann, wenn unterwegs gerade kein Netz da ist (siehe lib/errorLog.ts).
+installGlobalErrorLogging();
 
 /**
  * Fängt Abstürze ab, die React sonst mit einem leeren weißen Bildschirm
@@ -47,7 +51,7 @@ function CrashFallback() {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <Sentry.ErrorBoundary fallback={<CrashFallback />}>
+    <Sentry.ErrorBoundary fallback={<CrashFallback />} onError={(error) => logError(error, 'react')}>
       <App />
     </Sentry.ErrorBoundary>
   </React.StrictMode>
