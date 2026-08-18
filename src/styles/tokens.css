@@ -30,6 +30,8 @@
   --color-success-muted: rgba(21, 128, 61, 0.1);
   --color-danger: #dc2626;
   --color-danger-muted: rgba(220, 38, 38, 0.1);
+  --color-warning: #b45309;
+  --color-warning-muted: rgba(180, 83, 9, 0.1);
 
   /* --- Radius-System: bewusst 3 Stufen --- */
   --radius-sm: 4px;   /* Badges, Inputs, kleine Controls */

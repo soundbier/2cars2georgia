@@ -15,7 +15,15 @@ export type QuickLogIconName =
   | 'home'
   | 'fuel'
   | 'gauge'
-  | 'tag';
+  | 'tag'
+  | 'ship'
+  | 'utensils'
+  | 'camera'
+  | 'wrench'
+  | 'shopping-cart'
+  | 'compass'
+  | 'sun'
+  | 'users';
 
 export interface QuickLogConfig {
   id: string;
