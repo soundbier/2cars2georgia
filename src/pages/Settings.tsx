@@ -6,6 +6,7 @@ import { usePreferences } from '../hooks/usePreferences';
 import { useQuickLogs } from '../hooks/useSettings';
 import { getUserColor } from '../lib/userColors';
 import { UnitSystem } from '../lib/units';
+import { BASE_LAYERS, BASE_LAYER_IDS, OVERLAYS, OVERLAY_IDS, BaseLayerId } from '../lib/mapLayers';
 import {
   Button,
   Section,
@@ -121,13 +122,39 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
           />
         </SettingRow>
 
-        <SettingRow label="Seezeichen" description="OpenSeaMap-Ebene über der Karte">
-          <Toggle
-            label="Seezeichen auf der Karte anzeigen"
-            checked={preferences.showSeamarks}
-            onChange={(value) => setPreference('showSeamarks', value)}
-          />
+      </Section>
+
+      <Section title="Karte">
+        <SettingRow label="Grundkarte" description={BASE_LAYERS[preferences.baseLayer].description}>
+          <Select
+            className="setting-select"
+            aria-label="Grundkarte"
+            value={preferences.baseLayer}
+            onChange={(e) => setPreference('baseLayer', e.target.value as BaseLayerId)}
+          >
+            {BASE_LAYER_IDS.map((id) => (
+              <option key={id} value={id}>
+                {BASE_LAYERS[id].label}
+              </option>
+            ))}
+          </Select>
         </SettingRow>
+
+        {OVERLAY_IDS.map((id) => (
+          <SettingRow key={id} label={OVERLAYS[id].label} description={OVERLAYS[id].description}>
+            <Toggle
+              label={`${OVERLAYS[id].label} auf der Karte anzeigen`}
+              checked={preferences.overlays[id]}
+              onChange={(value) =>
+                setPreference('overlays', { ...preferences.overlays, [id]: value })
+              }
+            />
+          </SettingRow>
+        ))}
+
+        <p className="helper-text setting-note">
+          Ebenen liegen übereinander – die Grundkarte unten, jedes aktive Overlay darüber.
+        </p>
       </Section>
 
       <Section title="Aufzeichnung">

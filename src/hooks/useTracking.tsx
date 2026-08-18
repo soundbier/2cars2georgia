@@ -2,7 +2,16 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactN
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePreferences } from './usePreferences';
-import { GpsPoint, LivePosition } from '../types';
+import { bearingDegrees, distanceMeters } from '../lib/geo';
+import { Coordinates, GpsPoint, LivePosition } from '../types';
+
+/**
+ * Ab dieser Strecke gilt eine Bewegung als gerichtet.
+ *
+ * Unterhalb davon steckt im Versatz zwischen zwei Fixes fast nur GPS-Rauschen –
+ * daraus einen Kurs zu rechnen ließe das Boot im Hafen um sich selbst kreiseln.
+ */
+const HEADING_MIN_DISTANCE_M = 8;
 
 interface TrackingContextValue {
   /** Letzte bekannte Position, unabhängig davon ob eine Tour läuft. */
@@ -33,6 +42,9 @@ export function TrackingProvider({ user, children }: { user: string; children: R
   const isTrackingRef = useRef(false);
   const lastSavedTimestampRef = useRef(0);
   const trackIntervalRef = useRef(preferences.trackIntervalMs);
+  // Letzter bekannter Kurs und der Punkt, von dem aus er gemessen wurde.
+  const headingRef = useRef<number | null>(null);
+  const headingAnchorRef = useRef<Coordinates | null>(null);
 
   useEffect(() => {
     isTrackingRef.current = isTracking;
@@ -53,10 +65,27 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
     const watchId = navigator.geolocation.watchPosition(
       ({ coords }) => {
+        const here: Coordinates = { lat: coords.latitude, lng: coords.longitude };
+
+        // Der Kompass des Geräts liefert den Kurs nur unterwegs – im Stand und
+        // auf Geräten ohne Sensor ist er NaN oder null. Dann leiten wir ihn aus
+        // der zurückgelegten Strecke ab. Der Ankerpunkt rückt erst nach, wenn
+        // die Schwelle erreicht ist, damit auch langsame Fahrt einen Kurs ergibt.
+        const anchor = headingAnchorRef.current;
+        if (coords.heading !== null && Number.isFinite(coords.heading)) {
+          headingRef.current = coords.heading;
+          headingAnchorRef.current = here;
+        } else if (!anchor) {
+          headingAnchorRef.current = here;
+        } else if (distanceMeters(anchor, here) >= HEADING_MIN_DISTANCE_M) {
+          headingRef.current = bearingDegrees(anchor, here);
+          headingAnchorRef.current = here;
+        }
+
         const next: LivePosition = {
-          lat: coords.latitude,
-          lng: coords.longitude,
-          speedKmh: Math.max(0, Math.round((coords.speed ?? 0) * 3.6 * 10) / 10)
+          ...here,
+          speedKmh: Math.max(0, Math.round((coords.speed ?? 0) * 3.6 * 10) / 10),
+          headingDeg: headingRef.current === null ? null : Math.round(headingRef.current)
         };
         setPosition(next);
         setError(null);

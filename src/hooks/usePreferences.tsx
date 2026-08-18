@@ -1,30 +1,54 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { UnitSystem } from '../lib/units';
+import { BaseLayerId, OverlayId, BASE_LAYERS, OVERLAYS } from '../lib/mapLayers';
 
 const STORAGE_KEY = 'boat_preferences';
 
 export interface Preferences {
   /** Metrisch (km/h, km) oder nautisch (kn, sm). */
   unitSystem: UnitSystem;
-  /** OpenSeaMap-Seezeichen über der Grundkarte einblenden. */
-  showSeamarks: boolean;
+  /** Grundkarte unter allen anderen Ebenen. */
+  baseLayer: BaseLayerId;
+  /** Zusatzebenen über der Grundkarte, je Ebene ein/aus. */
+  overlays: Record<OverlayId, boolean>;
   /** Mindestabstand zwischen zwei gespeicherten Trackpunkten. */
   trackIntervalMs: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   unitSystem: 'metric',
-  showSeamarks: true,
+  baseLayer: 'osm',
+  overlays: { seamarks: true, cycling: false, hiking: false },
   trackIntervalMs: 30_000
 };
+
+/** Stand vor der Ebenenauswahl: ein einzelner Schalter für die Seezeichen. */
+interface LegacyPreferences {
+  showSeamarks?: boolean;
+}
 
 function readStored(): Preferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFERENCES;
+    const stored = JSON.parse(raw) as Partial<Preferences> & LegacyPreferences;
+
     // Unbekannte/fehlende Felder fallen auf die Defaults zurück, damit ein
     // älterer gespeicherter Stand die App nicht in einen kaputten Zustand bringt.
-    return { ...DEFAULT_PREFERENCES, ...(JSON.parse(raw) as Partial<Preferences>) };
+    const merged: Preferences = { ...DEFAULT_PREFERENCES, ...stored };
+    if (!(merged.baseLayer in BASE_LAYERS)) merged.baseLayer = DEFAULT_PREFERENCES.baseLayer;
+
+    // Overlays einzeln zusammenführen: Neue Ebenen einer App-Version starten
+    // auf ihrem Default, ohne die Auswahl des Nutzers zu überschreiben.
+    merged.overlays = { ...DEFAULT_PREFERENCES.overlays };
+    for (const id of Object.keys(OVERLAYS) as OverlayId[]) {
+      if (typeof stored.overlays?.[id] === 'boolean') merged.overlays[id] = stored.overlays[id];
+    }
+    // Migration: Der alte Einzelschalter bestimmt weiterhin die Seezeichen.
+    if (!stored.overlays && typeof stored.showSeamarks === 'boolean') {
+      merged.overlays.seamarks = stored.showSeamarks;
+    }
+    return merged;
   } catch (err) {
     console.error('Einstellungen konnten nicht gelesen werden:', err);
     return DEFAULT_PREFERENCES;
