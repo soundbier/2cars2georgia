@@ -16,7 +16,7 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { trackWrite } from '../lib/pendingWrites';
-import { writeOptimistically } from '../lib/writeOutcome';
+import { writeErrorKey, writeOptimistically } from '../lib/writeOutcome';
 import { activeOnly } from '../lib/trash';
 import {
   computeSettlement,
@@ -342,7 +342,7 @@ export default function Costs({ user, users }: Props) {
     if (!tripId) return;
     writeOptimistically(
       updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: deleteField() }),
-      () => notify(t('common.restoreFailed'), 'danger')
+      (err) => notify(t(writeErrorKey(err, 'common.restoreFailed')), 'danger')
     );
     notify(t('costs.expenseRestored'), 'success');
   };
@@ -353,7 +353,7 @@ export default function Costs({ user, users }: Props) {
     setDeleteTargetId(null);
     writeOptimistically(
       updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: Date.now() }),
-      () => notify(t('common.deleteError'), 'danger')
+      (err) => notify(t(writeErrorKey(err, 'common.deleteError')), 'danger')
     );
     notify(t('costs.expenseTrashed'), 'success', {
       label: t('common.undo'),

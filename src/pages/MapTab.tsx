@@ -10,7 +10,7 @@ import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { trackWrite } from '../lib/pendingWrites';
-import { writeOptimistically } from '../lib/writeOutcome';
+import { writeErrorKey, writeOptimistically } from '../lib/writeOutcome';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
@@ -357,7 +357,7 @@ export default function MapTab({ user }: { user: string }) {
     if (!tripId) return;
     writeOptimistically(
       updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }),
-      () => notify(t('common.restoreFailed'), 'danger')
+      (err) => notify(t(writeErrorKey(err, 'common.restoreFailed')), 'danger')
     );
     notify(t('map.eventRestored'), 'success');
   };
@@ -368,7 +368,7 @@ export default function MapTab({ user }: { user: string }) {
     setDeleteTargetId(null);
     writeOptimistically(
       updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }),
-      () => notify(t('common.deleteError'), 'danger')
+      (err) => notify(t(writeErrorKey(err, 'common.deleteError')), 'danger')
     );
     notify(t('map.eventTrashed'), 'success', {
       label: t('common.undo'),

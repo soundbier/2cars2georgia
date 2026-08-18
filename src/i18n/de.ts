@@ -42,6 +42,7 @@ export const de = {
   'common.saveError': 'Fehler beim Speichern.',
   'common.deleteError': 'Fehler beim Löschen.',
   'common.restoreFailed': 'Wiederherstellen fehlgeschlagen.',
+  'common.writeRejected': 'Vom Server abgelehnt – Firestore-Regeln nicht aktuell?',
   'common.undo': 'Rückgängig',
   'common.connecting': 'Verbinde mit Server …',
 

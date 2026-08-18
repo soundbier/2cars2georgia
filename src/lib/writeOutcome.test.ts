@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPendingWriteCount, __resetPendingWritesForTests } from './pendingWrites';
-import { isOfflineWriteError, writeOptimistically } from './writeOutcome';
+import { isOfflineWriteError, writeErrorKey, writeOptimistically } from './writeOutcome';
 
 function firestoreError(code: string) {
   return Object.assign(new Error(code), { code });
@@ -55,5 +55,16 @@ describe('writeOptimistically', () => {
     writeOptimistically(rejected, onFailure);
     await vi.waitFor(() => expect(getPendingWriteCount()).toBe(0));
     expect(onFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe('writeErrorKey', () => {
+  it('benennt eine Server-Ablehnung statt eines allgemeinen Fehlers', () => {
+    expect(writeErrorKey(firestoreError('permission-denied'), 'common.deleteError')).toBe('common.writeRejected');
+  });
+
+  it('bleibt sonst bei der Meldung des Aufrufers', () => {
+    expect(writeErrorKey(new Error('irgendwas'), 'common.deleteError')).toBe('common.deleteError');
+    expect(writeErrorKey(firestoreError('internal'), 'common.restoreFailed')).toBe('common.restoreFailed');
   });
 });
