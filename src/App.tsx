@@ -15,6 +15,7 @@ import { PreferencesProvider } from './hooks/usePreferences';
 import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
 import { setSentryContext } from './lib/sentry';
 import { useCrew } from './hooks/useSettings';
+import { usePushForegroundMessages } from './hooks/usePush';
 import { UpdatePrompt } from './UpdatePrompt';
 import { RecoveryCodeDialog } from './components/RecoveryCodeDialog';
 import { SyncStatusBanner } from './components/SyncStatusBanner';
@@ -26,6 +27,7 @@ import Costs from './pages/Costs';
 import Settings from './pages/Settings';
 import CrewSettings from './pages/settings/CrewSettings';
 import QuickLogSettings from './pages/settings/QuickLogSettings';
+import NotificationSettings from './pages/settings/NotificationSettings';
 import Privacy from './pages/Privacy';
 
 const STORAGE_KEY_USER = 'boat_user';
@@ -48,6 +50,10 @@ function CrewGate() {
   const { tripId } = useRoadtrip();
   const [user, setUser] = useState<string>(() => localStorage.getItem(STORAGE_KEY_USER) ?? '');
   const { users, loading } = useCrew();
+
+  // Meldungen, die eintreffen während die App offen ist, zeigt FCM nicht
+  // selbst an – sie laufen als Toast durch.
+  usePushForegroundMessages();
 
   // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) dem Roadtrip und
   // Crewmitglied zu, ohne echte personenbezogene Daten zu senden – tripId
@@ -119,6 +125,10 @@ function CrewGate() {
                 element={<CrewSettings currentUser={user} users={users} />}
               />
               <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
+              <Route
+                path="/settings/benachrichtigungen"
+                element={<NotificationSettings currentUser={user} />}
+              />
               <Route path="/datenschutz" element={<Privacy />} />
             </Routes>
           </div>

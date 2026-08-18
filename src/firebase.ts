@@ -16,7 +16,8 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
+// Exportiert, weil lib/push.ts daraus die Messaging-Instanz ableitet.
+export const app = initializeApp(firebaseConfig);
 
 // Zusätzliche Bremse gegen automatisiertes Durchprobieren von
 // Roadtrip-Namen/-Passwörtern (siehe lib/attemptThrottle.ts für die rein

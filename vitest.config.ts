@@ -17,7 +17,11 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    // functions/src ist mit drin, weil die reine Benachrichtigungslogik der
+    // Cloud Functions (functions/src/notifications.ts) bewusst ohne
+    // firebase-admin/-functions auskommt und deshalb hier mitlaufen kann,
+    // statt einen zweiten Testlauf mit eigener Installation zu brauchen.
+    include: ['src/**/*.test.{ts,tsx}', 'functions/src/**/*.test.ts'],
     css: false
   }
 });

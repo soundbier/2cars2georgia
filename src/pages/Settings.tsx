@@ -1,6 +1,17 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ListChecks, ShieldCheck, ChevronRight, Wifi, WifiOff, LogOut, DoorOpen, Compass } from 'lucide-react';
+import {
+  Users,
+  ListChecks,
+  ShieldCheck,
+  ChevronRight,
+  Wifi,
+  WifiOff,
+  LogOut,
+  DoorOpen,
+  Compass,
+  BellRing
+} from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePreferences } from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
@@ -216,6 +227,12 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
             icon={<ListChecks size={18} strokeWidth={1.75} />}
             label="Schnell-Logs"
             value={`${quickLogs.length} ${quickLogs.length === 1 ? 'Kategorie' : 'Kategorien'}`}
+          />
+          <SettingLink
+            to="/settings/benachrichtigungen"
+            icon={<BellRing size={18} strokeWidth={1.75} />}
+            label="Benachrichtigungen"
+            value="Push auf dieses Gerät"
           />
         </div>
       </Section>

@@ -64,6 +64,10 @@ service cloud.firestore {
       return data()[field] is int && data()[field] > 1000000000000 && data()[field] < 4000000000000;
     }
 
+    function isOptionalEpochMillis(field) {
+      return !(field in data()) || isEpochMillis(field);
+    }
+
     function isLatitude(field) {
       return data()[field] is number && data()[field] >= -90 && data()[field] <= 90;
     }
@@ -168,6 +172,60 @@ service cloud.firestore {
         allow read: if ownsTrip(tripId);
         allow create, update: if ownsTrip(tripId) && isSettingsDoc();
         allow delete: if false;
+      }
+
+      // --- Push-Empfänger --------------------------------------------------
+      // Ein Dokument je Gerät, das Benachrichtigungen bekommen möchte (siehe
+      // src/lib/push.ts). Gelesen wird es von den Cloud Functions über das
+      // Admin-SDK, das die Regeln ohnehin umgeht – die Regeln hier schützen
+      // also vor allem davor, dass ein Gerät fremde Registrierungen mit
+      // beliebigem Inhalt überschreibt.
+      match /devices/{deviceId} {
+        function isTopicFlag(field) {
+          return field in data().topics && data().topics[field] is bool;
+        }
+
+        function isDevice() {
+          return fieldsAre(['token', 'user', 'topics', 'createdAt', 'updatedAt'], [])
+            // FCM-Tokens sind lang, aber nicht beliebig lang.
+            && isText('token', 4096)
+            && isText('user', 60)
+            && data().topics is map
+            && data().topics.keys().hasOnly(['expenses', 'events', 'emergency'])
+            && isTopicFlag('expenses')
+            && isTopicFlag('events')
+            && isTopicFlag('emergency')
+            && isEpochMillis('createdAt')
+            && isEpochMillis('updatedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isDevice();
+        allow delete: if ownsTrip(tripId);
+      }
+
+      // --- Zustand der Aufzeichnung ----------------------------------------
+      // Ein Dokument je Crewmitglied, das dem Notfall-Wächter in den Cloud
+      // Functions sagt, ob eine Tour läuft und wann zuletzt eine Position
+      // ankam (siehe src/hooks/useTracking.tsx).
+      //
+      // alertedAt setzt ausschließlich die Cloud Function über das Admin-SDK.
+      // Für die App ist es deshalb zwar erlaubt (sonst könnte sie das Dokument
+      // nach einer Warnung nicht mehr fortschreiben), aber sie schreibt es nie
+      // selbst.
+      match /tracking/{trackedUser} {
+        function isTrackingState() {
+          return fieldsAre(['user', 'active', 'lastPointAt'], ['alertedAt'])
+            && isText('user', 60)
+            && data().user == trackedUser
+            && data().active is bool
+            && isEpochMillis('lastPointAt')
+            && isOptionalEpochMillis('alertedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isTrackingState();
+        allow delete: if ownsTrip(tripId);
       }
 
       // --- Fehlerprotokoll -------------------------------------------------

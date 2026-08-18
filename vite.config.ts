@@ -32,6 +32,11 @@ export default defineConfig({
         // Alte Precache-Einträge früherer Builds entfernen, damit nach einem
         // Deploy keine veralteten Assets liegen bleiben.
         cleanupOutdatedCaches: true,
+        // Der FCM-Worker ist selbst ein Service Worker mit eigenem Scope
+        // (siehe public/firebase-messaging-sw.js). Ihn mit zu precachen würde
+        // eine alte Fassung festhalten, obwohl der Browser ihn ohnehin eigen-
+        // ständig aktuell hält.
+        globIgnores: ['**/firebase-messaging-sw.js'],
         // Der neue Service Worker übernimmt alle offenen Tabs, sobald er
         // aktiviert wird – aber erst NACH Bestätigung im Update-Screen
         // (bewusst kein skipWaiting hier, siehe registerType oben).

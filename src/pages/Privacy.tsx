@@ -44,6 +44,13 @@ export function PrivacyContent() {
             E-Mail-Adressen oder sonstigen Kontaktdaten.
           </li>
           <li>
+            <strong>Benachrichtigungen (nur nach Zustimmung):</strong> Wer Push aktiviert,
+            hinterlegt für dieses Gerät eine Geräte-Kennung, das Push-Token des Browsers, den
+            gewählten Crew-Namen und die abonnierten Themen. Außerdem wird bei laufender
+            Aufzeichnung vermerkt, wann zuletzt eine Position ankam – nur so lässt sich ein
+            Stillstand überhaupt bemerken. Ohne Zustimmung entsteht nichts davon.
+          </li>
+          <li>
             <strong>Technisch, lokal auf dem Gerät:</strong> der gewählte Crew-Name
             (`localStorage`) und die Firebase-Anmeldesitzung des Roadtrips – keine
             Werbe-/Tracking-Cookies.
@@ -71,6 +78,13 @@ export function PrivacyContent() {
           Fehler-Monitoring konfiguriert (siehe README), erhält auch Sentry technische
           Fehlerberichte – dabei bewusst ohne Standort-, Namens- oder Kostendaten, nur die
           anonyme Roadtrip-ID als Kontext.
+        </p>
+        <p className="helper-text">
+          Sind Benachrichtigungen aktiviert, läuft deren Zustellung zusätzlich über den
+          Push-Dienst des jeweiligen Browserherstellers (Google, Apple oder Mozilla). Dorthin
+          gelangt der Text der Meldung – also etwa der Name des Crewmitglieds und der Betrag
+          einer Ausgabe. Wer das nicht möchte, lässt Benachrichtigungen einfach aus; die App
+          funktioniert dann unverändert.
         </p>
       </Section>
 

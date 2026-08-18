@@ -1,0 +1,21 @@
+{
+  "name": "2cars2georgia-functions",
+  "private": true,
+  "type": "commonjs",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "deploy": "npm run build && firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

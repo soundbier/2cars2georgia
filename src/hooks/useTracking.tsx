@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePreferences } from './usePreferences';
 import { useRoadtrip, tripPath } from './useRoadtrip';
@@ -54,6 +54,27 @@ export function TrackingProvider({ user, children }: { user: string; children: R
     if (!isTracking) lastSavedTimestampRef.current = 0;
   }, [isTracking]);
 
+  /**
+   * Zustand der Aufzeichnung, wie ihn der Notfall-Wächter in den Cloud
+   * Functions sieht (functions/src/index.ts, checkStalledTracking). Ohne
+   * dieses Dokument kann serverseitig niemand unterscheiden, ob keine
+   * Positionen ankommen, weil die Tour beendet wurde, oder weil an Bord etwas
+   * nicht stimmt.
+   */
+  const writeTrackingState = useRef<(active: boolean, lastPointAt: number) => void>(() => {});
+  writeTrackingState.current = (active, lastPointAt) => {
+    if (!user || !tripId) return;
+    trackWrite(
+      setDoc(doc(db, tripPath(tripId, 'tracking'), user), { user, active, lastPointAt })
+    ).catch((err) => console.error('Aufzeichnungsstatus konnte nicht gemeldet werden:', err));
+  };
+
+  useEffect(() => {
+    // Beim Start zählt der aktuelle Zeitpunkt als "zuletzt gesehen", sonst
+    // schlüge der Wächter sofort an, falls der erste Fix auf sich warten lässt.
+    writeTrackingState.current(isTracking, Date.now());
+  }, [isTracking, user, tripId]);
+
   // Ebenfalls per Ref: Ein geändertes Intervall wirkt ab dem nächsten
   // Positionsupdate, ohne den Watcher neu zu starten.
   useEffect(() => {
@@ -102,6 +123,9 @@ export function TrackingProvider({ user, children }: { user: string; children: R
         trackWrite(addDoc(collection(db, tripPath(tripId, 'track')), point)).catch((err) => {
           console.error('GPS-Speicherfehler:', err);
         });
+        // Im selben Takt wie die Trackpunkte, nicht bei jedem GPS-Fix: Der
+        // Heartbeat soll die Schreiblast nicht vervielfachen.
+        writeTrackingState.current(true, now);
       },
       (err) => setError(err.message),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }

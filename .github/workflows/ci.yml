@@ -43,6 +43,28 @@ jobs:
           VITE_FIREBASE_APP_ID: ci-dummy
         run: npm run build
 
+  functions:
+    name: Cloud Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      # Eigenes npm-Projekt mit eigenen Abhängigkeiten (firebase-admin,
+      # firebase-functions) – die reine Benachrichtigungslogik läuft dagegen
+      # im Unit-Test-Job oben mit, ganz ohne diese Installation.
+      - run: npm ci
+        working-directory: functions
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: functions
+
   firestore-rules:
     name: Firestore-Sicherheitsregeln
     runs-on: ubuntu-latest

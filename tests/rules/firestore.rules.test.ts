@@ -66,6 +66,20 @@ const validExpense = {
   category: 'tanken'
 };
 
+const validDevice = {
+  token: 'fcm-token-abc',
+  user: 'Lukas',
+  topics: { expenses: true, events: false, emergency: true },
+  createdAt: NOW,
+  updatedAt: NOW
+};
+
+const validTracking = {
+  user: 'Lukas',
+  active: true,
+  lastPointAt: NOW
+};
+
 const validError = {
   timestamp: NOW,
   message: 'TypeError: undefined is not a function'
@@ -347,6 +361,85 @@ describe('Einstellungen', () => {
   it('verweigert das Löschen der Einstellungen', async () => {
     await seed(`roadtrips/${TRIP}/settings/general`, { users: ['Lukas'] });
     await assertFails(deleteDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`)));
+  });
+});
+
+describe('Push-Empfänger', () => {
+  const path = `roadtrips/${TRIP}/devices/geraet-1`;
+
+  it('nimmt eine gültige Registrierung an', async () => {
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validDevice));
+  });
+
+  it('verlangt alle drei Themen als Wahrheitswert', async () => {
+    const db = tripDb(TRIP);
+    await assertFails(
+      setDoc(doc(db, path), { ...validDevice, topics: { expenses: true, events: false } })
+    );
+    await assertFails(
+      setDoc(doc(db, path), {
+        ...validDevice,
+        topics: { expenses: 'ja', events: false, emergency: true }
+      })
+    );
+  });
+
+  it('weist ein unbekanntes Thema ab', async () => {
+    await assertFails(
+      setDoc(doc(tripDb(TRIP), path), {
+        ...validDevice,
+        topics: { expenses: true, events: false, emergency: true, werbung: true }
+      })
+    );
+  });
+
+  it('weist ein leeres oder absurd langes Token ab', async () => {
+    const db = tripDb(TRIP);
+    await assertFails(setDoc(doc(db, path), { ...validDevice, token: '' }));
+    await assertFails(setDoc(doc(db, path), { ...validDevice, token: 'x'.repeat(4097) }));
+  });
+
+  it('sperrt fremde Roadtrips aus', async () => {
+    await seed(path, validDevice);
+    const db = tripDb(OTHER_TRIP);
+    await assertFails(getDoc(doc(db, path)));
+    await assertFails(setDoc(doc(db, path), validDevice));
+  });
+
+  it('erlaubt das Abmelden', async () => {
+    await seed(path, validDevice);
+    await assertSucceeds(deleteDoc(doc(tripDb(TRIP), path)));
+  });
+});
+
+describe('Zustand der Aufzeichnung', () => {
+  const path = `roadtrips/${TRIP}/tracking/Lukas`;
+
+  it('nimmt einen gültigen Zustand mit und ohne Warnzeitpunkt an', async () => {
+    const db = tripDb(TRIP);
+    await assertSucceeds(setDoc(doc(db, path), validTracking));
+    await assertSucceeds(setDoc(doc(db, path), { ...validTracking, alertedAt: NOW }));
+  });
+
+  it('verlangt, dass der Name zur Dokument-Id passt', async () => {
+    // Sonst könnte ein Gerät die Aufzeichnung eines anderen Crewmitglieds
+    // unter dessen Namen als beendet melden und den Notfall-Wächter aushebeln.
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validTracking, user: 'Leon' }));
+  });
+
+  it('weist unplausible Zeitstempel ab', async () => {
+    const db = tripDb(TRIP);
+    await assertFails(setDoc(doc(db, path), { ...validTracking, lastPointAt: 0 }));
+    await assertFails(setDoc(doc(db, path), { ...validTracking, alertedAt: 'jetzt' }));
+  });
+
+  it('weist einen nicht-booleschen Aufzeichnungsstatus ab', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validTracking, active: 'ja' }));
+  });
+
+  it('sperrt fremde Roadtrips aus', async () => {
+    await seed(path, validTracking);
+    await assertFails(getDoc(doc(tripDb(OTHER_TRIP), path)));
   });
 });
 
