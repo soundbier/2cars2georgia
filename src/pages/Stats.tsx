@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { trackWrite } from '../lib/pendingWrites';
+import { writeOptimistically } from '../lib/writeOutcome';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
@@ -153,31 +154,27 @@ export default function Stats() {
     }
   };
 
-  const restoreEvent = async (id: string) => {
+  const restoreEvent = (id: string) => {
     if (!tripId) return;
-    try {
-      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }));
-      notify(t('logbook.eventRestored'), 'success');
-    } catch (err) {
-      console.error(err);
-      notify(t('common.restoreFailed'), 'danger');
-    }
+    writeOptimistically(
+      updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }),
+      () => notify(t('common.restoreFailed'), 'danger')
+    );
+    notify(t('logbook.eventRestored'), 'success');
   };
 
-  const handleDeleteEvent = async () => {
+  const handleDeleteEvent = () => {
     if (!deleteTargetId || !tripId) return;
     const id = deleteTargetId;
     setDeleteTargetId(null);
-    try {
-      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }));
-      notify(t('logbook.eventTrashed'), 'success', {
-        label: t('common.undo'),
-        onAct: () => void restoreEvent(id)
-      });
-    } catch (err) {
-      console.error(err);
-      notify(t('common.deleteError'), 'danger');
-    }
+    writeOptimistically(
+      updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }),
+      () => notify(t('common.deleteError'), 'danger')
+    );
+    notify(t('logbook.eventTrashed'), 'success', {
+      label: t('common.undo'),
+      onAct: () => restoreEvent(id)
+    });
   };
 
   return (

@@ -16,6 +16,7 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { trackWrite } from '../lib/pendingWrites';
+import { writeOptimistically } from '../lib/writeOutcome';
 import { activeOnly } from '../lib/trash';
 import {
   computeSettlement,
@@ -337,31 +338,27 @@ export default function Costs({ user, users }: Props) {
     }
   };
 
-  const restoreExpense = async (id: string) => {
+  const restoreExpense = (id: string) => {
     if (!tripId) return;
-    try {
-      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: deleteField() }));
-      notify(t('costs.expenseRestored'), 'success');
-    } catch (err) {
-      console.error(err);
-      notify(t('common.restoreFailed'), 'danger');
-    }
+    writeOptimistically(
+      updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: deleteField() }),
+      () => notify(t('common.restoreFailed'), 'danger')
+    );
+    notify(t('costs.expenseRestored'), 'success');
   };
 
-  const handleDeleteExpense = async () => {
+  const handleDeleteExpense = () => {
     if (!deleteTargetId || !tripId) return;
     const id = deleteTargetId;
     setDeleteTargetId(null);
-    try {
-      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: Date.now() }));
-      notify(t('costs.expenseTrashed'), 'success', {
-        label: t('common.undo'),
-        onAct: () => void restoreExpense(id)
-      });
-    } catch (err) {
-      console.error(err);
-      notify(t('common.deleteError'), 'danger');
-    }
+    writeOptimistically(
+      updateDoc(doc(db, tripPath(tripId, 'expenses'), id), { deletedAt: Date.now() }),
+      () => notify(t('common.deleteError'), 'danger')
+    );
+    notify(t('costs.expenseTrashed'), 'success', {
+      label: t('common.undo'),
+      onAct: () => restoreExpense(id)
+    });
   };
 
   const total = expenses.reduce((sum, item) => sum + item.amountEuro, 0);

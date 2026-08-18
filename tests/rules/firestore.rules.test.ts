@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, deleteField, serverTimestamp } from 'firebase/firestore';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -280,6 +280,15 @@ describe('Logbuch-Ereignisse', () => {
     await assertSucceeds(setDoc(doc(tripDb(TRIP), path), { ...validEvent, deletedAt: NOW }));
   });
 
+  it('erlaubt das weiche Löschen als Teil-Update, so wie die App es schickt', async () => {
+    // Die App schickt beim Löschen nur { deletedAt }, nicht das ganze Dokument –
+    // die Regeln prüfen deshalb den zusammengeführten Stand.
+    await seed(path, validEvent);
+    const db = tripDb(TRIP);
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
+  });
+
   it('weist ein deletedAt ab, das kein plausibler Zeitstempel ist', async () => {
     const db = tripDb(TRIP);
     await assertFails(setDoc(doc(db, path), { ...validEvent, deletedAt: 'gestern' }));
@@ -322,6 +331,13 @@ describe('Ausgaben', () => {
     const db = tripDb(TRIP);
     await assertSucceeds(setDoc(doc(db, path), { ...validExpense, deletedAt: NOW }));
     await assertFails(setDoc(doc(db, path), { ...validExpense, deletedAt: 0 }));
+  });
+
+  it('erlaubt das weiche Löschen als Teil-Update, so wie die App es schickt', async () => {
+    await seed(path, validExpense);
+    const db = tripDb(TRIP);
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
   });
 
   it('erlaubt Ändern und Löschen', async () => {
