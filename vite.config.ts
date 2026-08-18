@@ -12,7 +12,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' statt 'autoUpdate': Ein neuer Service Worker aktiviert sich
+      // nicht mehr selbstständig im Hintergrund, sondern wartet, bis die
+      // Crew den Update-Screen (src/UpdatePrompt.tsx) bestätigt. So wird
+      // niemandem mitten in einer Eingabe der Boden unter den Füßen weggezogen.
+      registerType: 'prompt',
       includeAssets: ['favicon.ico'],
       manifest: {
         name: '2cars2georgia',
@@ -26,12 +30,12 @@ export default defineConfig({
       },
       workbox: {
         // Alte Precache-Einträge früherer Builds entfernen, damit nach einem
-        // Deploy keine veralteten Assets ausgeliefert werden.
+        // Deploy keine veralteten Assets liegen bleiben.
         cleanupOutdatedCaches: true,
-        // Neuer Service Worker übernimmt sofort, statt auf das Schließen
-        // aller Tabs zu warten.
+        // Der neue Service Worker übernimmt alle offenen Tabs, sobald er
+        // aktiviert wird – aber erst NACH Bestätigung im Update-Screen
+        // (bewusst kein skipWaiting hier, siehe registerType oben).
         clientsClaim: true,
-        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
