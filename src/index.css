@@ -204,15 +204,18 @@ button {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--nav-height);
-  background: var(--color-bg-raised);
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--color-bg-raised) 92%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   justify-content: space-around;
   align-items: center;
+  gap: 4px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--color-border-strong);
-  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.09);
+  box-shadow: 0 -1px 12px rgba(15, 23, 42, 0.06);
   z-index: 1000;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .nav-item {
@@ -226,27 +229,31 @@ button {
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  gap: 3px;
+  gap: 4px;
   flex: 1;
   height: 100%;
+  min-width: 0;
+  border-radius: 16px;
+  transition: color var(--duration-fast) ease;
 }
 
-.nav-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  width: 28px;
-  height: 2px;
-  border-radius: 0 0 2px 2px;
-  background: transparent;
+.nav-item svg {
+  transition: transform var(--duration-fast) ease;
+}
+
+.nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .nav-item.active {
   color: var(--color-accent);
 }
 
-.nav-item.active::before {
-  background: var(--color-accent);
+.nav-item.active svg {
+  transform: translateY(-1px) scale(1.05);
 }
 
 /* ============================================================
