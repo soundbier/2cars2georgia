@@ -37,6 +37,7 @@ export const en: Translations = {
   'common.saveError': 'Could not save.',
   'common.deleteError': 'Could not delete.',
   'common.restoreFailed': 'Could not restore.',
+  'common.writeRejected': 'Rejected by the server – are the Firestore rules up to date?',
   'common.undo': 'Undo',
   'common.connecting': 'Connecting to server …',
 

@@ -1,3 +1,4 @@
+import type { TranslationKey } from '../i18n/translate';
 import { trackWrite } from './pendingWrites';
 
 /**
@@ -37,4 +38,18 @@ export function writeOptimistically(promise: Promise<unknown>, onFailure: (err: 
     console.error(err);
     if (!isOfflineWriteError(err)) onFailure(err);
   });
+}
+
+/**
+ * Meldung für einen fehlgeschlagenen Schreibvorgang.
+ *
+ * `permission-denied` heißt: Der Server hat den Schreibvorgang bewusst
+ * abgelehnt – praktisch immer, weil die veröffentlichten Firestore-Regeln
+ * nicht zum Stand von firestore.rules passen (siehe README, „Firestore-Regeln
+ * veröffentlichen“). Der Eintrag verschwindet dann kurz aus der Liste, weil
+ * der lokale Cache ihn schon angewendet hat, und taucht nach der Ablehnung
+ * wieder auf. Ein allgemeines „Fehler beim Löschen“ führt hier in die Irre.
+ */
+export function writeErrorKey(err: unknown, fallback: TranslationKey): TranslationKey {
+  return (err as { code?: string })?.code === 'permission-denied' ? 'common.writeRejected' : fallback;
 }
