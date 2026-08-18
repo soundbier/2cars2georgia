@@ -7,28 +7,18 @@ import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { distanceUnitLabel, toDisplayDistance } from '../lib/units';
+import { distanceMeters } from '../lib/geo';
 import { LogEvent, GpsPoint, LogType, QuickLogConfig } from '../types';
 import { PageHeader, EmptyState, IconButton, Input, Select, ConfirmDialog, useToast } from '../components/ui';
 import './Stats.css';
 
-const EARTH_RADIUS_KM = 6371;
-
-const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-
-/** Gesamtstrecke entlang der Trackpunkte (Haversine) in Kilometern. */
+/** Gesamtstrecke entlang der Trackpunkte in Kilometern. */
 function totalDistanceKm(points: GpsPoint[]): number {
-  let total = 0;
+  let totalMeters = 0;
   for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const dLat = toRadians(curr.lat - prev.lat);
-    const dLng = toRadians(curr.lng - prev.lng);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRadians(prev.lat)) * Math.cos(toRadians(curr.lat)) * Math.sin(dLng / 2) ** 2;
-    total += EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    totalMeters += distanceMeters(points[i - 1], points[i]);
   }
-  return total;
+  return totalMeters / 1000;
 }
 
 function formatDuration(milliseconds: number): string {

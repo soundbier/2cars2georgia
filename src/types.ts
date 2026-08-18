@@ -41,6 +41,12 @@ export interface Coordinates {
 /** Momentaufnahme des GPS-Empfängers, noch ohne Bezug zu Nutzer/Zeit. */
 export interface LivePosition extends Coordinates {
   speedKmh: number;
+  /**
+   * Fahrtrichtung in Grad (0 = Nord, im Uhrzeigersinn), oder null solange sie
+   * unbekannt ist – im Stand oder direkt nach dem ersten Fix liefert das Gerät
+   * keinen verwertbaren Kurs.
+   */
+  headingDeg: number | null;
 }
 
 export interface GpsPoint extends LivePosition {

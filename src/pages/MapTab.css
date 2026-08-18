@@ -12,13 +12,68 @@
   width: 100%;
 }
 
-/* Positionsmarker: von L.divIcon in userIcon() eingehängt. */
+/* Marker: von L.divIcon in dotIcon()/boatIcon() eingehängt. */
 .map-marker-dot {
   width: 16px;
   height: 16px;
   border-radius: 50%;
   border: 2px solid #ffffff;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.map-marker-boat {
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.45));
+}
+
+/* ---- Schwebende Kartenbedienung ---------------------------------------- */
+
+.map-controls {
+  position: absolute;
+  right: var(--space-3);
+  /* Oberhalb der Attributionszeile, die Leaflet unten rechts einblendet. */
+  bottom: calc(var(--space-3) + 22px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Über den Kartenpanes, aber unter Popups (Leaflet: 700). */
+  z-index: 500;
+}
+
+.map-control {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg-raised);
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.map-control:active {
+  background: var(--color-surface-hover);
+}
+
+.map-control-active {
+  background: var(--color-accent);
+  border-color: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.map-control-active:active {
+  background: var(--color-accent-strong);
+}
+
+/* Die Nadel zeigt nach Norden – gedreht wird sie inline aus MapTab.tsx. */
+.map-control-compass svg {
+  transition: transform var(--duration-fast);
 }
 
 .map-popup {

@@ -8,7 +8,13 @@ Eine Progressive Web App (PWA) zur Live-GPS-Verfolgung, ereignisbasierten Dokume
     * Erfasst kontinuierlich Geolocation-Daten.
     * Visualisiert den Standort und den Routenverlauf als `Polyline` auf der Karte.
     * Berechnet in Echtzeit die aktuelle Geschwindigkeit (km/h).
-    * Automatische Zentrierung der Karte auf den eigenen Standort.
+    * Zeigt die eigene Position als ausgerichtetes Boots-Symbol; der Kurs kommt vom Gerät oder wird aus der zurückgelegten Strecke abgeleitet.
+
+* **Kartenbedienung:**
+    * **Folgen:** Eine Taste zentriert die Karte auf die eigene Position und lässt sie mitlaufen; das Verschieben der Karte beendet das Folgen.
+    * **Gemerkter Ausschnitt:** Position, Zoom und Ausrichtung überleben Tab-Wechsel und App-Neustart (`lib/mapView.ts`).
+    * **Drehbar:** Zwei-Finger-Geste (am Desktop Shift + Scrollen) dreht die Karte, die Kompasstaste richtet sie wieder nach Norden aus.
+    * **Ebenen:** Grundkarte (Standard, Topografisch, Satellit, Reduziert) und Overlays (Seezeichen, Radrouten, Wanderwege) in den Einstellungen wählbar – alle Quellen ohne API-Schlüssel (`lib/mapLayers.ts`).
 
 * **Ereignis-Logbuch & Interaktive Karte:**
     * **Logging:** Schnelles Erfassen von Ereignissen (Schleuse, Pause, Panne, Grenze, Anlegen, Tanken, Pegel).

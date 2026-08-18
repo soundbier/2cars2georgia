@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Pencil } from 'lucide-react';
+import { Pencil, LocateFixed } from 'lucide-react';
 import L from 'leaflet';
+// Seiteneffekt-Import: erweitert Leaflet um die Kartendrehung (map.setBearing).
+import 'leaflet-rotate';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
@@ -10,42 +12,189 @@ import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
 import { formatSpeed } from '../lib/units';
-import { GpsPoint, LogEvent, LogType, QuickLogConfig } from '../types';
+import { getBaseLayer, OVERLAYS, OVERLAY_IDS } from '../lib/mapLayers';
+import { readMapView, saveMapView } from '../lib/mapView';
+import { GpsPoint, LivePosition, LogEvent, LogType, QuickLogConfig } from '../types';
 import { Button, Input, Select, useToast, ConfirmDialog } from '../components/ui';
 import 'leaflet/dist/leaflet.css';
 import './MapTab.css';
-
-/** Hamburg als Startansicht, solange weder GPS noch Track vorliegen. */
-const FALLBACK_CENTER: [number, number] = [53.5511, 9.9937];
 
 // Leaflet setzt die Linienfarbe als SVG-Attribut – dort werden CSS-Variablen
 // nicht aufgelöst, deshalb hier der Literalwert von --color-accent.
 const TRACK_COLOR = '#0284c7';
 
+const DEG_TO_RAD = Math.PI / 180;
+
 // Leaflet-Icons sind pro Farbe identisch – einmal erzeugen statt bei jedem Render.
 const iconCache = new Map<string, L.DivIcon>();
 
-function userIcon(color: string): L.DivIcon {
-  let icon = iconCache.get(color);
+function cachedIcon(key: string, create: () => L.DivIcon): L.DivIcon {
+  let icon = iconCache.get(key);
   if (!icon) {
-    icon = L.divIcon({
-      className: 'custom-marker',
-      html: `<div class="map-marker-dot" style="background-color: ${color};"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8]
-    });
-    iconCache.set(color, icon);
+    icon = create();
+    iconCache.set(key, icon);
   }
   return icon;
 }
 
-function MapViewController({ center }: { center: [number, number] }) {
+/** Punktmarker für Log-Ereignisse und für Positionen ohne bekannten Kurs. */
+function dotIcon(color: string): L.DivIcon {
+  return cachedIcon(`dot:${color}`, () =>
+    L.divIcon({
+      className: 'custom-marker',
+      html: `<div class="map-marker-dot" style="background-color: ${color};"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    })
+  );
+}
+
+/**
+ * Bootsrumpf von oben, Bug nach oben.
+ *
+ * Die Drehung übernimmt leaflet-rotate über die Marker-Option `rotation`, damit
+ * sie beim Drehen der Karte ohne Neuaufbau des Icons mitläuft.
+ */
+function boatIcon(color: string): L.DivIcon {
+  return cachedIcon(`boat:${color}`, () =>
+    L.divIcon({
+      className: 'custom-marker',
+      // Rumpf von oben: spitzer Bug, gerade Bordwände, runder Spiegel.
+      html: `<svg class="map-marker-boat" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+               <path d="M12 2 L16.5 11 L16.5 16.5 A4.5 4.5 0 0 1 7.5 16.5 L7.5 11 Z"
+                     fill="${color}" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round" />
+               <path d="M9.6 12.5 H14.4" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"
+                     opacity="0.9" />
+             </svg>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    })
+  );
+}
+
+/** Kompassnadel: rote Hälfte nach Norden, graue nach Süden. */
+function CompassNeedle({ bearing }: { bearing: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      style={{ transform: `rotate(${bearing}deg)` }}
+    >
+      <path d="M12 2.5 L16 12 L12 12 Z" fill="#dc2626" />
+      <path d="M12 2.5 L8 12 L12 12 Z" fill="#f87171" />
+      <path d="M12 21.5 L16 12 L12 12 Z" fill="#94a3b8" />
+      <path d="M12 21.5 L8 12 L12 12 Z" fill="#cbd5e1" />
+    </svg>
+  );
+}
+
+/**
+ * Hält den gespeicherten Ausschnitt aktuell und meldet Nutzerinteraktionen.
+ *
+ * Ohne das Speichern startete die Karte nach jedem Tab-Wechsel wieder über der
+ * eigenen Position (siehe lib/mapView).
+ */
+function MapStateSync({
+  onUserDrag,
+  onBearingChange
+}: {
+  onUserDrag: () => void;
+  onBearingChange: (bearing: number) => void;
+}) {
   const map = useMap();
-  const [lat, lng] = center;
+
   useEffect(() => {
-    map.setView([lat, lng], map.getZoom());
-  }, [lat, lng, map]);
+    // `rotate` feuert bei jedem Frame der Drehgeste – der Ausschnitt wird
+    // deshalb erst nach dem Loslassen geschrieben, die Kompassnadel dagegen
+    // sofort aktualisiert.
+    let persistTimer: number | undefined;
+    const persist = () => {
+      window.clearTimeout(persistTimer);
+      persistTimer = window.setTimeout(() => {
+        const center = map.getCenter();
+        saveMapView({
+          lat: center.lat,
+          lng: center.lng,
+          zoom: map.getZoom(),
+          bearing: map.getBearing()
+        });
+      }, 250);
+    };
+    const handleRotate = () => {
+      onBearingChange(map.getBearing());
+      persist();
+    };
+
+    map.on('moveend', persist);
+    map.on('zoomend', persist);
+    map.on('rotate', handleRotate);
+    map.on('dragstart', onUserDrag);
+
+    return () => {
+      window.clearTimeout(persistTimer);
+      map.off('moveend', persist);
+      map.off('zoomend', persist);
+      map.off('rotate', handleRotate);
+      map.off('dragstart', onUserDrag);
+    };
+  }, [map, onUserDrag, onBearingChange]);
+
   return null;
+}
+
+/** Zieht die Karte der eigenen Position hinterher, solange „Folgen“ aktiv ist. */
+function FollowController({ position, active }: { position: LivePosition | null; active: boolean }) {
+  const map = useMap();
+  const lat = position?.lat;
+  const lng = position?.lng;
+
+  useEffect(() => {
+    if (!active || lat === undefined || lng === undefined) return;
+    map.setView([lat, lng], map.getZoom(), { animate: true });
+  }, [map, active, lat, lng]);
+
+  return null;
+}
+
+function PositionMarker({
+  position,
+  user,
+  children
+}: {
+  position: LivePosition;
+  user: string;
+  children: ReactNode;
+}) {
+  const markerRef = useRef<L.Marker>(null);
+  const color = getUserColor(user);
+  const heading = position.headingDeg;
+  // Nur der Wechsel zwischen „Kurs bekannt“ und „unbekannt“ tauscht das Icon;
+  // der Kurs selbst dreht den vorhandenen Marker, statt ihn neu zu zeichnen.
+  const hasHeading = heading !== null;
+  const icon = useMemo(
+    () => (hasHeading ? boatIcon(color) : dotIcon(color)),
+    [hasHeading, color]
+  );
+
+  useEffect(() => {
+    markerRef.current?.setRotation((heading ?? 0) * DEG_TO_RAD);
+  }, [heading, icon]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[position.lat, position.lng]}
+      icon={icon}
+      rotation={(heading ?? 0) * DEG_TO_RAD}
+      // Kurs über Grund bleibt beim Drehen der Karte geografisch korrekt.
+      rotateWithView
+      zIndexOffset={1000}
+    >
+      {children}
+    </Marker>
+  );
 }
 
 type EventChanges = Pick<LogEvent, 'title' | 'type' | 'lat' | 'lng'>;
@@ -146,13 +295,38 @@ export default function MapTab({ user }: { user: string }) {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
 
+  // Beim Einhängen einmal gelesen: MapContainer wertet center/zoom nur initial
+  // aus, alles Weitere läuft über die Map-Instanz.
+  const [initialView] = useState(readMapView);
+  const [map, setMap] = useState<L.Map | null>(null);
+  const [bearing, setBearing] = useState(initialView.bearing);
+  const [follow, setFollow] = useState(initialView.follow);
+
+  const baseLayer = getBaseLayer(preferences.baseLayer);
   const line: [number, number][] = track.map((p) => [p.lat, p.lng]);
 
-  const center: [number, number] = position
-    ? [position.lat, position.lng]
-    : line.length > 0
-      ? line[line.length - 1]
-      : FALLBACK_CENTER;
+  useEffect(() => {
+    saveMapView({ follow });
+  }, [follow]);
+
+  // Wer die Karte selbst verschiebt, will dort bleiben.
+  const stopFollowing = useCallback(() => setFollow(false), []);
+
+  const centerOnUser = () => {
+    if (follow) {
+      setFollow(false);
+      return;
+    }
+    if (!position) {
+      notify('Noch keine GPS-Position verfügbar.', 'danger');
+      return;
+    }
+    // Das Zentrieren selbst übernimmt der FollowController, sobald „Folgen“
+    // aktiv ist – die Zoomstufe bleibt dabei bewusst erhalten.
+    setFollow(true);
+  };
+
+  const resetNorth = () => map?.setBearing(0);
 
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
     try {
@@ -180,31 +354,57 @@ export default function MapTab({ user }: { user: string }) {
 
   return (
     <div className="map-view">
-      <MapContainer center={center} zoom={13} className="map-canvas">
-        <MapViewController center={center} />
+      <MapContainer
+        ref={setMap}
+        center={[initialView.lat, initialView.lng]}
+        zoom={initialView.zoom}
+        className="map-canvas"
+        // Drehen per Zwei-Finger-Geste, am Desktop mit gedrückter Shift-Taste.
+        rotate
+        touchRotate
+        bearing={initialView.bearing}
+        rotateControl={false}
+      >
+        <MapStateSync onUserDrag={stopFollowing} onBearingChange={setBearing} />
+        <FollowController position={position} active={follow} />
+
         <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          // Attribution und Zoomgrenzen gelten pro Quelle: neu einhängen statt
+          // nur die URL auszutauschen.
+          key={preferences.baseLayer}
+          url={baseLayer.url}
+          attribution={baseLayer.attribution}
+          maxZoom={baseLayer.maxZoom}
+          maxNativeZoom={baseLayer.maxNativeZoom}
         />
-        {preferences.showSeamarks && (
-          <TileLayer url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" />
-        )}
+        {OVERLAY_IDS.filter((id) => preferences.overlays[id]).map((id) => (
+          <TileLayer
+            key={id}
+            url={OVERLAYS[id].url}
+            attribution={OVERLAYS[id].attribution}
+            maxZoom={OVERLAYS[id].maxZoom}
+            maxNativeZoom={OVERLAYS[id].maxNativeZoom}
+          />
+        ))}
 
         {line.length > 1 && <Polyline positions={line} color={TRACK_COLOR} weight={4} />}
 
         {position && (
-          <Marker position={[position.lat, position.lng]} icon={userIcon(getUserColor(user))}>
+          <PositionMarker position={position} user={user}>
             <Popup>
               <div className="map-popup">
                 <strong>Aktuelle Position ({user})</strong>
-                <div className="helper-text">{formatSpeed(position.speedKmh, preferences.unitSystem)}</div>
+                <div className="helper-text">
+                  {formatSpeed(position.speedKmh, preferences.unitSystem)}
+                  {position.headingDeg !== null && ` · ${position.headingDeg}°`}
+                </div>
               </div>
             </Popup>
-          </Marker>
+          </PositionMarker>
         )}
 
         {events.map((evt) => (
-          <Marker key={evt.id} position={[evt.lat, evt.lng]} icon={userIcon(getUserColor(evt.author))}>
+          <Marker key={evt.id} position={[evt.lat, evt.lng]} icon={dotIcon(getUserColor(evt.author))}>
             <Popup minWidth={200}>
               <EventPopup
                 event={evt}
@@ -216,6 +416,31 @@ export default function MapTab({ user }: { user: string }) {
           </Marker>
         ))}
       </MapContainer>
+
+      <div className="map-controls">
+        {/* Nur sichtbar, wenn es etwas zurückzusetzen gibt. */}
+        {Math.round(bearing) % 360 !== 0 && (
+          <button
+            type="button"
+            className="map-control map-control-compass"
+            onClick={resetNorth}
+            aria-label="Karte nach Norden ausrichten"
+            title="Karte nach Norden ausrichten"
+          >
+            <CompassNeedle bearing={bearing} />
+          </button>
+        )}
+        <button
+          type="button"
+          className={`map-control ${follow ? 'map-control-active' : ''}`}
+          onClick={centerOnUser}
+          aria-pressed={follow}
+          aria-label={follow ? 'Position nicht mehr folgen' : 'Auf eigene Position zentrieren'}
+          title={follow ? 'Position nicht mehr folgen' : 'Auf eigene Position zentrieren'}
+        >
+          <LocateFixed size={20} />
+        </button>
+      </div>
 
       <ConfirmDialog
         open={deleteTargetId !== null}
