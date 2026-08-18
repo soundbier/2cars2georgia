@@ -4,29 +4,50 @@ import './Toast.css';
 
 type ToastTone = 'info' | 'success' | 'danger';
 
+export interface ToastAction {
+  label: string;
+  onAct: () => void;
+}
+
 interface ToastEntry {
   id: number;
   message: string;
   tone: ToastTone;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
-  notify: (message: string, tone?: ToastTone) => void;
+  notify: (message: string, tone?: ToastTone, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
+
+/**
+ * Toasts mit Aktion bleiben länger stehen: Ein „Rückgängig“ nach 3,2 Sekunden
+ * wegzublenden reicht nicht, um es auf einem Handy überhaupt zu lesen.
+ */
+const TOAST_TIMEOUT_MS = 3200;
+const TOAST_WITH_ACTION_TIMEOUT_MS = 7000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const idRef = useRef(0);
 
-  const notify = useCallback((message: string, tone: ToastTone = 'info') => {
-    const id = ++idRef.current;
-    setToasts((prev) => [...prev, { id, message, tone }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3200);
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  const notify = useCallback(
+    (message: string, tone: ToastTone = 'info', action?: ToastAction) => {
+      const id = ++idRef.current;
+      setToasts((prev) => [...prev, { id, message, tone, action }]);
+      setTimeout(
+        () => dismiss(id),
+        action ? TOAST_WITH_ACTION_TIMEOUT_MS : TOAST_TIMEOUT_MS
+      );
+    },
+    [dismiss]
+  );
 
   return (
     <ToastContext.Provider value={{ notify }}>
@@ -37,7 +58,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             {t.tone === 'danger' && <AlertTriangle size={16} />}
             {t.tone === 'success' && <CheckCircle2 size={16} />}
             {t.tone === 'info' && <Info size={16} />}
-            <span>{t.message}</span>
+            <span className="toast-message">{t.message}</span>
+            {t.action && (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => {
+                  dismiss(t.id);
+                  t.action!.onAct();
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

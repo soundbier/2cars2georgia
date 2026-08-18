@@ -62,6 +62,12 @@ export interface LogEvent extends Coordinates {
   type: LogType;
   title: string;
   note?: string;
+  /**
+   * Gesetzt, sobald der Eintrag im Papierkorb liegt – siehe lib/trash.ts.
+   * Gelöscht wird bewusst weich, damit ein Fehlgriff rückgängig gemacht
+   * werden kann.
+   */
+  deletedAt?: number;
 }
 
 export type ExpenseCategory = 'tanken' | 'liegeplatz' | 'schleuse' | 'verpflegung' | 'sonstiges';
@@ -74,4 +80,6 @@ export interface Expense {
   title: string;
   amountEuro: number;
   category: ExpenseCategory;
+  /** Gesetzt, sobald die Ausgabe im Papierkorb liegt – siehe lib/trash.ts. */
+  deletedAt?: number;
 }

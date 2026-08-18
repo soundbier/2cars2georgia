@@ -64,6 +64,12 @@ service cloud.firestore {
       return data()[field] is int && data()[field] > 1000000000000 && data()[field] < 4000000000000;
     }
 
+    // Papierkorb-Markierung (siehe src/lib/trash.ts): fehlt bei aktiven
+    // Einträgen komplett und trägt beim Löschen die Client-Zeit.
+    function isOptionalEpochMillis(field) {
+      return !(field in data()) || isEpochMillis(field);
+    }
+
     function isLatitude(field) {
       return data()[field] is number && data()[field] >= -90 && data()[field] <= 90;
     }
@@ -116,12 +122,13 @@ service cloud.firestore {
       // --- Logbuch -------------------------------------------------------
       match /events/{eventId} {
         function isLogEvent() {
-          return fieldsAre(['timestamp', 'author', 'type', 'title', 'lat', 'lng'], ['note'])
+          return fieldsAre(['timestamp', 'author', 'type', 'title', 'lat', 'lng'], ['note', 'deletedAt'])
             && isEpochMillis('timestamp')
             && isText('author', 60)
             && isText('type', 40)
             && isText('title', 120)
             && isOptionalText('note', 2000)
+            && isOptionalEpochMillis('deletedAt')
             && isLatitude('lat')
             && isLongitude('lng');
         }
@@ -134,7 +141,8 @@ service cloud.firestore {
       // --- Bordkasse -----------------------------------------------------
       match /expenses/{expenseId} {
         function isExpense() {
-          return fieldsAre(['timestamp', 'author', 'paidBy', 'title', 'amountEuro', 'category'], [])
+          return fieldsAre(['timestamp', 'author', 'paidBy', 'title', 'amountEuro', 'category'], ['deletedAt'])
+            && isOptionalEpochMillis('deletedAt')
             && isEpochMillis('timestamp')
             && isText('author', 60)
             && isText('paidBy', 60)

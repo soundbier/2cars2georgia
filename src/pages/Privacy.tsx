@@ -80,6 +80,21 @@ export function PrivacyContent() {
           keine automatische Löschung. Auf Wunsch löscht die verantwortliche Stelle (siehe oben)
           einzelne Einträge oder den gesamten Roadtrip manuell.
         </p>
+        <p className="helper-text">
+          Gelöschte Logbuch-Einträge und Ausgaben landen zunächst im Papierkorb
+          (Mehr&nbsp;→&nbsp;Papierkorb) und sind dort weiterhin gespeichert, damit ein Fehlgriff
+          rückgängig gemacht werden kann. Endgültig entfernt werden sie erst, wenn sie dort
+          gelöscht oder der Papierkorb geleert wird.
+        </p>
+      </Section>
+
+      <Section title="Export und Weitergabe">
+        <p className="helper-text">
+          Über Mehr&nbsp;→&nbsp;Export lassen sich Logbuch, Kosten und Route als PDF, CSV oder GPX
+          aus der App holen. Diese Dateien enthalten Namen, Positionen und Beträge der Crew und
+          verlassen mit dem Teilen den Schutzbereich der App – die Weitergabe an Dritte sollte
+          deshalb mit allen Betroffenen abgestimmt sein.
+        </p>
       </Section>
 
       <Section title="Eure Rechte">

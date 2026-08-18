@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, deleteField, updateDoc } from 'firebase/firestore';
 import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X } from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
@@ -9,25 +9,11 @@ import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { distanceUnitLabel, toDisplayDistance } from '../lib/units';
-import { distanceMeters } from '../lib/geo';
+import { formatDuration, totalDistanceKm, trackDurationMs } from '../lib/tripStats';
+import { activeOnly } from '../lib/trash';
 import { LogEvent, GpsPoint, LogType, QuickLogConfig } from '../types';
 import { PageHeader, EmptyState, IconButton, Input, Select, ConfirmDialog, useToast } from '../components/ui';
 import './Stats.css';
-
-/** Gesamtstrecke entlang der Trackpunkte in Kilometern. */
-function totalDistanceKm(points: GpsPoint[]): number {
-  let totalMeters = 0;
-  for (let i = 1; i < points.length; i++) {
-    totalMeters += distanceMeters(points[i - 1], points[i]);
-  }
-  return totalMeters / 1000;
-}
-
-function formatDuration(milliseconds: number): string {
-  const hours = Math.floor(milliseconds / 3_600_000);
-  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
-  return `${hours}h ${minutes}m`;
-}
 
 type EventChanges = Pick<LogEvent, 'title' | 'type'>;
 
@@ -132,18 +118,20 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
 export default function Stats() {
   const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
-  const events = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
+  const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
   const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
   const { preferences } = usePreferences();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
 
+  // Einträge im Papierkorb bleiben in Firestore, verschwinden aber aus dem
+  // Logbuch – wiederherstellbar über Einstellungen → Papierkorb.
+  const events = useMemo(() => activeOnly(allEvents), [allEvents]);
+
   const { distance, duration } = useMemo(
     () => ({
       distance: toDisplayDistance(totalDistanceKm(track), preferences.unitSystem).toFixed(1),
-      duration: formatDuration(
-        track.length > 1 ? track[track.length - 1].timestamp - track[0].timestamp : 0
-      )
+      duration: formatDuration(trackDurationMs(track))
     }),
     [track, preferences.unitSystem]
   );
@@ -161,16 +149,31 @@ export default function Stats() {
     }
   };
 
+  const restoreEvent = async (id: string) => {
+    if (!tripId) return;
+    try {
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: deleteField() }));
+      notify('Ereignis wiederhergestellt', 'success');
+    } catch (err) {
+      console.error(err);
+      notify('Wiederherstellen fehlgeschlagen.', 'danger');
+    }
+  };
+
   const handleDeleteEvent = async () => {
     if (!deleteTargetId || !tripId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
     try {
-      await trackWrite(deleteDoc(doc(db, tripPath(tripId, 'events'), deleteTargetId)));
-      notify('Ereignis gelöscht', 'success');
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), { deletedAt: Date.now() }));
+      notify('Ereignis in den Papierkorb verschoben', 'success', {
+        label: 'Rückgängig',
+        onAct: () => void restoreEvent(id)
+      });
     } catch (err) {
       console.error(err);
       notify('Fehler beim Löschen.', 'danger');
     }
-    setDeleteTargetId(null);
   };
 
   return (
@@ -222,7 +225,7 @@ export default function Stats() {
       <ConfirmDialog
         open={deleteTargetId !== null}
         title="Ereignis löschen"
-        description="Dieser Log-Eintrag wird endgültig entfernt."
+        description="Der Eintrag wandert in den Papierkorb und lässt sich unter Mehr → Papierkorb wiederherstellen."
         confirmLabel="Löschen"
         destructive
         onConfirm={handleDeleteEvent}
