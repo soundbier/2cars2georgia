@@ -1,8 +1,10 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ListChecks, ChevronRight, Wifi, WifiOff, LogOut } from 'lucide-react';
+import { Users, ListChecks, ChevronRight, Wifi, WifiOff, LogOut, DoorOpen, Compass } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePreferences } from '../hooks/usePreferences';
+import { useRoadtrip } from '../hooks/useRoadtrip';
+import { leaveRoadtrip } from '../lib/roadtrip';
 import { useQuickLogs } from '../hooks/useSettings';
 import { getUserColor } from '../lib/userColors';
 import { UnitSystem } from '../lib/units';
@@ -83,10 +85,34 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
   const isOnline = useOnlineStatus();
   const quickLogs = useQuickLogs();
   const { preferences, setPreference } = usePreferences();
+  const { tripName } = useRoadtrip();
+
+  const handleLeaveRoadtrip = async () => {
+    // Profil zuerst abmelden, damit das Gerät nicht mit dem Nutzernamen
+    // eines fremden Roadtrips im Gate landet.
+    onLogout();
+    try {
+      await leaveRoadtrip();
+    } catch (err) {
+      console.error('Roadtrip konnte nicht verlassen werden:', err);
+    }
+  };
 
   return (
     <div className="settings-page">
       <PageHeader title="Einstellungen" subtitle="Gerät, Anzeige und Daten dieser Reise" />
+
+      <Section title="Dieser Roadtrip">
+        <div className="setting-row">
+          <span className="setting-link-icon">
+            <Compass size={18} strokeWidth={1.75} />
+          </span>
+          <div className="setting-row-body">
+            <div className="setting-row-label">{tripName ?? '…'}</div>
+            <div className="helper-text">Nur mit Roadtrip-Passwort erreichbar</div>
+          </div>
+        </div>
+      </Section>
 
       <Section title="Dieses Gerät">
         <div className="setting-row">
@@ -198,9 +224,14 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
         <SettingRow label="Version" description="2cars2georgia">
           <span className="mono-num helper-text">{__APP_VERSION__}</span>
         </SettingRow>
-        <Button variant="destructive" fullWidth onClick={onLogout}>
-          <LogOut size={18} /> Profil abmelden
-        </Button>
+        <div className="stack">
+          <Button variant="secondary" fullWidth onClick={onLogout}>
+            <LogOut size={18} /> Profil abmelden
+          </Button>
+          <Button variant="destructive" fullWidth onClick={handleLeaveRoadtrip}>
+            <DoorOpen size={18} /> Roadtrip verlassen
+          </Button>
+        </div>
       </Section>
     </div>
   );

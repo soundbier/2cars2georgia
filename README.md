@@ -32,6 +32,24 @@ Eine Progressive Web App (PWA) zur Live-GPS-Verfolgung, ereignisbasierten Dokume
     * **Crew-Management:** Zentrale Verwaltung der erlaubten Nutzer.
     * **Offline-Ready:** Als PWA mit Service Workern konfiguriert, um auch bei instabiler Internetverbindung stabil zu laufen.
 
+* **Roadtrip-Zugriffsschutz:**
+    * **Mehrere Roadtrips:** Jede Reise ist ein eigener Roadtrip mit eigenem Namen, eigenem Passwort und vollständig isolierten Daten (`roadtrips/{tripId}/…`).
+    * **Passwortgeschützter Beitritt:** Nur wer Roadtrip-Name und -Passwort kennt, kommt an Position, Logbuch und Kasse – nicht mehr jeder mit dem Link.
+    * **Echte Durchsetzung via Firebase Auth:** Jeder Roadtrip entspricht einem Firebase-Auth-User; Firestore-Regeln (`firestore.rules`) verlangen serverseitig eine passende Anmeldung. Ein reiner UI-Passwortscreen wäre kein echter Schutz, da die Firebase-Config im Client liegt und jeder damit direkt gegen Firestore schreiben könnte.
+
+## Roadtrip-Auth einrichten (einmalig pro Firebase-Projekt)
+
+1. **Email/Password-Anmeldung aktivieren:** Firebase Console → *Authentication* → *Sign-in method* → *Email/Password* aktivieren. (Es werden keine echten E-Mail-Adressen genutzt – siehe `src/lib/roadtrip.ts`.)
+2. **Firestore-Regeln deployen**, damit der Schutz tatsächlich greift:
+   ```bash
+   npm install -g firebase-tools
+   firebase deploy --only firestore:rules --project <DEIN_FIREBASE_PROJECT_ID>
+   ```
+   Alternativ den Inhalt von `firestore.rules` in der Firebase Console unter *Firestore Database → Regeln* einfügen.
+3. Fertig – im ersten Bildschirm der App kann nun ein Roadtrip erstellt (mit selbstgewähltem Passwort) oder einem bestehenden per Name+Passwort beigetreten werden.
+
+Zum lokalen Testen der Regeln ohne echtes Firebase-Projekt: `firebase emulators:start --only auth,firestore --project demo-2cars2georgia`.
+
 ## Projektstruktur
 
 ```text

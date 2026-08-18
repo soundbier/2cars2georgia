@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { db } from '../../firebase';
+import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { QUICK_LOG_ICONS, DEFAULT_QUICK_LOG_ICON, getQuickLogIcon } from '../../lib/quickLogIcons';
 import { QuickLogConfig, QuickLogIconName } from '../../types';
@@ -54,6 +55,7 @@ function IconPicker({ value, onChange }: IconPickerProps) {
 }
 
 export default function QuickLogSettings() {
+  const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
   const { notify } = useToast();
 
@@ -65,8 +67,9 @@ export default function QuickLogSettings() {
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   const saveQuickLogs = async (items: QuickLogConfig[], errorMessage = 'Fehler beim Speichern.') => {
+    if (!tripId) return false;
     try {
-      await updateDoc(doc(db, 'settings', 'quicklogs'), { items });
+      await updateDoc(doc(db, tripPath(tripId, 'settings', 'quicklogs')), { items });
       return true;
     } catch (err) {
       console.error(err);

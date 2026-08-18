@@ -3,6 +3,7 @@ import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X } from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
+import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
@@ -128,9 +129,10 @@ function LogbookEntry({ event, quickLogs, onSave, onRequestDelete }: LogbookEntr
 }
 
 export default function Stats() {
+  const { tripId } = useRoadtrip();
   const quickLogs = useQuickLogs();
-  const events = useCollection<LogEvent>('events', 'timestamp', 'desc');
-  const track = useCollection<GpsPoint>('track');
+  const events = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
+  const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
   const { preferences } = usePreferences();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { notify } = useToast();
@@ -146,8 +148,9 @@ export default function Stats() {
   );
 
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
+    if (!tripId) return false;
     try {
-      await updateDoc(doc(db, 'events', id), changes);
+      await updateDoc(doc(db, tripPath(tripId, 'events'), id), changes);
       notify('Ereignis aktualisiert', 'success');
       return true;
     } catch (err) {
@@ -158,9 +161,9 @@ export default function Stats() {
   };
 
   const handleDeleteEvent = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteTargetId || !tripId) return;
     try {
-      await deleteDoc(doc(db, 'events', deleteTargetId));
+      await deleteDoc(doc(db, tripPath(tripId, 'events'), deleteTargetId));
       notify('Ereignis gelöscht', 'success');
     } catch (err) {
       console.error(err);

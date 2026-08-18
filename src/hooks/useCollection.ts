@@ -7,15 +7,22 @@ import { db } from '../firebase';
  *
  * Ersetzt die zuvor in jeder Seite wiederholte onSnapshot-Schleife. Die Daten
  * kommen dank persistentLocalCache auch offline aus dem lokalen Cache.
+ *
+ * `path` darf null sein (z.B. solange noch kein Roadtrip angemeldet ist) –
+ * dann wird nichts abonniert und eine leere Liste geliefert.
  */
 export function useCollection<T>(
-  path: string,
+  path: string | null,
   orderField = 'timestamp',
   direction: OrderByDirection = 'asc'
 ): T[] {
   const [items, setItems] = useState<T[]>([]);
 
   useEffect(() => {
+    if (!path) {
+      setItems([]);
+      return;
+    }
     const q = query(collection(db, path), orderBy(orderField, direction));
     return onSnapshot(
       q,

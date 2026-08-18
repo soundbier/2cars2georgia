@@ -1,9 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from "firebase/firestore";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,3 +22,12 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager()
   })
 });
+
+// Meldet die Crew am Roadtrip an (siehe lib/roadtrip.ts) – pro Roadtrip gibt
+// es einen technischen Auth-User, dessen Passwort das gemeinsame
+// Roadtrip-Passwort ist. `browserLocalPersistence` hält die Anmeldung über
+// Neustarts hinweg, damit nicht jedes Mal erneut das Passwort nötig ist.
+export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch((err) =>
+  console.error('Auth-Persistenz konnte nicht gesetzt werden:', err)
+);

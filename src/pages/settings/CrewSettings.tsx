@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { doc, updateDoc, arrayUnion, arrayRemove, FieldValue } from 'firebase/firestore';
 import { UserPlus, Trash2 } from 'lucide-react';
 import { db } from '../../firebase';
+import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { getUserColor } from '../../lib/userColors';
 import { IconButton, Input, Section, ListItem, PageHeader, ConfirmDialog, useToast } from '../../components/ui';
 import '../Settings.css';
@@ -12,11 +13,15 @@ interface Props {
 }
 
 export default function CrewSettings({ currentUser, users }: Props) {
+  const { tripId } = useRoadtrip();
   const [newUser, setNewUser] = useState('');
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const { notify } = useToast();
 
-  const saveCrew = (change: FieldValue) => updateDoc(doc(db, 'settings', 'general'), { users: change });
+  const saveCrew = (change: FieldValue) => {
+    if (!tripId) return Promise.resolve();
+    return updateDoc(doc(db, tripPath(tripId, 'settings', 'general')), { users: change });
+  };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
