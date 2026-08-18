@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const addDoc = vi.fn(() => Promise.resolve({ id: 'doc-1' }));
+// Signatur wie der echte addDoc-Aufruf in errorLog.ts – so kennt
+// addDoc.mock.calls die Argumenttypen und die Tests kommen ohne Casts aus.
+const addDoc = vi.fn((_ref: { path: string }, _entry: Record<string, unknown>) =>
+  Promise.resolve({ id: 'doc-1' })
+);
 
 vi.mock('firebase/firestore', () => ({
-  addDoc: (...args: unknown[]) => addDoc(...(args as [])),
+  addDoc: (ref: { path: string }, entry: Record<string, unknown>) => addDoc(ref, entry),
   collection: (_db: unknown, path: string) => ({ path })
 }));
 vi.mock('../firebase', () => ({ db: {} }));
@@ -12,7 +16,7 @@ const { __resetErrorLogForTests, errorMessage, logError, setErrorLogContext } = 
 
 /** Das geschriebene Dokument des n-ten Aufrufs. */
 function writtenEntry(call = 0) {
-  return addDoc.mock.calls[call][1] as Record<string, unknown>;
+  return addDoc.mock.calls[call][1];
 }
 
 beforeEach(() => {
