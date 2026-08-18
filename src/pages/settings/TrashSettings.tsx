@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { useCollection } from '../../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { useQuickLogs } from '../../hooks/useSettings';
-import { trackWrite } from '../../lib/pendingWrites';
+import { writeOptimistically } from '../../lib/writeOutcome';
 import { deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
 import { Expense, LogEvent } from '../../types';
 import {
@@ -68,39 +68,36 @@ export default function TrashSettings() {
 
   const expiredCount = useMemo(() => items.filter((item) => isExpired(item)).length, [items]);
 
-  const restore = async (item: TrashItem) => {
+  const restore = (item: TrashItem) => {
     if (!tripId) return;
-    try {
-      await trackWrite(
-        updateDoc(doc(db, tripPath(tripId, item.collectionName), item.id), { deletedAt: deleteField() })
-      );
-      notify('Eintrag wiederhergestellt', 'success');
-    } catch (err) {
-      console.error(err);
-      notify('Wiederherstellen fehlgeschlagen.', 'danger');
-    }
+    writeOptimistically(
+      updateDoc(doc(db, tripPath(tripId, item.collectionName), item.id), { deletedAt: deleteField() }),
+      () => notify('Wiederherstellen fehlgeschlagen.', 'danger')
+    );
+    notify('Eintrag wiederhergestellt', 'success');
   };
 
-  const confirmPurge = async () => {
+  const confirmPurge = () => {
     const target = purgeTarget;
     setPurgeTarget(null);
     if (!target || !tripId) return;
 
     const toPurge = target.kind === 'all' ? items : [target.item];
-    try {
-      // Bewusst sequenziell statt als Batch: Die Schreibvorgänge laufen auch
-      // offline über den Firestore-Cache und sollen einzeln nachziehen können.
-      for (const item of toPurge) {
-        await trackWrite(deleteDoc(doc(db, tripPath(tripId, item.collectionName), item.id)));
-      }
-      notify(
-        toPurge.length === 1 ? 'Eintrag endgültig gelöscht' : `${toPurge.length} Einträge endgültig gelöscht`,
-        'success'
-      );
-    } catch (err) {
-      console.error(err);
-      notify('Endgültiges Löschen fehlgeschlagen.', 'danger');
+    // Bewusst einzeln statt als Batch: Die Schreibvorgänge laufen auch offline
+    // über den Firestore-Cache und sollen einzeln nachziehen können. Auf die
+    // Server-Bestätigung wird nicht gewartet, siehe lib/writeOutcome.ts.
+    let reported = false;
+    for (const item of toPurge) {
+      writeOptimistically(deleteDoc(doc(db, tripPath(tripId, item.collectionName), item.id)), () => {
+        if (reported) return;
+        reported = true;
+        notify('Endgültiges Löschen fehlgeschlagen.', 'danger');
+      });
     }
+    notify(
+      toPurge.length === 1 ? 'Eintrag endgültig gelöscht' : `${toPurge.length} Einträge endgültig gelöscht`,
+      'success'
+    );
   };
 
   return (
