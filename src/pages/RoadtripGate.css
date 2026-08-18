@@ -56,3 +56,67 @@
 .roadtrip-gate-hint {
   text-align: center;
 }
+
+.roadtrip-gate-recovery-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  text-align: center;
+}
+
+.roadtrip-gate-recovery-link:hover {
+  color: var(--color-accent);
+}
+
+.roadtrip-gate-privacy-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-size: var(--text-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  text-align: center;
+}
+
+.roadtrip-gate-privacy-link:hover {
+  color: var(--color-accent);
+}
+
+.roadtrip-gate-privacy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  background: var(--color-bg-raised);
+  overflow-y: auto;
+  padding: var(--space-5);
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+
+.roadtrip-gate-privacy-panel {
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.roadtrip-gate-privacy-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  color: var(--color-text);
+  cursor: pointer;
+}

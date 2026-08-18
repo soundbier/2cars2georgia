@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import {
   Gauge,
@@ -13,8 +13,11 @@ import { ToastProvider } from './components/ui';
 import { TrackingProvider } from './hooks/useTracking';
 import { PreferencesProvider } from './hooks/usePreferences';
 import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
+import { setSentryContext } from './lib/sentry';
 import { useCrew } from './hooks/useSettings';
 import { UpdatePrompt } from './UpdatePrompt';
+import { RecoveryCodeDialog } from './components/RecoveryCodeDialog';
+import { SyncStatusBanner } from './components/SyncStatusBanner';
 import RoadtripGate from './pages/RoadtripGate';
 import Dashboard from './pages/Dashboard';
 import MapTab from './pages/MapTab';
@@ -23,6 +26,7 @@ import Costs from './pages/Costs';
 import Settings from './pages/Settings';
 import CrewSettings from './pages/settings/CrewSettings';
 import QuickLogSettings from './pages/settings/QuickLogSettings';
+import Privacy from './pages/Privacy';
 
 const STORAGE_KEY_USER = 'boat_user';
 
@@ -41,8 +45,16 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
  * um "wer bist du innerhalb der Crew", nicht "darfst du überhaupt rein".
  */
 function CrewGate() {
+  const { tripId } = useRoadtrip();
   const [user, setUser] = useState<string>(() => localStorage.getItem(STORAGE_KEY_USER) ?? '');
   const { users, loading } = useCrew();
+
+  // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) dem Roadtrip und
+  // Crewmitglied zu, ohne echte personenbezogene Daten zu senden – tripId
+  // ist bereits ein anonymer Slug, kein Klarname oder Kontaktdaten.
+  useEffect(() => {
+    setSentryContext(tripId, user || null);
+  }, [tripId, user]);
 
   const login = (name: string) => {
     localStorage.setItem(STORAGE_KEY_USER, name);
@@ -107,6 +119,7 @@ function CrewGate() {
                 element={<CrewSettings currentUser={user} users={users} />}
               />
               <Route path="/settings/quicklogs" element={<QuickLogSettings />} />
+              <Route path="/datenschutz" element={<Privacy />} />
             </Routes>
           </div>
           <nav className="bottom-nav">
@@ -122,6 +135,7 @@ function CrewGate() {
               </NavLink>
             ))}
           </nav>
+          <SyncStatusBanner />
         </BrowserRouter>
       </TrackingProvider>
     </PreferencesProvider>
@@ -129,7 +143,11 @@ function CrewGate() {
 }
 
 /** Blendet zwischen dem Roadtrip-Gate und der eigentlichen App um. */
-function RoadtripGateOrApp() {
+function RoadtripGateOrApp({
+  onRoadtripCreated
+}: {
+  onRoadtripCreated: (tripName: string, recoveryCode: string) => void;
+}) {
   const { loading, tripId } = useRoadtrip();
 
   if (loading) {
@@ -143,18 +161,40 @@ function RoadtripGateOrApp() {
 
   // key={tripId} erzwingt einen frischen CrewGate-Baum bei Roadtrip-Wechsel,
   // damit kein Zustand (z.B. ein Crew-Name) aus dem vorigen Trip übrig bleibt.
-  return tripId ? <CrewGate key={tripId} /> : <RoadtripGate />;
+  return tripId ? (
+    <CrewGate key={tripId} />
+  ) : (
+    <RoadtripGate onRoadtripCreated={onRoadtripCreated} />
+  );
 }
 
 export default function App() {
+  // Lebt bewusst hier oben, nicht in RoadtripGate: Sobald createRoadtrip
+  // erfolgreich ist, wechselt der Auth-Status und RoadtripGateOrApp blendet
+  // auf CrewGate um – RoadtripGate selbst wäre dann schon unmontiert und
+  // könnte den Dialog nicht mehr zeigen.
+  const [pendingRecoveryCode, setPendingRecoveryCode] = useState<{
+    tripName: string;
+    code: string;
+  } | null>(null);
+
   return (
     <ToastProvider>
       {/* App-weit gemountet, unabhängig vom Anmeldestatus: Ein Deploy soll auch
           erreichen, wer gerade erst das Roadtrip-Gate sieht. */}
       <UpdatePrompt />
       <RoadtripProvider>
-        <RoadtripGateOrApp />
+        <RoadtripGateOrApp
+          onRoadtripCreated={(tripName, code) => setPendingRecoveryCode({ tripName, code })}
+        />
       </RoadtripProvider>
+      {pendingRecoveryCode && (
+        <RecoveryCodeDialog
+          tripName={pendingRecoveryCode.tripName}
+          code={pendingRecoveryCode.code}
+          onAcknowledge={() => setPendingRecoveryCode(null)}
+        />
+      )}
     </ToastProvider>
   );
 }

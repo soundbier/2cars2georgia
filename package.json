@@ -14,6 +14,7 @@
     "test:rules:emulator": "firebase emulators:exec --only firestore --project demo-2cars2georgia \"npm run test:rules\""
   },
   "dependencies": {
+    "@sentry/react": "^10.70.0",
     "firebase": "^10.12.0",
     "leaflet": "^1.9.4",
     "leaflet-rotate": "^0.2.8",

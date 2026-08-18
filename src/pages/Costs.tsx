@@ -14,6 +14,7 @@ import {
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { trackWrite } from '../lib/pendingWrites';
 import { Expense, ExpenseCategory } from '../types';
 import { Button, Input, Select, PageHeader, EmptyState, IconButton, ConfirmDialog, useToast } from '../components/ui';
 import './Costs.css';
@@ -194,7 +195,7 @@ export default function Costs({ user, users }: Props) {
     };
 
     try {
-      await addDoc(collection(db, tripPath(tripId, 'expenses')), newExpense);
+      await trackWrite(addDoc(collection(db, tripPath(tripId, 'expenses')), newExpense));
       setTitle('');
       setAmount('');
     } catch (err) {
@@ -206,7 +207,7 @@ export default function Costs({ user, users }: Props) {
   const handleSaveEdit = async (id: string, changes: ExpenseChanges) => {
     if (!tripId) return false;
     try {
-      await updateDoc(doc(db, tripPath(tripId, 'expenses'), id), changes);
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'expenses'), id), changes));
       notify('Ausgabe aktualisiert', 'success');
       return true;
     } catch (err) {
@@ -219,7 +220,7 @@ export default function Costs({ user, users }: Props) {
   const handleDeleteExpense = async () => {
     if (!deleteTargetId || !tripId) return;
     try {
-      await deleteDoc(doc(db, tripPath(tripId, 'expenses'), deleteTargetId));
+      await trackWrite(deleteDoc(doc(db, tripPath(tripId, 'expenses'), deleteTargetId)));
       notify('Ausgabe gelöscht', 'success');
     } catch (err) {
       console.error(err);

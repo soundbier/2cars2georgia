@@ -3,6 +3,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { db } from '../../firebase';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
+import { trackWrite } from '../../lib/pendingWrites';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { QUICK_LOG_ICONS, DEFAULT_QUICK_LOG_ICON, getQuickLogIcon } from '../../lib/quickLogIcons';
 import { QuickLogConfig, QuickLogIconName } from '../../types';
@@ -69,7 +70,7 @@ export default function QuickLogSettings() {
   const saveQuickLogs = async (items: QuickLogConfig[], errorMessage = 'Fehler beim Speichern.') => {
     if (!tripId) return false;
     try {
-      await updateDoc(doc(db, tripPath(tripId, 'settings', 'quicklogs')), { items });
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'settings', 'quicklogs')), { items }));
       return true;
     } catch (err) {
       console.error(err);

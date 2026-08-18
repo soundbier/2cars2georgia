@@ -3,6 +3,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePreferences } from './usePreferences';
 import { useRoadtrip, tripPath } from './useRoadtrip';
+import { trackWrite } from '../lib/pendingWrites';
 import { bearingDegrees, distanceMeters } from '../lib/geo';
 import { Coordinates, GpsPoint, LivePosition } from '../types';
 
@@ -98,7 +99,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
         lastSavedTimestampRef.current = now;
         const point: GpsPoint = { timestamp: now, author: user, ...next };
-        addDoc(collection(db, tripPath(tripId, 'track')), point).catch((err) => {
+        trackWrite(addDoc(collection(db, tripPath(tripId, 'track')), point)).catch((err) => {
           console.error('GPS-Speicherfehler:', err);
         });
       },

@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useTracking } from '../hooks/useTracking';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
+import { trackWrite } from '../lib/pendingWrites';
 import { useQuickLogs } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
@@ -333,7 +334,7 @@ export default function MapTab({ user }: { user: string }) {
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
     if (!tripId) return false;
     try {
-      await updateDoc(doc(db, tripPath(tripId, 'events'), id), changes);
+      await trackWrite(updateDoc(doc(db, tripPath(tripId, 'events'), id), changes));
       notify('Ereignis aktualisiert', 'success');
       return true;
     } catch (err) {
@@ -346,7 +347,7 @@ export default function MapTab({ user }: { user: string }) {
   const handleDeleteEvent = async () => {
     if (!deleteTargetId || !tripId) return;
     try {
-      await deleteDoc(doc(db, tripPath(tripId, 'events'), deleteTargetId));
+      await trackWrite(deleteDoc(doc(db, tripPath(tripId, 'events'), deleteTargetId)));
       notify('Ereignis gelöscht', 'success');
     } catch (err) {
       console.error(err);
