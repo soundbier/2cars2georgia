@@ -6,29 +6,197 @@ rules_version = '2';
 // ist nur erlaubt, wenn der angemeldete Auth-User zu genau diesem tripId
 // gehört – das UI-Passwort-Gate allein wäre kein echter Schutz, da jeder mit
 // der Firebase-Config direkt gegen Firestore schreiben könnte.
+//
+// Zusätzlich validiert jede Collection ihre Dokumente. Wer das gemeinsame
+// Roadtrip-Passwort kennt, darf zwar schreiben – aber nicht beliebig viel und
+// nicht in beliebiger Form. Ohne diese Schranken könnte ein einzelnes Gerät
+// (oder ein Skript mit dem Passwort) die Datenbank mit Müll fluten und damit
+// echte Kosten verursachen.
+//
+// Bewusst gibt es KEINEN rekursiven Wildcard mehr unterhalb eines Roadtrips:
+// Jede Collection ist einzeln aufgeführt. Eine neue Collection braucht damit
+// eine bewusste Regeländerung, statt still durch eine Sammelfreigabe zu
+// rutschen. Die Regeln sind in tests/rules/firestore.rules.test.ts abgedeckt.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Identität ------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email is string;
+    }
+
     function signedInTripId() {
       return request.auth.token.email.split('@')[0];
     }
 
+    function ownsTrip(tripId) {
+      return signedIn() && signedInTripId() == tripId;
+    }
+
+    // --- Bausteine für die Feldprüfung ----------------------------------
+
+    // Bei create wie bei update enthält request.resource.data das vollständige
+    // Dokument NACH dem Schreibvorgang – dieselben Prüfungen gelten deshalb
+    // für beides, auch wenn die App bei update nur einzelne Felder schickt.
+    function data() {
+      return request.resource.data;
+    }
+
+    function fieldsAre(required, optional) {
+      return data().keys().hasAll(required) && data().keys().hasOnly(required.concat(optional));
+    }
+
+    function isText(field, maxLength) {
+      return data()[field] is string
+        && data()[field].size() > 0
+        && data()[field].size() <= maxLength;
+    }
+
+    function isOptionalText(field, maxLength) {
+      return !(field in data()) || (data()[field] is string && data()[field].size() <= maxLength);
+    }
+
+    // Zeitstempel kommen aus Date.now() im Client. Eine exakte Serverzeit lässt
+    // sich nicht verlangen, da Einträge offline entstehen und später
+    // nachsynchronisiert werden – geprüft wird nur eine plausible Größenordnung.
+    function isEpochMillis(field) {
+      return data()[field] is int && data()[field] > 1000000000000 && data()[field] < 4000000000000;
+    }
+
+    function isLatitude(field) {
+      return data()[field] is number && data()[field] >= -90 && data()[field] <= 90;
+    }
+
+    function isLongitude(field) {
+      return data()[field] is number && data()[field] >= -180 && data()[field] <= 180;
+    }
+
+    // --- Roadtrip-Wurzel -------------------------------------------------
+
     match /roadtrips/{tripId} {
       // Anlegen passiert direkt nach createUserWithEmailAndPassword, der neue
       // Auth-User ist zu dem Zeitpunkt bereits angemeldet.
-      allow create: if request.auth != null && signedInTripId() == tripId;
-      allow read: if request.auth != null && signedInTripId() == tripId;
+      allow create: if ownsTrip(tripId)
+        && fieldsAre(['name', 'createdAt'], [])
+        && isText('name', 80)
+        && data().createdAt == request.time;
+
+      allow read: if ownsTrip(tripId);
+
       // Name/Erstellungsdatum eines Roadtrips ändern sich nach dem Anlegen nicht.
       allow update, delete: if false;
 
-      match /{document=**} {
-        allow read, write: if request.auth != null && signedInTripId() == tripId;
+      // --- GPS-Spur ------------------------------------------------------
+      // Die mit Abstand größte Collection: Bei kurzem Aufzeichnungsintervall
+      // entstehen tausende Punkte pro Tour. Entsprechend eng ist die Prüfung.
+      match /track/{pointId} {
+        function isTrackPoint() {
+          return fieldsAre(['timestamp', 'author', 'lat', 'lng', 'speedKmh', 'headingDeg'], [])
+            && isEpochMillis('timestamp')
+            && isText('author', 60)
+            && isLatitude('lat')
+            && isLongitude('lng')
+            && data().speedKmh is number
+            && data().speedKmh >= 0
+            && data().speedKmh <= 500
+            // Kurs unbekannt (Stillstand, Gerät ohne Kompass) wird als null
+            // gespeichert, siehe LivePosition in src/types.ts.
+            && (data().headingDeg == null
+                || (data().headingDeg is number && data().headingDeg >= 0 && data().headingDeg <= 360));
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create: if ownsTrip(tripId) && isTrackPoint();
+        // Trackpunkte werden nur angehängt, nie nachträglich verändert.
+        allow update: if false;
+        allow delete: if ownsTrip(tripId);
+      }
+
+      // --- Logbuch -------------------------------------------------------
+      match /events/{eventId} {
+        function isLogEvent() {
+          return fieldsAre(['timestamp', 'author', 'type', 'title', 'lat', 'lng'], ['note'])
+            && isEpochMillis('timestamp')
+            && isText('author', 60)
+            && isText('type', 40)
+            && isText('title', 120)
+            && isOptionalText('note', 2000)
+            && isLatitude('lat')
+            && isLongitude('lng');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isLogEvent();
+        allow delete: if ownsTrip(tripId);
+      }
+
+      // --- Bordkasse -----------------------------------------------------
+      match /expenses/{expenseId} {
+        function isExpense() {
+          return fieldsAre(['timestamp', 'author', 'paidBy', 'title', 'amountEuro', 'category'], [])
+            && isEpochMillis('timestamp')
+            && isText('author', 60)
+            && isText('paidBy', 60)
+            && isText('title', 120)
+            && data().amountEuro is number
+            && data().amountEuro >= 0
+            && data().amountEuro <= 1000000
+            && isText('category', 40);
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isExpense();
+        allow delete: if ownsTrip(tripId);
+      }
+
+      // --- Roadtrip-weite Einstellungen ------------------------------------
+      // Genau zwei Dokumente: "general" (Crew-Liste) und "quicklogs"
+      // (Schnell-Log-Kategorien), siehe src/hooks/useSettings.ts.
+      match /settings/{docId} {
+        function isSettingsDoc() {
+          return (docId == 'general'
+                  && fieldsAre(['users'], [])
+                  && data().users is list
+                  && data().users.size() <= 50)
+              || (docId == 'quicklogs'
+                  && fieldsAre(['items'], [])
+                  && data().items is list
+                  && data().items.size() <= 50);
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isSettingsDoc();
+        allow delete: if false;
+      }
+
+      // --- Fehlerprotokoll -------------------------------------------------
+      // Von src/lib/errorLog.ts befüllt, damit Abstürze auf den Geräten der
+      // Crew nachvollziehbar sind. Nur anhängen, nie ändern.
+      match /errors/{errorId} {
+        function isErrorEntry() {
+          return fieldsAre(['timestamp', 'message'],
+                           ['stack', 'context', 'author', 'appVersion', 'userAgent', 'url'])
+            && isEpochMillis('timestamp')
+            && isText('message', 1000)
+            && isOptionalText('stack', 4000)
+            && isOptionalText('context', 200)
+            && isOptionalText('author', 60)
+            && isOptionalText('appVersion', 40)
+            && isOptionalText('userAgent', 500)
+            && isOptionalText('url', 500);
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create: if ownsTrip(tripId) && isErrorEntry();
+        allow update: if false;
+        allow delete: if ownsTrip(tripId);
       }
     }
 
-    // Alles andere ist gesperrt – insbesondere die alten, nicht mehr
-    // genutzten Top-Level-Collections track/events/expenses/settings.
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // Alles außerhalb der oben aufgeführten Pfade ist gesperrt – Firestore
+    // verweigert ohne passende allow-Regel ohnehin jeden Zugriff. Das gilt
+    // insbesondere für die alten, nicht mehr genutzten Top-Level-Collections
+    // track/events/expenses/settings.
   }
 }
