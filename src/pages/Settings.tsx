@@ -11,11 +11,7 @@ import {
   DoorOpen,
   Compass,
   Download,
-  Trash2,
-  CalendarDays,
-  UtensilsCrossed,
-  ShoppingCart,
-  Package
+  Trash2
 } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePreferences } from '../hooks/usePreferences';
@@ -262,35 +258,6 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
             icon={<ListChecks size={18} strokeWidth={1.75} />}
             label={t('quickLogs.title')}
             value={t('settings.quickLogCount', { count: quickLogs.length })}
-          />
-        </div>
-      </Section>
-
-      <Section title={t('kombuese.sectionTitle')}>
-        <div className="settings-list">
-          <SettingLink
-            to="/settings/speiseplan"
-            icon={<CalendarDays size={18} strokeWidth={1.75} />}
-            label={t('kombuese.mealPlan')}
-            value={t('kombuese.mealPlanValue')}
-          />
-          <SettingLink
-            to="/settings/gerichte"
-            icon={<UtensilsCrossed size={18} strokeWidth={1.75} />}
-            label={t('kombuese.dishes')}
-            value={t('kombuese.dishesValue')}
-          />
-          <SettingLink
-            to="/settings/einkaufsliste"
-            icon={<ShoppingCart size={18} strokeWidth={1.75} />}
-            label={t('kombuese.shoppingList')}
-            value={t('kombuese.shoppingListValue')}
-          />
-          <SettingLink
-            to="/settings/lager"
-            icon={<Package size={18} strokeWidth={1.75} />}
-            label={t('kombuese.inventory')}
-            value={t('kombuese.inventoryValue')}
           />
         </div>
       </Section>
