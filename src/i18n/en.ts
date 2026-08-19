@@ -347,7 +347,7 @@ export const en: Translations = {
     'This app is run privately among friends, not commercially. It still processes location, name and cost data of the crew – so here is a transparent account of what happens with what.',
   'privacy.controller': 'Controller',
   'privacy.controllerPlaceholder':
-    '[Enter the name and contact details of the person running this roadtrip / the Firebase project – e.g. “First name Last name, email”.]',
+    'Lukas Gehrke, LukasGehrke@gmx.de; 2cars2georgia, 2cars2georgia@gmx.de',
   'privacy.dataTitle': 'What data is processed',
   'privacy.dataGps': 'Location (GPS):',
   'privacy.dataGpsText':
