@@ -37,6 +37,9 @@ const {
   joinRoadtrip,
   recoverRoadtrip,
   leaveRoadtrip,
+  isAdminSession,
+  enterAdminMode,
+  setUpAdminAccess,
   slugifyTripName,
   tripIdFromUser,
   generateRecoveryCode,
@@ -152,8 +155,8 @@ describe('generateRecoveryCode', () => {
 });
 
 describe('createRoadtrip', () => {
-  it('legt Haupt- und Wiederherstellungs-Account an und meldet am Ende wieder den Hauptaccount an', async () => {
-    const result = await createRoadtrip('  Sommertour 2026 ', 'geheim123');
+  it('legt Haupt-, Wiederherstellungs- und Admin-Account an und meldet am Ende wieder den Hauptaccount an', async () => {
+    const result = await createRoadtrip('  Sommertour 2026 ', 'geheim123', 'adminpass1');
 
     expect(result.tripId).toBe('sommertour-2026');
     expect(result.tripName).toBe('Sommertour 2026');
@@ -171,7 +174,13 @@ describe('createRoadtrip', () => {
       'sommertour-2026@2cars2georgia.recovery',
       result.recoveryCode
     );
-    // Die Erstellung des Wiederherstellungs-Accounts wechselt die Sitzung –
+    expect(createUserWithEmailAndPassword).toHaveBeenNthCalledWith(
+      3,
+      authState,
+      'sommertour-2026@2cars2georgia.admin',
+      'adminpass1'
+    );
+    // Das Anlegen der weiteren Accounts wechselt jeweils die Sitzung –
     // am Ende muss wieder der Hauptaccount angemeldet sein.
     expect(signInWithEmailAndPassword).toHaveBeenCalledWith(
       authState,
@@ -187,12 +196,12 @@ describe('createRoadtrip', () => {
   });
 
   it('lehnt einen Namen ohne verwertbare Zeichen ab', async () => {
-    await expect(errorCode(createRoadtrip('###', 'geheim123'))).resolves.toBe('missingName');
+    await expect(errorCode(createRoadtrip('###', 'geheim123', 'adminpass1'))).resolves.toBe('missingName');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
   it('lehnt zu kurze Passwörter ab, bevor Firebase überhaupt gefragt wird', async () => {
-    const code = await errorCode(createRoadtrip('Ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1)));
+    const code = await errorCode(createRoadtrip('Ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1), 'adminpass1'));
 
     expect(code).toBe('passwordTooShort');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
@@ -200,7 +209,25 @@ describe('createRoadtrip', () => {
 
   it('übersetzt einen belegten Namen in einen eigenen Fehlercode', async () => {
     createUserWithEmailAndPassword.mockRejectedValueOnce(authError('auth/email-already-in-use'));
-    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123'))).resolves.toBe('nameTaken');
+    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123', 'adminpass1'))).resolves.toBe('nameTaken');
+  });
+
+  it('lehnt ein zu kurzes Admin-Passwort ab, bevor Firebase überhaupt gefragt wird', async () => {
+    const code = await errorCode(
+      createRoadtrip('Ostsee', 'geheim123', 'a'.repeat(MIN_PASSWORD_LENGTH - 1))
+    );
+
+    expect(code).toBe('passwordTooShort');
+    expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
+  });
+
+  it('lehnt ein Admin-Passwort ab, das dem Roadtrip-Passwort entspricht', async () => {
+    // Sonst wäre es keine zweite Schranke: Das Roadtrip-Passwort kennt die
+    // ganze Crew.
+    const code = await errorCode(createRoadtrip('Ostsee', 'geheim123', 'geheim123'));
+
+    expect(code).toBe('adminPasswordSameAsTrip');
+    expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
   it('räumt den Hauptaccount auf, wenn der Wiederherstellungs-Account nicht angelegt werden kann', async () => {
@@ -210,7 +237,7 @@ describe('createRoadtrip', () => {
     });
     createUserWithEmailAndPassword.mockRejectedValueOnce(new Error('netzwerk kaputt'));
 
-    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123'))).resolves.toBe('unknown');
+    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123', 'adminpass1'))).resolves.toBe('unknown');
 
     // Zum Zeitpunkt des Fehlers war der Hauptaccount currentUser – der wird
     // best-effort wieder gelöscht, damit der Name nicht dauerhaft blockiert.
@@ -298,5 +325,63 @@ describe('leaveRoadtrip', () => {
     signOut.mockResolvedValue(undefined);
     await leaveRoadtrip();
     expect(signOut).toHaveBeenCalledWith(authState);
+  });
+});
+
+describe('isAdminSession', () => {
+  it('erkennt den Admin-Zugang an der Domain', () => {
+    expect(isAdminSession({ email: 'ostsee@2cars2georgia.admin' } as User)).toBe(true);
+  });
+
+  it('sieht normalen Zugang und Wiederherstellung nicht als Admin', () => {
+    expect(isAdminSession({ email: 'ostsee@2cars2georgia.trip' } as User)).toBe(false);
+    expect(isAdminSession({ email: 'ostsee@2cars2georgia.recovery' } as User)).toBe(false);
+    expect(isAdminSession(null)).toBe(false);
+  });
+});
+
+describe('enterAdminMode', () => {
+  it('meldet das Gerät auf dem Admin-Zugang desselben Roadtrips an', async () => {
+    await enterAdminMode('ostsee', ' adminpass1 ');
+
+    expect(signInWithEmailAndPassword).toHaveBeenCalledWith(
+      authState,
+      'ostsee@2cars2georgia.admin',
+      'adminpass1'
+    );
+  });
+
+  it('übersetzt ein falsches Admin-Passwort in einen Fehlercode', async () => {
+    signInWithEmailAndPassword.mockRejectedValueOnce(authError('auth/invalid-credential'));
+    await expect(errorCode(enterAdminMode('ostsee', 'falsch'))).resolves.toBe('wrongCredentials');
+  });
+});
+
+describe('setUpAdminAccess', () => {
+  it('legt den Admin-Zugang für einen Roadtrip ohne an', async () => {
+    await setUpAdminAccess('ostsee', 'adminpass1');
+
+    expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(
+      authState,
+      'ostsee@2cars2georgia.admin',
+      'adminpass1'
+    );
+  });
+
+  it('meldet einen bereits eingerichteten Admin-Zugang mit eigenem Code', async () => {
+    createUserWithEmailAndPassword.mockRejectedValueOnce(authError('auth/email-already-in-use'));
+
+    // Nicht 'nameTaken': Hier ist nicht der Roadtrip-Name belegt, sondern der
+    // Admin-Zugang steht bereits – dafür gibt es einen eigenen Hinweis.
+    await expect(errorCode(setUpAdminAccess('ostsee', 'adminpass1'))).resolves.toBe(
+      'adminAlreadyExists'
+    );
+  });
+
+  it('lehnt ein zu kurzes Admin-Passwort ab', async () => {
+    const code = await errorCode(setUpAdminAccess('ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1)));
+
+    expect(code).toBe('passwordTooShort');
+    expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 });

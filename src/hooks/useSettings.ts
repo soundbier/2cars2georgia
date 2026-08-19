@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { useT } from '../i18n';
-import { DEFAULT_QUICK_LOG_SEEDS, DEFAULT_USERS, CrewRoles, QuickLogConfig } from '../types';
+import { DEFAULT_QUICK_LOG_SEEDS, CrewRoles, QuickLogConfig } from '../types';
 
 /**
  * Abonniert eine Liste aus der settings-Collection des aktuellen Roadtrips
@@ -86,13 +86,13 @@ export function useQuickLogs(): QuickLogConfig[] {
  */
 export function useCrew() {
   const { tripId } = useRoadtrip();
-  const [users, setUsers] = useState<string[]>(DEFAULT_USERS);
+  const [users, setUsers] = useState<string[]>([]);
   const [roles, setRoles] = useState<CrewRoles>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!tripId) {
-      setUsers(DEFAULT_USERS);
+      setUsers([]);
       setRoles({});
       setLoading(false);
       return;
@@ -102,16 +102,7 @@ export function useCrew() {
       docRef,
       (docSnap) => {
         const data = docSnap.exists() ? docSnap.data() : undefined;
-        const storedUsers = data?.users as string[] | undefined;
-        if (storedUsers && storedUsers.length > 0) {
-          setUsers(storedUsers);
-        } else {
-          setUsers(DEFAULT_USERS);
-          // merge: true, damit ein bereits vorhandenes roles-Feld dabei nicht verloren geht.
-          setDoc(docRef, { users: DEFAULT_USERS }, { merge: true }).catch((err) =>
-            console.error('settings/general konnte nicht angelegt werden:', err)
-          );
-        }
+        setUsers((data?.users as string[] | undefined) ?? []);
         setRoles((data?.roles as CrewRoles | undefined) ?? {});
         setLoading(false);
       },

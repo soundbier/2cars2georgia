@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove, deleteField, FieldValue } from 'firebase/firestore';
+import { doc, updateDoc, arrayRemove, deleteField, FieldValue } from 'firebase/firestore';
 import { UserPlus, Trash2, ShieldCheck } from 'lucide-react';
 import { db } from '../../firebase';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
@@ -7,6 +7,7 @@ import { useCrew } from '../../hooks/useSettings';
 import { usePermissions } from '../../hooks/usePermissions';
 import { CREW_ROLES, ROLE_LABEL_KEY, countOwners, getEffectiveRole } from '../../lib/permissions';
 import { trackWrite } from '../../lib/pendingWrites';
+import { MAX_CREW_NAME_LENGTH, addCrewMember, isCrewNameTaken, normalizeCrewName } from '../../lib/crew';
 import { getUserColor } from '../../lib/userColors';
 import { useT } from '../../i18n';
 import { CrewRole } from '../../types';
@@ -28,9 +29,14 @@ interface Props {
 }
 
 export default function CrewSettings({ currentUser, users }: Props) {
-  const { tripId } = useRoadtrip();
+  const { tripId, isAdmin } = useRoadtrip();
   const { roles } = useCrew();
   const { isOwner } = usePermissions(currentUser);
+  // Entfernen und Rollen vergeben verlangt laut firestore.rules den
+  // Admin-Zugang – die Owner-Rolle allein ist reine Anzeige, sie steht in
+  // denselben Daten, die sie schützen soll. Eintragen darf weiterhin jedes
+  // Crewmitglied, das ist offline unterwegs der Normalfall.
+  const canManage = isAdmin;
   const [newUser, setNewUser] = useState('');
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const { notify } = useToast();
@@ -43,16 +49,18 @@ export default function CrewSettings({ currentUser, users }: Props) {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = newUser.trim();
+    const name = normalizeCrewName(newUser);
     if (!name) return;
-    if (users.some((u) => u.toLowerCase() === name.toLowerCase())) {
+    if (isCrewNameTaken(users, name)) {
       notify(t('crew.alreadyAboard', { name }), 'danger');
       return;
     }
+    if (!tripId) return;
     try {
-      // Neue Mitglieder starten als Mitfahrer – die Rolle lässt sich danach
-      // jederzeit über die Auswahl unten ändern.
-      await saveCrew({ users: arrayUnion(name), [`roles.${name}`]: 'member' });
+      // Nur der Name – eine Rolle vergibt erst der Admin-Zugang (siehe
+      // firestore.rules). Derselbe Helfer wie beim Selbst-Eintragen im
+      // CrewGate, damit beide Wege dasselbe schreiben.
+      await trackWrite(addCrewMember(tripId, name));
       setNewUser('');
     } catch (err) {
       console.error(err);
@@ -108,11 +116,12 @@ export default function CrewSettings({ currentUser, users }: Props) {
       />
 
       <Section title={t('crew.section', { count: users.length })}>
-        {isOwner ? (
+        {canManage || isOwner ? (
           <form onSubmit={handleAddUser} className="row settings-add-form">
             <Input
               placeholder={t('crew.newNamePlaceholder')}
               value={newUser}
+              maxLength={MAX_CREW_NAME_LENGTH}
               onChange={(e) => setNewUser(e.target.value)}
             />
             <IconButton type="submit" label={t('crew.addMember')} tone="accent" disabled={!newUser.trim()}>
@@ -123,6 +132,13 @@ export default function CrewSettings({ currentUser, users }: Props) {
           <p className="helper-text setting-note">
             <ShieldCheck size={13} className="setting-note-icon" />
             {t('crew.onlyOwnerCanManage')}
+          </p>
+        )}
+
+        {isOwner && !canManage && (
+          <p className="helper-text setting-note">
+            <ShieldCheck size={13} className="setting-note-icon" />
+            {t('admin.requiredForCrew')}
           </p>
         )}
 
@@ -144,9 +160,9 @@ export default function CrewSettings({ currentUser, users }: Props) {
                     name
                   )
                 }
-                subtitle={!isOwner ? t(ROLE_LABEL_KEY[role]) : undefined}
+                subtitle={!canManage ? t(ROLE_LABEL_KEY[role]) : undefined}
                 trailing={
-                  isOwner ? (
+                  canManage ? (
                     <>
                       <Select
                         className="setting-select"

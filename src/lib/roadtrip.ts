@@ -29,6 +29,12 @@ import { auth, db } from '../firebase';
 // gültiges Passwort fürs Comeback, kein Reset-Mechanismus.
 const TRIP_EMAIL_DOMAIN = '2cars2georgia.trip';
 const RECOVERY_EMAIL_DOMAIN = '2cars2georgia.recovery';
+// Dritter Auth-User pro Roadtrip, nach demselben Muster wie der
+// Wiederherstellungs-Account: gleicher lokaler Teil (die tripId), andere
+// Domain. Die Firestore-Regeln sehen die volle E-Mail und können daran
+// erkennen, ob eine Sitzung Adminrechte hat – anders als bei den Rollen in
+// settings/general, die jedes Gerät selbst überschreiben könnte.
+const ADMIN_EMAIL_DOMAIN = '2cars2georgia.admin';
 
 export const MIN_PASSWORD_LENGTH = 6;
 
@@ -49,6 +55,21 @@ function tripEmail(tripId: string): string {
 
 function recoveryEmail(tripId: string): string {
   return `${tripId}@${RECOVERY_EMAIL_DOMAIN}`;
+}
+
+function adminEmail(tripId: string): string {
+  return `${tripId}@${ADMIN_EMAIL_DOMAIN}`;
+}
+
+/**
+ * Läuft die aktuelle Sitzung über den Admin-Zugang?
+ *
+ * Muss zur Prüfung in firestore.rules passen (`isAdminSession`) – die Regel
+ * ist die verbindliche, diese Funktion blendet nur die passende Oberfläche
+ * ein.
+ */
+export function isAdminSession(user: User | null): boolean {
+  return user?.email?.endsWith(`@${ADMIN_EMAIL_DOMAIN}`) ?? false;
 }
 
 /** Liest die Roadtrip-ID aus dem eingeloggten Auth-User (Präfix der Kunst-E-Mail). */
@@ -92,6 +113,8 @@ export function generateRecoveryCode(): string {
 export type RoadtripErrorCode =
   | 'nameTaken'
   | 'passwordTooShort'
+  | 'adminPasswordSameAsTrip'
+  | 'adminAlreadyExists'
   | 'wrongCredentials'
   | 'tooManyAttempts'
   | 'missingName'
@@ -140,12 +163,26 @@ async function resolveTripName(tripId: string, fallback: string): Promise<string
   return storedName ?? fallback;
 }
 
-/** Legt einen neuen Roadtrip an, meldet das Gerät darin an und liefert den Wiederherstellungscode. */
-export async function createRoadtrip(name: string, password: string): Promise<CreateRoadtripResult> {
+/**
+ * Legt einen neuen Roadtrip an, meldet das Gerät darin an und liefert den
+ * Wiederherstellungscode.
+ *
+ * `adminPassword` sichert die Aktionen ab, die sich nicht rückgängig machen
+ * lassen (endgültiges Löschen, Crew verwalten – siehe firestore.rules). Es
+ * muss sich vom Roadtrip-Passwort unterscheiden, sonst wäre es keine zweite
+ * Schranke: Jedes Crewmitglied kennt das Roadtrip-Passwort.
+ */
+export async function createRoadtrip(
+  name: string,
+  password: string,
+  adminPassword: string
+): Promise<CreateRoadtripResult> {
   const trimmedName = name.trim();
   const tripId = slugifyTripName(trimmedName);
   if (!tripId) throw new RoadtripAuthError('missingName');
   if (password.length < MIN_PASSWORD_LENGTH) throw new RoadtripAuthError('passwordTooShort');
+  if (adminPassword.length < MIN_PASSWORD_LENGTH) throw new RoadtripAuthError('passwordTooShort');
+  if (adminPassword === password) throw new RoadtripAuthError('adminPasswordSameAsTrip');
 
   const recoveryCode = generateRecoveryCode();
 
@@ -155,9 +192,12 @@ export async function createRoadtrip(name: string, password: string): Promise<Cr
       name: trimmedName,
       createdAt: serverTimestamp()
     });
-    // Erzeugt den zweiten Auth-User; wechselt dabei die aktive Sitzung auf ihn.
+    // Erzeugt die weiteren Auth-User; wechselt dabei jeweils die aktive
+    // Sitzung auf den neu angelegten User.
     await createUserWithEmailAndPassword(auth, recoveryEmail(tripId), recoveryCode);
-    // Gerät soll nach dem Anlegen wie gewohnt über den Hauptzugang angemeldet sein.
+    await createUserWithEmailAndPassword(auth, adminEmail(tripId), adminPassword);
+    // Gerät soll nach dem Anlegen wie gewohnt über den Hauptzugang angemeldet
+    // sein – der Admin-Modus wird bewusst nur bei Bedarf gestartet.
     await signInWithEmailAndPassword(auth, tripEmail(tripId), password);
     return { tripId, tripName: trimmedName, recoveryCode };
   } catch (err) {
@@ -197,6 +237,45 @@ export async function recoverRoadtrip(name: string, recoveryCode: string): Promi
     await signInWithEmailAndPassword(auth, recoveryEmail(tripId), recoveryCode.trim());
     return { tripId, tripName: await resolveTripName(tripId, name.trim()) };
   } catch (err) {
+    throw new RoadtripAuthError(authErrorCode(err));
+  }
+}
+
+/**
+ * Wechselt die Sitzung dieses Geräts auf den Admin-Zugang.
+ *
+ * Danach ist das Gerät weiterhin im selben Roadtrip (beide E-Mails haben
+ * denselben lokalen Teil), darf aber zusätzlich die adminpflichtigen
+ * Aktionen. Zurück in den normalen Modus geht es über leaveRoadtrip() und
+ * eine erneute Anmeldung – bewusst kein automatischer Rückweg, denn das
+ * Roadtrip-Passwort wird auf dem Gerät nirgends gespeichert.
+ */
+export async function enterAdminMode(tripId: string, adminPassword: string): Promise<void> {
+  if (!tripId) throw new RoadtripAuthError('missingName');
+  try {
+    await signInWithEmailAndPassword(auth, adminEmail(tripId), adminPassword.trim());
+  } catch (err) {
+    throw new RoadtripAuthError(authErrorCode(err));
+  }
+}
+
+/**
+ * Richtet den Admin-Zugang für einen Roadtrip ein, der noch keinen hat.
+ *
+ * Nötig für Roadtrips, die vor dieser Funktion angelegt wurden. Wer das
+ * Roadtrip-Passwort kennt, kann das tun – eine serverseitige Prüfung "nur der
+ * Owner darf das" gäbe es ohne eigenes Backend nicht. Ist der Zugang bereits
+ * eingerichtet, scheitert das Anlegen an der belegten E-Mail-Adresse.
+ */
+export async function setUpAdminAccess(tripId: string, adminPassword: string): Promise<void> {
+  if (!tripId) throw new RoadtripAuthError('missingName');
+  if (adminPassword.length < MIN_PASSWORD_LENGTH) throw new RoadtripAuthError('passwordTooShort');
+  try {
+    // Legt den Admin-User an und meldet das Gerät zugleich als Admin an.
+    await createUserWithEmailAndPassword(auth, adminEmail(tripId), adminPassword);
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === 'auth/email-already-in-use') throw new RoadtripAuthError('adminAlreadyExists');
     throw new RoadtripAuthError(authErrorCode(err));
   }
 }

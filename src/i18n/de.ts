@@ -49,6 +49,14 @@ export const de = {
   // --- Crew-Anmeldung ---------------------------------------------------
   'crewGate.title': 'Wer ist an Bord?',
   'crewGate.hint': 'Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.',
+  'crewGate.firstMemberHint':
+    'Dieser Roadtrip hat noch keine Crew. Trag dich als erstes Mitglied ein – du verwaltest die Crew danach.',
+  'crewGate.firstMemberLabel': 'Dein Name',
+  'crewGate.newHere': 'Neu dabei? Trag dich ein',
+  'crewGate.namePlaceholder': 'Name',
+  'crewGate.join': 'Beitreten',
+  'crewGate.nameTaken': '{name} ist bereits an Bord – oben auswählen.',
+  'crewGate.joinFailed': 'Beitreten fehlgeschlagen.',
 
   // --- Roadtrip-Gate ----------------------------------------------------
   'gate.joinHint': 'Roadtrip-Namen und Passwort der Crew eingeben, um beizutreten.',
@@ -82,6 +90,29 @@ export const de = {
   'authError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
   'authError.missingName': 'Bitte einen Namen für den Roadtrip eingeben.',
   'authError.passwordTooShort': 'Das Passwort muss mindestens {min} Zeichen haben.',
+  'authError.adminPasswordSameAsTrip':
+    'Das Admin-Passwort muss sich vom Roadtrip-Passwort unterscheiden – sonst kennt es die ganze Crew.',
+  'authError.adminAlreadyExists': 'Für diesen Roadtrip ist bereits ein Admin-Passwort eingerichtet.',
+  'gate.adminPasswordPlaceholder': 'Admin-Passwort',
+  'gate.adminPasswordHint':
+    'Zweites, eigenes Passwort für endgültiges Löschen und das Verwalten der Crew. Nicht an alle weitergeben.',
+  'admin.title': 'Admin-Zugang',
+  'admin.subtitle': 'Endgültiges Löschen und Crew verwalten',
+  'admin.active': 'Admin-Modus aktiv',
+  'admin.activeHint':
+    'Dieses Gerät darf endgültig löschen und die Crew verwalten. Zum Beenden den Roadtrip verlassen und normal wieder anmelden.',
+  'admin.enterHint':
+    'Mit dem Admin-Passwort anmelden, um endgültig zu löschen oder die Crew zu verwalten.',
+  'admin.passwordPlaceholder': 'Admin-Passwort',
+  'admin.start': 'Admin-Modus starten',
+  'admin.entered': 'Admin-Modus aktiv',
+  'admin.setUpTitle': 'Noch kein Admin-Passwort?',
+  'admin.setUpHint':
+    'Roadtrips, die vor dieser Funktion angelegt wurden, haben noch keinen Admin-Zugang. Wer das Roadtrip-Passwort kennt, kann ihn hier einmalig einrichten – am besten sofort, denn danach ist er belegt.',
+  'admin.setUp': 'Admin-Zugang einrichten',
+  'admin.setUpSuccess': 'Admin-Zugang eingerichtet – dieses Gerät ist jetzt im Admin-Modus.',
+  'admin.requiredForPurge': 'Endgültiges Löschen ist nur im Admin-Modus möglich.',
+  'admin.requiredForCrew': 'Mitglieder entfernen und Rollen vergeben ist nur im Admin-Modus möglich.',
 
   // --- Wiederherstellungscode ------------------------------------------
   'recovery.title': 'Wiederherstellungscode für „{tripName}“',

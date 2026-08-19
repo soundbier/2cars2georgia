@@ -44,6 +44,14 @@ export const en: Translations = {
   // --- Crew sign-in -----------------------------------------------------
   'crewGate.title': 'Who is aboard?',
   'crewGate.hint': 'Assign this device to a crew member to record position and log entries.',
+  'crewGate.firstMemberHint':
+    'This roadtrip has no crew yet. Add yourself as the first member – you will manage the crew afterwards.',
+  'crewGate.firstMemberLabel': 'Your name',
+  'crewGate.newHere': 'New here? Add yourself',
+  'crewGate.namePlaceholder': 'Name',
+  'crewGate.join': 'Join',
+  'crewGate.nameTaken': '{name} is already aboard – pick the name above.',
+  'crewGate.joinFailed': 'Could not join.',
 
   // --- Roadtrip gate ----------------------------------------------------
   'gate.joinHint': "Enter the roadtrip's name and the crew password to join.",
@@ -77,6 +85,28 @@ export const en: Translations = {
   'authError.unknown': 'Something went wrong. Please try again.',
   'authError.missingName': 'Please enter a name for the roadtrip.',
   'authError.passwordTooShort': 'The password must be at least {min} characters long.',
+  'authError.adminPasswordSameAsTrip':
+    'The admin password must differ from the roadtrip password – otherwise the whole crew knows it.',
+  'authError.adminAlreadyExists': 'This roadtrip already has an admin password.',
+  'gate.adminPasswordPlaceholder': 'Admin password',
+  'gate.adminPasswordHint':
+    'A second, separate password for permanent deletion and crew management. Do not share it with everyone.',
+  'admin.title': 'Admin access',
+  'admin.subtitle': 'Permanent deletion and crew management',
+  'admin.active': 'Admin mode active',
+  'admin.activeHint':
+    'This device may delete permanently and manage the crew. To end it, leave the roadtrip and sign in normally again.',
+  'admin.enterHint': 'Sign in with the admin password to delete permanently or manage the crew.',
+  'admin.passwordPlaceholder': 'Admin password',
+  'admin.start': 'Start admin mode',
+  'admin.entered': 'Admin mode active',
+  'admin.setUpTitle': 'No admin password yet?',
+  'admin.setUpHint':
+    'Roadtrips created before this feature have no admin access yet. Anyone who knows the roadtrip password can set it up once here – best done right away, because afterwards it is taken.',
+  'admin.setUp': 'Set up admin access',
+  'admin.setUpSuccess': 'Admin access set up – this device is now in admin mode.',
+  'admin.requiredForPurge': 'Permanent deletion requires admin mode.',
+  'admin.requiredForCrew': 'Removing members and assigning roles requires admin mode.',
 
   // --- Recovery code ----------------------------------------------------
   'recovery.title': 'Recovery code for “{tripName}”',

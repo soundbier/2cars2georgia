@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, ReactNode } fr
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { tripIdFromUser } from '../lib/roadtrip';
+import { isAdminSession, tripIdFromUser } from '../lib/roadtrip';
 
 interface RoadtripContextValue {
   /** true, solange der Auth-Status noch nicht bekannt ist (erster Start). */
@@ -11,6 +11,12 @@ interface RoadtripContextValue {
   tripId: string | null;
   /** Anzeigename des Roadtrips, fällt auf die ID zurück solange er noch lädt. */
   tripName: string | null;
+  /**
+   * Läuft die Sitzung dieses Geräts über den Admin-Zugang? Entscheidend ist
+   * die gleichnamige Prüfung in firestore.rules – hier steht sie nur, damit
+   * die Oberfläche nicht Aktionen anbietet, die der Server ablehnen würde.
+   */
+  isAdmin: boolean;
 }
 
 const RoadtripContext = createContext<RoadtripContextValue | null>(null);
@@ -25,10 +31,12 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [tripId, setTripId] = useState<string | null>(null);
   const [tripName, setTripName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
       setTripId(tripIdFromUser(user));
+      setIsAdmin(isAdminSession(user));
       setLoading(false);
     });
   }, []);
@@ -43,7 +51,10 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
     });
   }, [tripId]);
 
-  const value = useMemo(() => ({ loading, tripId, tripName }), [loading, tripId, tripName]);
+  const value = useMemo(
+    () => ({ loading, tripId, tripName, isAdmin }),
+    [loading, tripId, tripName, isAdmin]
+  );
 
   return <RoadtripContext.Provider value={value}>{children}</RoadtripContext.Provider>;
 }
