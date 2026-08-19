@@ -83,6 +83,49 @@ const validError = {
   message: 'TypeError: undefined is not a function'
 };
 
+const validDish = {
+  name: 'Rotes Thai-Curry',
+  mealType: 'dinner',
+  ingredients: [
+    { name: 'Paprika', quantity: 4, unit: 'Stück' },
+    { name: 'Kokosmilch', quantity: 1, unit: 'Dose' }
+  ],
+  author: 'Leon',
+  timestamp: NOW
+};
+
+const validMealPlanEntry = {
+  date: '2026-07-03',
+  mealType: 'dinner',
+  dishId: 'curry',
+  author: 'Leon',
+  timestamp: NOW
+};
+
+const validInventoryItem = {
+  name: 'Paprika',
+  quantity: 4,
+  unit: 'Stück',
+  location: 'Bilge',
+  author: 'Leon',
+  timestamp: NOW
+};
+
+const validShoppingListExtra = {
+  name: 'Gas',
+  quantity: 1,
+  unit: 'Flasche',
+  checked: false,
+  author: 'Leon',
+  timestamp: NOW
+};
+
+const validShoppingListCheck = {
+  checked: true,
+  checkedBy: 'Leon',
+  checkedAt: NOW
+};
+
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: 'demo-2cars2georgia',
@@ -365,6 +408,130 @@ describe('Ausgaben', () => {
   });
 });
 
+describe('Gerichte', () => {
+  const path = `roadtrips/${TRIP}/dishes/curry`;
+
+  it('nimmt ein gültiges Gericht an', async () => {
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validDish));
+  });
+
+  it('weist eine unbekannte Mahlzeit ab', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validDish, mealType: 'brunch' }));
+  });
+
+  it('weist Zutaten ab, die keine Liste sind', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validDish, ingredients: 'viel' }));
+  });
+
+  it('deckelt die Zutatenliste', async () => {
+    const zuVieleZutaten = Array.from({ length: 31 }, (_, i) => ({ name: `Zutat ${i}`, quantity: 1, unit: 'Stück' }));
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validDish, ingredients: zuVieleZutaten }));
+  });
+
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+    await seed(path, validDish);
+    const db = tripDb(TRIP);
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertFails(deleteDoc(doc(db, path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+  });
+});
+
+describe('Speiseplan-Einträge', () => {
+  const path = `roadtrips/${TRIP}/mealPlanEntries/e1`;
+
+  it('nimmt einen gültigen Eintrag an', async () => {
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validMealPlanEntry));
+  });
+
+  it('weist ein Datum in falschem Format ab', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validMealPlanEntry, date: '3.7.2026' }));
+  });
+
+  it('weist eine unbekannte Mahlzeit ab', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validMealPlanEntry, mealType: 'brunch' }));
+  });
+
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+    await seed(path, validMealPlanEntry);
+    const db = tripDb(TRIP);
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertFails(deleteDoc(doc(db, path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+  });
+});
+
+describe('Lager', () => {
+  const path = `roadtrips/${TRIP}/inventory/i1`;
+
+  it('nimmt einen gültigen Lagerposten an', async () => {
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validInventoryItem));
+  });
+
+  it('weist eine negative Menge ab', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validInventoryItem, quantity: -1 }));
+  });
+
+  it('erlaubt das Anpassen der Menge als Teil-Update, so wie es die App beim Kochen tut', async () => {
+    await seed(path, validInventoryItem);
+    await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { quantity: 2 }));
+  });
+
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+    await seed(path, validInventoryItem);
+    const db = tripDb(TRIP);
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertFails(deleteDoc(doc(db, path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+  });
+});
+
+describe('Einkaufsliste (manuell)', () => {
+  const path = `roadtrips/${TRIP}/shoppingListExtras/s1`;
+
+  it('nimmt einen gültigen manuellen Posten an', async () => {
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validShoppingListExtra));
+  });
+
+  it('verlangt, dass checked ein Wahrheitswert ist', async () => {
+    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validShoppingListExtra, checked: 'ja' }));
+  });
+
+  it('erlaubt das Abhaken als Teil-Update', async () => {
+    await seed(path, validShoppingListExtra);
+    await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { checked: true }));
+  });
+
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+    await seed(path, validShoppingListExtra);
+    const db = tripDb(TRIP);
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertFails(deleteDoc(doc(db, path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+  });
+});
+
+describe('Einkaufsliste (Abhaken berechneter Posten)', () => {
+  const path = `roadtrips/${TRIP}/shoppingListChecks/paprika-stück`;
+
+  it('nimmt einen gültigen Abhak-Status an', async () => {
+    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validShoppingListCheck));
+  });
+
+  it('weist ein fehlendes Pflichtfeld ab', async () => {
+    const { checkedBy, ...ohneCheckedBy } = validShoppingListCheck;
+    void checkedBy;
+    await assertFails(setDoc(doc(tripDb(TRIP), path), ohneCheckedBy));
+  });
+
+  it('erlaubt das Umschalten ohne Admin-Zugang', async () => {
+    await seed(path, validShoppingListCheck);
+    await assertSucceeds(
+      updateDoc(doc(tripDb(TRIP), path), { checked: false, checkedBy: 'Niklas', checkedAt: NOW })
+    );
+  });
+});
+
 describe('Einstellungen', () => {
   it('erlaubt Crew-Liste und Schnell-Logs', async () => {
     const db = tripDb(TRIP);
@@ -431,6 +598,38 @@ describe('Einstellungen', () => {
         roles: ['owner']
       })
     );
+  });
+
+  it('erlaubt einen Reisezeitraum in settings/general', async () => {
+    await assertSucceeds(
+      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
+        users: ['Lukas'],
+        startDate: '2026-07-01',
+        endDate: '2026-07-14'
+      })
+    );
+  });
+
+  it('weist ein Datum in falschem Format ab', async () => {
+    await assertFails(
+      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
+        users: ['Lukas'],
+        startDate: '1.7.2026'
+      })
+    );
+  });
+
+  it('lässt den Reisezeitraum beim Beitreten unangetastet', async () => {
+    const path = `roadtrips/${TRIP}/settings/general`;
+    await seed(path, { users: [], startDate: '2026-07-01', endDate: '2026-07-14' });
+
+    // Der Join-Schreibvorgang berührt nur "users" (arrayUnion-Merge) – das
+    // Datum bleibt dabei automatisch erhalten, ohne dass die Regel es
+    // gesondert prüfen muss.
+    await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { users: ['Lukas'] }));
+    const snap = await getDoc(doc(tripDb(TRIP), path));
+    expect(snap.data()?.startDate).toBe('2026-07-01');
+    expect(snap.data()?.endDate).toBe('2026-07-14');
   });
 
   describe('Crew verwalten', () => {

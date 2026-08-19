@@ -123,3 +123,8 @@
   color: var(--color-text);
   cursor: pointer;
 }
+
+.roadtrip-gate-dates .field-control {
+  flex: 1;
+  min-width: 0;
+}
