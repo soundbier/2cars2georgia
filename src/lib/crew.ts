@@ -1,7 +1,6 @@
 import { arrayUnion, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { tripPath } from '../hooks/useRoadtrip';
-import { CrewRole } from '../types';
 
 /**
  * Die Crew-Liste eines Roadtrips (settings/general).
@@ -36,20 +35,17 @@ export function isCrewNameTaken(users: string[], name: string): boolean {
  * Person noch gar nicht existiert – `updateDoc` würde daran scheitern.
  * `arrayUnion` hält zwei gleichzeitig beitretende Geräte auseinander, ohne
  * dass eines das andere überschreibt.
+ *
+ * Bewusst wird dabei KEINE Rolle geschrieben: Rollen vergeben darf laut
+ * firestore.rules nur der Admin-Zugang, sonst könnte sich jedes Gerät mit dem
+ * Roadtrip-Passwort selbst zum Owner machen. Wer als erstes an Bord kommt,
+ * gilt über getEffectiveRole() in lib/permissions.ts ohnehin als Owner,
+ * solange niemand ausdrücklich eine Rolle bekommen hat.
  */
-export function addCrewMember(tripId: string, name: string, role: CrewRole): Promise<void> {
+export function addCrewMember(tripId: string, name: string): Promise<void> {
   return setDoc(
     doc(db, tripPath(tripId, 'settings', 'general')),
-    { users: arrayUnion(name), roles: { [name]: role } },
+    { users: arrayUnion(name) },
     { merge: true }
   );
-}
-
-/**
- * Rolle, mit der jemand beitritt: Die erste Person an Bord verwaltet die Crew,
- * alle weiteren fahren mit. Ohne diese Regel stünde ein frischer Roadtrip ohne
- * Owner da – niemand könnte dann Rollen vergeben, auch nicht sich selbst.
- */
-export function joiningRole(users: string[]): CrewRole {
-  return users.length === 0 ? 'owner' : 'member';
 }

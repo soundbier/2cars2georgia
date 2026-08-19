@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { deleteDoc, deleteField, doc, updateDoc } from 'firebase/firestore';
-import { RotateCcw, Trash2, BookOpen, Wallet } from 'lucide-react';
+import { RotateCcw, Trash2, BookOpen, Wallet, ShieldCheck } from 'lucide-react';
 import { db } from '../../firebase';
 import { useCollection } from '../../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
@@ -38,7 +38,7 @@ interface TrashItem {
 type PurgeTarget = { kind: 'item'; item: TrashItem } | { kind: 'all' };
 
 export default function TrashSettings({ currentUser }: { currentUser: string }) {
-  const { tripId } = useRoadtrip();
+  const { tripId, isAdmin } = useRoadtrip();
   const { canEdit } = usePermissions(currentUser);
   const quickLogs = useQuickLogs();
   const { notify } = useToast();
@@ -84,7 +84,7 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
   const confirmPurge = () => {
     const target = purgeTarget;
     setPurgeTarget(null);
-    if (!target || !tripId || !canEdit) return;
+    if (!target || !tripId || !canEdit || !isAdmin) return;
 
     const toPurge = target.kind === 'all' ? items : [target.item];
     // Bewusst einzeln statt als Batch: Die Schreibvorgänge laufen auch offline
@@ -148,13 +148,15 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
                         >
                           <RotateCcw size={16} />
                         </IconButton>
-                        <IconButton
-                          label={t('trash.purgeOne', { title: item.title })}
-                          tone="danger"
-                          onClick={() => setPurgeTarget({ kind: 'item', item })}
-                        >
-                          <Trash2 size={16} />
-                        </IconButton>
+                        {isAdmin && (
+                          <IconButton
+                            label={t('trash.purgeOne', { title: item.title })}
+                            tone="danger"
+                            onClick={() => setPurgeTarget({ kind: 'item', item })}
+                          >
+                            <Trash2 size={16} />
+                          </IconButton>
+                        )}
                       </>
                     ) : undefined
                   }
@@ -172,11 +174,19 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
               ? t('trash.expiredNote', { count: expiredCount, days: RETENTION_DAYS })
               : t('trash.retentionNote', { days: RETENTION_DAYS })}
           </p>
-          {canEdit && (
-            <Button variant="destructive" fullWidth onClick={() => setPurgeTarget({ kind: 'all' })}>
-              <Trash2 size={18} /> {t('trash.emptyTrashButton')}
-            </Button>
-          )}
+          {/* Endgültiges Löschen ist adminpflichtig (firestore.rules): ohne
+              Admin-Modus lehnt der Server es ohnehin ab. */}
+          {canEdit &&
+            (isAdmin ? (
+              <Button variant="destructive" fullWidth onClick={() => setPurgeTarget({ kind: 'all' })}>
+                <Trash2 size={18} /> {t('trash.emptyTrashButton')}
+              </Button>
+            ) : (
+              <p className="helper-text setting-note">
+                <ShieldCheck size={13} className="setting-note-icon" />
+                {t('admin.requiredForPurge')}
+              </p>
+            ))}
         </Section>
       )}
 

@@ -31,6 +31,7 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   // Nur relevant im Beitreten-Tab: Passwort-Feld wird zum Code-Feld.
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -41,6 +42,7 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
   const resetForm = () => {
     setPassword('');
     setPasswordConfirm('');
+    setAdminPassword('');
     setUseRecoveryCode(false);
   };
 
@@ -69,7 +71,7 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
     setSubmitting(true);
     try {
       if (mode === 'create') {
-        const result = await createRoadtrip(name, password);
+        const result = await createRoadtrip(name, password, adminPassword);
         recordAttemptSuccess();
         onRoadtripCreated(result.tripName, result.recoveryCode);
       } else if (useRecoveryCode) {
@@ -144,15 +146,27 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
           autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
         />
         {mode === 'create' && (
-          <Input
-            type="password"
-            placeholder={t('gate.passwordConfirmPlaceholder')}
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            minLength={MIN_PASSWORD_LENGTH}
-            required
-            autoComplete="new-password"
-          />
+          <>
+            <Input
+              type="password"
+              placeholder={t('gate.passwordConfirmPlaceholder')}
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              minLength={MIN_PASSWORD_LENGTH}
+              required
+              autoComplete="new-password"
+            />
+            <Input
+              type="password"
+              placeholder={t('gate.adminPasswordPlaceholder')}
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              minLength={MIN_PASSWORD_LENGTH}
+              required
+              autoComplete="new-password"
+            />
+            <p className="helper-text roadtrip-gate-hint">{t('gate.adminPasswordHint')}</p>
+          </>
         )}
 
         <Button type="submit" fullWidth disabled={submitting}>

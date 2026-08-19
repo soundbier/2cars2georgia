@@ -33,6 +33,18 @@ function tripDb(tripId: string) {
   }).firestore();
 }
 
+/**
+ * Firestore-Handle eines Geräts, das über den Admin-Zugang desselben
+ * Roadtrips angemeldet ist (eigener Auth-User mit eigenem Passwort, siehe
+ * src/lib/roadtrip.ts). Gleicher lokaler Teil der E-Mail, andere Domain.
+ */
+function adminDb(tripId: string) {
+  return testEnv.authenticatedContext(`uid-admin-${tripId}`, {
+    email: `${tripId}@2cars2georgia.admin`,
+    email_verified: false
+  }).firestore();
+}
+
 function anonymousDb() {
   return testEnv.unauthenticatedContext().firestore();
 }
@@ -239,9 +251,10 @@ describe('Trackpunkte', () => {
     await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validTrackPoint, speedKmh: 200 }));
   });
 
-  it('erlaubt das Löschen im eigenen Roadtrip', async () => {
+  it('erlaubt das endgültige Löschen nur dem Admin-Zugang', async () => {
     await seed(path, validTrackPoint);
-    await assertSucceeds(deleteDoc(doc(tripDb(TRIP), path)));
+    await assertFails(deleteDoc(doc(tripDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
   });
 });
 
@@ -295,9 +308,12 @@ describe('Logbuch-Ereignisse', () => {
     await assertFails(setDoc(doc(db, path), { ...validEvent, deletedAt: 0 }));
   });
 
-  it('erlaubt das Löschen', async () => {
+  it('erlaubt das endgültige Löschen nur dem Admin-Zugang', async () => {
     await seed(path, validEvent);
-    await assertSucceeds(deleteDoc(doc(tripDb(TRIP), path)));
+    // Für die Crew führt der Weg über den Papierkorb (deletedAt), nicht über
+    // das endgültige Entfernen.
+    await assertFails(deleteDoc(doc(tripDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
   });
 });
 
@@ -340,11 +356,12 @@ describe('Ausgaben', () => {
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
   });
 
-  it('erlaubt Ändern und Löschen', async () => {
+  it('erlaubt Ändern der Crew, endgültiges Löschen nur dem Admin-Zugang', async () => {
     await seed(path, validExpense);
     const db = tripDb(TRIP);
     await assertSucceeds(setDoc(doc(db, path), { ...validExpense, amountEuro: 90 }));
-    await assertSucceeds(deleteDoc(doc(db, path)));
+    await assertFails(deleteDoc(doc(db, path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
   });
 });
 
@@ -415,6 +432,47 @@ describe('Einstellungen', () => {
       })
     );
   });
+
+  describe('Crew verwalten', () => {
+    const path = `roadtrips/${TRIP}/settings/general`;
+
+    it('lässt ein Crewmitglied sich selbst eintragen', async () => {
+      await seed(path, { users: ['Lukas'], roles: { Lukas: 'owner' } });
+
+      await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { users: ['Lukas', 'Leon'] }));
+    });
+
+    it('verweigert der Crew das Entfernen von Mitgliedern', async () => {
+      await seed(path, { users: ['Lukas', 'Leon'], roles: { Lukas: 'owner' } });
+
+      await assertFails(updateDoc(doc(tripDb(TRIP), path), { users: ['Lukas'] }));
+      await assertSucceeds(updateDoc(doc(adminDb(TRIP), path), { users: ['Lukas'] }));
+    });
+
+    it('verweigert der Crew das Vergeben von Rollen', async () => {
+      await seed(path, { users: ['Lukas', 'Leon'], roles: { Lukas: 'owner' } });
+
+      // Der eigentliche Punkt: Ohne diese Schranke könnte sich jedes Gerät
+      // mit dem Roadtrip-Passwort selbst zum Owner machen.
+      await assertFails(
+        updateDoc(doc(tripDb(TRIP), path), { roles: { Lukas: 'owner', Leon: 'owner' } })
+      );
+      await assertSucceeds(
+        updateDoc(doc(adminDb(TRIP), path), { roles: { Lukas: 'owner', Leon: 'owner' } })
+      );
+    });
+
+    it('erlaubt der Crew weiterhin die Schnell-Logs', async () => {
+      const quicklogs = `roadtrips/${TRIP}/settings/quicklogs`;
+      await seed(quicklogs, { items: [{ id: 'pause', label: 'Pause', iconName: 'coffee' }] });
+
+      await assertSucceeds(
+        updateDoc(doc(tripDb(TRIP), quicklogs), {
+          items: [{ id: 'pause', label: 'Kaffeepause', iconName: 'coffee' }]
+        })
+      );
+    });
+  });
 });
 
 describe('Fehlerprotokoll', () => {
@@ -455,6 +513,12 @@ describe('Fehlerprotokoll', () => {
   it('lässt Einträge nicht nachträglich ändern', async () => {
     await seed(path, validError);
     await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validError, message: 'harmlos' }));
+  });
+
+  it('erlaubt das Löschen nur dem Admin-Zugang', async () => {
+    await seed(path, validError);
+    await assertFails(deleteDoc(doc(tripDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
   });
 
   it('bleibt für fremde Roadtrips unlesbar', async () => {

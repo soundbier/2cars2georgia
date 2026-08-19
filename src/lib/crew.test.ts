@@ -15,13 +15,7 @@ vi.mock('firebase/firestore', () => ({
   setDoc: (...args: unknown[]) => setDoc(...args)
 }));
 
-import {
-  MAX_CREW_NAME_LENGTH,
-  addCrewMember,
-  isCrewNameTaken,
-  joiningRole,
-  normalizeCrewName
-} from './crew';
+import { MAX_CREW_NAME_LENGTH, addCrewMember, isCrewNameTaken, normalizeCrewName } from './crew';
 
 describe('normalizeCrewName', () => {
   it('räumt Leerzeichen auf', () => {
@@ -50,25 +44,17 @@ describe('isCrewNameTaken', () => {
   });
 });
 
-describe('joiningRole', () => {
-  it('macht die erste Person zum Owner', () => {
-    expect(joiningRole([])).toBe('owner');
-  });
-
-  it('lässt alle weiteren als Mitfahrer beitreten', () => {
-    expect(joiningRole(['Leon'])).toBe('member');
-  });
-});
-
 describe('addCrewMember', () => {
-  it('schreibt Name und Rolle zusammenführend in settings/general', () => {
-    addCrewMember('sommertour-2026', 'Leon', 'owner');
+  it('schreibt den Namen zusammenführend in settings/general', () => {
+    addCrewMember('sommertour-2026', 'Leon');
 
     const [ref, data, options] = setDoc.mock.calls.at(-1)!;
     expect((ref as { path: string }).path).toBe('roadtrips/sommertour-2026/settings/general');
     // arrayUnion statt Überschreiben: Zwei Geräte, die gleichzeitig beitreten,
     // dürfen sich nicht gegenseitig aus der Liste werfen.
-    expect(data).toEqual({ users: { __arrayUnion: ['Leon'] }, roles: { Leon: 'owner' } });
+    // Ohne roles-Feld: Rollen darf laut firestore.rules nur der Admin-Zugang
+    // vergeben, sonst könnte sich jedes Gerät selbst zum Owner machen.
+    expect(data).toEqual({ users: { __arrayUnion: ['Leon'] } });
     // Ohne merge würde der erste Beitritt ein bestehendes Dokument ersetzen.
     expect(options).toEqual({ merge: true });
   });

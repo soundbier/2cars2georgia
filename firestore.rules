@@ -34,6 +34,20 @@ service cloud.firestore {
       return signedIn() && signedInTripId() == tripId;
     }
 
+    // Adminsitzung: derselbe Roadtrip, aber über den Admin-Zugang angemeldet
+    // (eigener Auth-User "<tripId>@2cars2georgia.admin" mit eigenem Passwort,
+    // siehe src/lib/roadtrip.ts). Die Rollen in settings/general taugen dafür
+    // nicht – die kann jedes Gerät mit dem Roadtrip-Passwort selbst
+    // umschreiben, die E-Mail der Sitzung dagegen nicht.
+    //
+    // Adminpflichtig ist bewusst nur, was sich nicht rückgängig machen lässt
+    // oder die Crew umbaut: endgültiges Löschen und das Verwalten von
+    // Mitgliedern/Rollen. Der Alltag (Einträge anlegen, ändern, in den
+    // Papierkorb legen) bleibt für die ganze Crew offen.
+    function isAdminSession(tripId) {
+      return ownsTrip(tripId) && request.auth.token.email.matches('.*@2cars2georgia[.]admin');
+    }
+
     // --- Bausteine für die Feldprüfung ----------------------------------
 
     // Bei create wie bei update enthält request.resource.data das vollständige
@@ -116,7 +130,7 @@ service cloud.firestore {
         allow create: if ownsTrip(tripId) && isTrackPoint();
         // Trackpunkte werden nur angehängt, nie nachträglich verändert.
         allow update: if false;
-        allow delete: if ownsTrip(tripId);
+        allow delete: if isAdminSession(tripId);
       }
 
       // --- Logbuch -------------------------------------------------------
@@ -134,8 +148,10 @@ service cloud.firestore {
         }
 
         allow read: if ownsTrip(tripId);
+        // Der Papierkorb (deletedAt) ist der Weg für die Crew; endgültig
+        // entfernen darf nur der Admin-Zugang.
         allow create, update: if ownsTrip(tripId) && isLogEvent();
-        allow delete: if ownsTrip(tripId);
+        allow delete: if isAdminSession(tripId);
       }
 
       // --- Bordkasse -----------------------------------------------------
@@ -155,7 +171,7 @@ service cloud.firestore {
 
         allow read: if ownsTrip(tripId);
         allow create, update: if ownsTrip(tripId) && isExpense();
-        allow delete: if ownsTrip(tripId);
+        allow delete: if isAdminSession(tripId);
       }
 
       // --- Roadtrip-weite Einstellungen ------------------------------------
@@ -188,8 +204,24 @@ service cloud.firestore {
                   && data().items.size() <= 50);
         }
 
+        // Beitreten darf jedes Gerät der Crew: Namen zur Liste hinzufügen,
+        // ohne jemanden zu entfernen und ohne Rollen anzufassen (siehe
+        // CrewGate in src/App.tsx). Wer entfernt oder Rollen vergibt, braucht
+        // den Admin-Zugang – sonst könnte sich jedes Crewmitglied selbst zum
+        // Owner machen und die Rollen wären reine Dekoration.
+        function isJoinOnly() {
+          return docId == 'general'
+            && data().users.hasAll(resource.data.users)
+            && data().get('roles', {}) == resource.data.get('roles', {});
+        }
+
         allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isSettingsDoc();
+        // Das erste Crewmitglied legt das Dokument an und wird dabei Owner –
+        // zu dem Zeitpunkt gibt es noch niemanden, der das absegnen könnte.
+        allow create: if ownsTrip(tripId) && isSettingsDoc();
+        allow update: if ownsTrip(tripId)
+          && isSettingsDoc()
+          && (isAdminSession(tripId) || docId == 'quicklogs' || isJoinOnly());
         allow delete: if false;
       }
 
@@ -213,7 +245,7 @@ service cloud.firestore {
         allow read: if ownsTrip(tripId);
         allow create: if ownsTrip(tripId) && isErrorEntry();
         allow update: if false;
-        allow delete: if ownsTrip(tripId);
+        allow delete: if isAdminSession(tripId);
       }
     }
 

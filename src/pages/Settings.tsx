@@ -18,6 +18,7 @@ import { usePreferences } from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
 import { usePermissions } from '../hooks/usePermissions';
 import { leaveRoadtrip } from '../lib/roadtrip';
+import { AdminAccessSection } from '../components/AdminAccessSection';
 import { useQuickLogs } from '../hooks/useSettings';
 import { ROLE_LABEL_KEY } from '../lib/permissions';
 import { getUserColor } from '../lib/userColors';
@@ -260,6 +261,8 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
           />
         </div>
       </Section>
+
+      <AdminAccessSection />
 
       <Section title={t('settings.data')}>
         <div className="settings-list">

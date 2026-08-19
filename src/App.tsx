@@ -15,13 +15,7 @@ import { TrackingProvider } from './hooks/useTracking';
 import { PreferencesProvider } from './hooks/usePreferences';
 import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
 import { setSentryContext } from './lib/sentry';
-import {
-  MAX_CREW_NAME_LENGTH,
-  addCrewMember,
-  isCrewNameTaken,
-  joiningRole,
-  normalizeCrewName
-} from './lib/crew';
+import { MAX_CREW_NAME_LENGTH, addCrewMember, isCrewNameTaken, normalizeCrewName } from './lib/crew';
 import { setErrorLogContext } from './lib/errorLog';
 import { useCrew } from './hooks/useSettings';
 import { UpdatePrompt } from './UpdatePrompt';
@@ -97,7 +91,7 @@ function CrewGate() {
     }
     setJoining(true);
     try {
-      await addCrewMember(tripId, name, joiningRole(users));
+      await addCrewMember(tripId, name);
       login(name);
     } catch (err) {
       console.error(err);

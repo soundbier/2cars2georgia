@@ -29,9 +29,14 @@ interface Props {
 }
 
 export default function CrewSettings({ currentUser, users }: Props) {
-  const { tripId } = useRoadtrip();
+  const { tripId, isAdmin } = useRoadtrip();
   const { roles } = useCrew();
   const { isOwner } = usePermissions(currentUser);
+  // Entfernen und Rollen vergeben verlangt laut firestore.rules den
+  // Admin-Zugang – die Owner-Rolle allein ist reine Anzeige, sie steht in
+  // denselben Daten, die sie schützen soll. Eintragen darf weiterhin jedes
+  // Crewmitglied, das ist offline unterwegs der Normalfall.
+  const canManage = isAdmin;
   const [newUser, setNewUser] = useState('');
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const { notify } = useToast();
@@ -52,10 +57,10 @@ export default function CrewSettings({ currentUser, users }: Props) {
     }
     if (!tripId) return;
     try {
-      // Neue Mitglieder starten als Mitfahrer – die Rolle lässt sich danach
-      // jederzeit über die Auswahl unten ändern. Derselbe Helfer wie beim
-      // Selbst-Eintragen im CrewGate, damit beide Wege dasselbe schreiben.
-      await trackWrite(addCrewMember(tripId, name, 'member'));
+      // Nur der Name – eine Rolle vergibt erst der Admin-Zugang (siehe
+      // firestore.rules). Derselbe Helfer wie beim Selbst-Eintragen im
+      // CrewGate, damit beide Wege dasselbe schreiben.
+      await trackWrite(addCrewMember(tripId, name));
       setNewUser('');
     } catch (err) {
       console.error(err);
@@ -111,7 +116,7 @@ export default function CrewSettings({ currentUser, users }: Props) {
       />
 
       <Section title={t('crew.section', { count: users.length })}>
-        {isOwner ? (
+        {canManage || isOwner ? (
           <form onSubmit={handleAddUser} className="row settings-add-form">
             <Input
               placeholder={t('crew.newNamePlaceholder')}
@@ -127,6 +132,13 @@ export default function CrewSettings({ currentUser, users }: Props) {
           <p className="helper-text setting-note">
             <ShieldCheck size={13} className="setting-note-icon" />
             {t('crew.onlyOwnerCanManage')}
+          </p>
+        )}
+
+        {isOwner && !canManage && (
+          <p className="helper-text setting-note">
+            <ShieldCheck size={13} className="setting-note-icon" />
+            {t('admin.requiredForCrew')}
           </p>
         )}
 
@@ -148,9 +160,9 @@ export default function CrewSettings({ currentUser, users }: Props) {
                     name
                   )
                 }
-                subtitle={!isOwner ? t(ROLE_LABEL_KEY[role]) : undefined}
+                subtitle={!canManage ? t(ROLE_LABEL_KEY[role]) : undefined}
                 trailing={
-                  isOwner ? (
+                  canManage ? (
                     <>
                       <Select
                         className="setting-select"
