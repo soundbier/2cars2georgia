@@ -106,21 +106,31 @@ export default function RoadtripGate() {
               required
             />
             <div className="row roadtrip-gate-dates">
-              <Input
-                type="date"
-                aria-label={t('trip.startDatePlaceholder')}
-                value={tripStartDate}
-                onChange={(e) => setTripStartDate(e.target.value)}
-                required
-              />
-              <Input
-                type="date"
-                aria-label={t('trip.endDatePlaceholder')}
-                value={tripEndDate}
-                onChange={(e) => setTripEndDate(e.target.value)}
-                min={tripStartDate || undefined}
-                required
-              />
+              <div className="roadtrip-gate-date-field">
+                <label className="label" htmlFor="trip-start-date">
+                  {t('trip.startDatePlaceholder')}
+                </label>
+                <Input
+                  id="trip-start-date"
+                  type="date"
+                  value={tripStartDate}
+                  onChange={(e) => setTripStartDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="roadtrip-gate-date-field">
+                <label className="label" htmlFor="trip-end-date">
+                  {t('trip.endDatePlaceholder')}
+                </label>
+                <Input
+                  id="trip-end-date"
+                  type="date"
+                  value={tripEndDate}
+                  onChange={(e) => setTripEndDate(e.target.value)}
+                  min={tripStartDate || undefined}
+                  required
+                />
+              </div>
             </div>
             <p className="helper-text roadtrip-gate-hint">{t('trip.tripDatesHint')}</p>
           </>
