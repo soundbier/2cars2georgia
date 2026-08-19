@@ -5,16 +5,31 @@
  * keine feste Namensliste stehen. Die Farbe wird stattdessen deterministisch
  * aus dem Namen abgeleitet: gleicher Name → gleiche Farbe auf allen Geräten,
  * ohne dass neue Crewmitglieder gepflegt werden müssen.
+ *
+ * Die Palette stammt aus derselben Farbwelt wie der Rest der App (siehe
+ * styles/tokens.css, Abschnitt „Crew-Farben") – vorher lief hier eine eigene,
+ * viel buntere Reihe, die neben dem übrigen UI wie aus einer anderen App
+ * aussah. Zwei Bedingungen gelten für jeden Ton:
+ *
+ * 1. Weiß muss darauf lesbar sein (mind. 4.5:1), denn die Farbe trägt das
+ *    weiße Initial im Avatar und die Positionsmarker auf der Karte.
+ * 2. Die Töne müssen sich in der Farbe unterscheiden, nicht nur in der
+ *    Helligkeit – nebeneinander stehen sie als kleine Kreise.
+ *
+ * Die Werte stehen hier als Literale, weil sie auch außerhalb von CSS
+ * gebraucht werden: Leaflet setzt Markerfarben als SVG-Attribut, dort werden
+ * CSS-Variablen nicht aufgelöst. Sie sind mit den `--crew-*`-Tokens identisch
+ * und müssen mit ihnen zusammen geändert werden.
  */
 const USER_COLOR_PALETTE = [
-  '#0ea5e9', // Cyan
-  '#f59e0b', // Amber
-  '#10b981', // Grün
-  '#8b5cf6', // Violett
-  '#ef4444', // Rot
-  '#ec4899', // Pink
-  '#14b8a6', // Teal
-  '#6366f1' // Indigo
+  '#bc4f27', // Terracotta
+  '#2a7f87', // Türkis
+  '#6b7a3f', // Oliv
+  '#96661c', // Ocker
+  '#a32e20', // Rost
+  '#2f4468', // Navy
+  '#5b7360', // Salbei
+  '#74685a' // Sand
 ];
 
 export function getUserColor(name: string): string {

@@ -1,8 +1,12 @@
+/* Papier: die ruhende Fläche für Inhalte.
+
+   Kein Schatten – die Section liegt nicht über etwas, sie ist der Grund. Sie
+   hebt sich über Material ab (helleres Papier, feine Linie), nicht über eine
+   angedeutete Höhe. */
 .section {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
   padding: var(--space-4);
 }
 

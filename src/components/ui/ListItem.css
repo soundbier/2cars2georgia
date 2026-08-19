@@ -29,6 +29,7 @@
 .list-item-title {
   font-size: var(--text-base);
   font-weight: 600;
+  line-height: 1.3;
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -44,11 +45,13 @@
   white-space: nowrap;
 }
 
+/* Der Abstand zwischen den Aktionen ist Absicht: Bearbeiten und Löschen
+   dürfen nicht Daumenbreite nebeneinander liegen. */
 .list-item-trailing {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-2);
-  min-width: 40px; /* eine Icon-Button-Breite, damit Aktionen über Zeilen hinweg auf einer Linie liegen */
+  gap: var(--space-3);
+  min-width: 44px; /* eine Icon-Button-Breite, damit Aktionen über Zeilen hinweg auf einer Linie liegen */
 }

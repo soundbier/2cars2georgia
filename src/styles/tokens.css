@@ -1,44 +1,154 @@
 /* ============================================================
    2cars2georgia — Design Tokens
-   Ein bewusst kleines System: Farbe, Radius, Abstand, Typografie.
-   Helle, maritime Instrumenten-Optik: gute Lesbarkeit im Sonnenlicht,
-   Ozeanblau als Signalfarbe.
-   ============================================================ */
-:root {
-  /* --- Farbe: Flächen (hell, mehrere Helligkeitsstufen) --- */
-  --color-bg: #f1f5f9;
-  --color-bg-raised: #ffffff;
-  --color-surface: #ffffff;
-  --color-surface-hover: #eef2f6;
-  --color-border: #e2e8f0;
-  --color-border-strong: #cbd5e1;
 
-  /* --- Farbe: Text --- */
-  --color-text: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-tertiary: #64748b;
+   Leitbild: „Instrument auf Papier".
+   Papier trägt die ruhenden Inhalte (Logbuch, Kosten, Crew, Einstellungen),
+   das Instrument zeigt Laufendes (Geschwindigkeit, GPS, aktive Aufzeichnung).
+   Das ist eine visuelle Grammatik, keine Skeuomorphie: keine Texturen, keine
+   Alterung, kein Retro – nur zwei klar unterscheidbare Materialwelten.
+
+   Die Datei hat zwei Ebenen:
+
+   1. FARBWELT – die rohen Werte. Hier steht, welche Farben es überhaupt gibt.
+   2. ROLLEN   – was eine Farbe bedeutet. Nur diese Tokens benutzen die
+                 Komponenten.
+
+   Die Trennung ist die Vorbereitung für einen späteren Nachtmodus: Der
+   überschreibt ausschließlich Ebene 2 (und zwar in einem eigenen Block), ohne
+   dass eine einzige Komponente angefasst werden muss. Deshalb darf in
+   Komponenten-CSS kein roher Farbwert und kein Token der Ebene 1 stehen.
+
+   Kontraste: Alle Text-/Hintergrund-Paare sind gegen WCAG AA (4.5:1) geprüft.
+   Wo ein Farbton als Fläche und als Text gebraucht wird, gibt es zwei Stufen –
+   Terracotta auf Papier erreicht als Text erst abgedunkelt AA.
+   ============================================================ */
+
+:root {
+  /* ============================================================
+     EBENE 1 — FARBWELT
+     ============================================================ */
+
+  /* --- Papier: ruhende Inhalte --- */
+  --paper: #f5eee2;
+  --paper-light: #fbf7f0;
+  --paper-shade: #ebe2d3; /* gedrückte/hervorgehobene Papierfläche */
+  --paper-line: #ded2be; /* Trennlinie auf Papier */
+  --paper-line-strong: #c9bca5;
+
+  /* --- Tinte: Schrift auf Papier --- */
+  --ink: #152238;
+  --ink-muted: #3e5068;
+  --pencil: #5a6678; /* Startwert #6B7788 erreichte auf Papier nur 3.94:1 */
+
+  /* --- Instrument: laufende Information --- */
+  --instrument: #101b2c;
+  --instrument-ink: #ffffff;
+  --instrument-ink-muted: #9aa7b9;
+
+  /* --- Signalfarben --- */
+  /* Terracotta: Primäraktion, Route, aktive Interaktion.
+     Fläche und Text sind zwei Stufen – Weiß auf dem hellen Terracotta
+     erreichte nur 4.49:1, Terracotta als Text auf Papier nur 3.89:1. */
+  --terracotta: #bc4f27;
+  --terracotta-ink: #a8431f;
+
+  /* Türkis: GPS, Live, Sync, aktive Verbindung. */
+  --turquoise: #2a7f87;
+  --turquoise-ink: #246e75;
+  --turquoise-light: #4fb0b9; /* auf dem dunklen Instrument */
+
+  /* Aufgehellte Signalfarben für die dunkle Instrumentenfläche: Rost und
+     Ocker erreichen dort in ihrer Papierstufe nur 2.44:1 bzw. 3.04:1. */
+  --rust-light: #d9705f;
+  --ocher-light: #c39a4a;
+
+  /* Oliv: Erfolg, positiv, bestätigt. */
+  --olive: #6b7a3f;
+  --olive-ink: #5f6d38;
+
+  /* Rost: Fehler, kritisch, destruktiv. */
+  --rust: #a32e20;
+
+  /* Ocker: pausiert/wartend – die einzige Zwischenstufe. */
+  --ocher: #8a5e19;
+
+  /* --- Crew-Farben: dieselbe Farbwelt, acht unterscheidbare Töne ---
+     Weiß ist auf jedem dieser Töne AA-lesbar (Avatar-Initial), siehe
+     lib/userColors.ts. */
+  --crew-terracotta: #bc4f27;
+  --crew-turquoise: #2a7f87;
+  --crew-olive: #6b7a3f;
+  --crew-ocher: #96661c;
+  --crew-rust: #a32e20;
+  --crew-navy: #2f4468;
+  --crew-sage: #5b7360;
+  --crew-sand: #74685a;
+
+  /* ============================================================
+     EBENE 2 — ROLLEN (nur diese in Komponenten verwenden)
+     ============================================================ */
+
+  /* --- Flächen: Papierwelt --- */
+  --color-bg: var(--paper);
+  --color-surface: var(--paper-light);
+  --color-surface-hover: var(--paper-shade);
+  --color-bg-raised: var(--paper-light);
+  --color-border: var(--paper-line);
+  --color-border-strong: var(--paper-line-strong);
+
+  /* --- Flächen: Instrumentenwelt --- */
+  --color-instrument: var(--instrument);
+  --color-instrument-border: #24354f;
+  --color-on-instrument: var(--instrument-ink);
+  --color-on-instrument-muted: var(--instrument-ink-muted);
+  --color-danger-on-instrument: var(--rust-light);
+  --color-warning-on-instrument: var(--ocher-light);
+
+  /* --- Text auf Papier --- */
+  --color-text: var(--ink);
+  --color-text-secondary: var(--ink-muted);
+  --color-text-tertiary: var(--pencil);
+
+  /* --- Primäraktion --- */
+  --color-accent: var(--terracotta);
+  --color-accent-strong: var(--terracotta-ink);
+  --color-accent-text: var(--terracotta-ink); /* Terracotta als Schrift/Icon auf Papier */
+  --color-accent-muted: rgba(188, 79, 39, 0.1);
+  --color-accent-border: rgba(188, 79, 39, 0.35);
   --color-on-accent: #ffffff;
 
-  /* --- Farbe: Akzent (Ozeanblau) --- */
-  --color-accent: #0284c7;
-  --color-accent-strong: #0369a1;
-  --color-accent-muted: rgba(2, 132, 199, 0.08);
-  --color-accent-border: rgba(2, 132, 199, 0.28);
+  /* --- Live/Verbindung --- */
+  --color-live: var(--turquoise);
+  --color-live-text: var(--turquoise-ink);
+  --color-live-on-instrument: var(--turquoise-light);
+  --color-live-muted: rgba(42, 127, 135, 0.12);
+  --color-on-live: #ffffff;
 
-  /* --- Farbe: Semantisch (nur wo Bedeutung vorhanden ist) --- */
-  --color-success: #15803d;
-  --color-success-muted: rgba(21, 128, 61, 0.1);
-  --color-danger: #dc2626;
-  --color-danger-muted: rgba(220, 38, 38, 0.1);
-  --color-warning: #b45309;
-  --color-warning-muted: rgba(180, 83, 9, 0.1);
+  /* --- Karte ---
+     Weiße Kontur um Route und Marker: Sie trennt die Signalfarbe vom
+     Kartenbild, das unter ihr alles sein kann – helles OSM, dunkles Topo,
+     Satellitenfoto. Ohne sie verschwindet die Route im Untergrund. */
+  --color-map-casing: #ffffff;
 
-  /* --- Radius-System: bewusst 3 Stufen --- */
-  --radius-sm: 4px;   /* Badges, Inputs, kleine Controls */
-  --radius-md: 8px;   /* Buttons, ListItems, Popups */
-  --radius-lg: 12px;  /* Sections/Cards, Dialoge */
+  /* --- Zustände --- */
+  --color-success: var(--olive-ink);
+  --color-success-surface: var(--olive);
+  --color-success-muted: rgba(107, 122, 63, 0.14);
+  --color-danger: var(--rust);
+  --color-danger-muted: rgba(163, 46, 32, 0.12);
+  --color-warning: var(--ocher);
+  --color-warning-muted: rgba(138, 94, 25, 0.12);
 
-  /* --- Spacing-System: 4px-Raster --- */
+  /* ============================================================
+     Radius — bewusst 3 Stufen
+     ============================================================ */
+  --radius-sm: 4px; /* Badges, Inputs, kleine Controls */
+  --radius-md: 8px; /* Buttons, Popups */
+  --radius-lg: 12px; /* Sections, Instrument, Dialoge */
+
+  /* ============================================================
+     Abstände — 4px-Raster
+     ============================================================ */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -47,20 +157,36 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  /* --- Typografie --- */
+  /* ============================================================
+     Typografie
+
+     `--font-display` (Archivo Narrow, selbst gehostet – siehe styles/fonts.css)
+     trägt Titel, Instrumentenwerte, Labels und Zahlen. `--font-ui` bleibt für
+     den Fließtext die neutrale System-Schrift: Sie wird am längsten gelesen
+     und muss auf jedem Gerät sofort da sein.
+     ============================================================ */
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Archivo Narrow', var(--font-ui);
   --font-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
 
-  --text-2xl: 1.5rem;
-  --text-xl: 1.15rem;
-  --text-lg: 1rem;
-  --text-base: 0.9rem;
-  --text-sm: 0.8rem;
-  --text-xs: 0.72rem;
+  /* Skala mit deutlicher Spreizung; nichts unter 13px. */
+  --text-instrument: clamp(3.4rem, 19vw, 4rem); /* ~64px Instrumentenwert */
+  --text-2xl: 1.875rem; /* 30px Seitentitel */
+  --text-xl: 1.1875rem; /* 19px Abschnitt */
+  --text-base: 1rem; /* 16px Fließtext */
+  --text-sm: 0.875rem; /* 14px Sekundärtext */
+  --text-label: 0.8125rem; /* 13px Label – die kleinste erlaubte Größe */
 
-  /* --- Sonstiges --- */
+  /* ============================================================
+     Sonstiges
+     ============================================================ */
   --nav-height: 76px;
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-elevated: 0 8px 24px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  /* Höhe des Sync-Banners; die Toasts rücken darüber, wenn es sichtbar ist. */
+  --sync-banner-height: 36px;
+
+  /* Schatten nur für Elemente, die tatsächlich über anderem Inhalt liegen. */
+  --shadow-overlay: 0 8px 24px rgba(21, 34, 56, 0.18), 0 2px 8px rgba(21, 34, 56, 0.1);
+  --shadow-control: 0 1px 3px rgba(21, 34, 56, 0.18);
+
   --duration-fast: 0.12s;
 }

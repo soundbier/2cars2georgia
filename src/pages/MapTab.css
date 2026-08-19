@@ -17,7 +17,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--color-map-casing);
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
 }
 
@@ -51,7 +51,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: var(--shadow-card);
+  /* Liegt tatsächlich über der Karte – hier ist ein Schatten begründet. */
+  box-shadow: var(--shadow-control);
   transition:
     background var(--duration-fast),
     color var(--duration-fast);
@@ -95,7 +96,7 @@
   color: var(--color-text);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-elevated);
+  box-shadow: var(--shadow-overlay);
 }
 
 .leaflet-popup-content {

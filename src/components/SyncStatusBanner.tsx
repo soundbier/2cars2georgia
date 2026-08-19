@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { CloudUpload } from 'lucide-react';
 import { usePendingWrites } from '../hooks/usePendingWrites';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -10,13 +11,25 @@ import './SyncStatusBanner.css';
  * Banner sah man das nirgends – Einträge wirkten gespeichert, obwohl sie nur
  * lokal lagen. App-weit über der Bottom-Nav platziert, damit es auf jeder
  * Seite sichtbar ist, während etwas offen ist.
+ *
+ * Solange es steht, bekommt <body> die Klasse `has-sync-banner`: Die Toasts
+ * liegen an derselben Bildschirmkante und haben das Banner vorher verdeckt –
+ * ausgerechnet die Meldung, dass noch etwas ungesichert ist.
  */
 export function SyncStatusBanner() {
   const pending = usePendingWrites();
   const isOnline = useOnlineStatus();
   const t = useT();
 
-  if (pending === 0) return null;
+  const visible = pending > 0;
+
+  useEffect(() => {
+    if (!visible) return;
+    document.body.classList.add('has-sync-banner');
+    return () => document.body.classList.remove('has-sync-banner');
+  }, [visible]);
+
+  if (!visible) return null;
 
   return (
     <div className="sync-status-banner" role="status">

@@ -1,11 +1,11 @@
+/* Kennzahlen bekommen keine eigene Fläche: Sie stehen direkt auf dem Papier
+   der Seite, unten abgeschlossen durch eine Linie. Eine Card um zwei Zahlen
+   herum ist Verpackung ohne Inhalt. */
 .logbook-summary {
   display: flex;
   align-items: center;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  padding: var(--space-4);
+  padding: 0 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .logbook-summary-item {
@@ -13,11 +13,12 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  color: var(--color-accent);
+  color: var(--color-text-tertiary);
 }
 
 .logbook-summary-value {
-  font-size: var(--text-xl);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.2;
@@ -53,8 +54,10 @@
   gap: 2px;
   width: 76px;
   flex-shrink: 0;
+  font-family: var(--font-display);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-secondary);
   padding-top: 1px;
 }
@@ -83,10 +86,12 @@
   gap: var(--space-2);
 }
 
+/* Abstand zwischen Bearbeiten und Löschen: siehe ui/ListItem.css – die
+   beiden dürfen nicht Daumenbreite nebeneinander liegen. */
 .logbook-entry-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-3);
   flex-shrink: 0;
 }
 
