@@ -162,7 +162,15 @@ service cloud.firestore {
         && data().ownerUid == request.auth.uid
         && data().createdAt == request.time;
 
-      allow read: if isMember();
+      // Einzeldokument statt Liste: Vor dem Beitreten (createRoadtrip prüft
+      // per get() auf freie Slugs, joinRoadtrip auf Existenz der Trip-ID,
+      // siehe src/lib/membership.ts) ist die aufrufende Person noch kein
+      // Mitglied – ein `read`, das komplett an isMember() hängt, würde genau
+      // diese Prüfung selbst blockieren. Die Trip-ID dient ohnehin als
+      // Beitritts-Code (siehe RoadtripGate) und ihr Inhalt ist unkritisch;
+      // eine Auflistung fremder Roadtrips bleibt aber gesperrt.
+      allow get: if signedIn();
+      allow list: if isMember();
 
       // Name/Erstellungsdatum/Owner eines Roadtrips ändern sich nach dem Anlegen nicht.
       allow update: if false;
@@ -195,7 +203,13 @@ service cloud.firestore {
                 && get(/databases/$(database)/documents/roadtrips/$(tripId)).data.ownerUid == request.auth.uid)
           );
 
-        allow read: if isMember();
+        // Gleiches Henne-Ei-Problem wie oben: joinRoadtrip prüft per get()
+        // die eigene (noch nicht existierende) Mitgliedschaft, bevor sie
+        // angelegt wird. `get` erlaubt deshalb zusätzlich den Blick auf das
+        // eigene Dokument unabhängig vom Mitgliedsstatus – fremde
+        // Mitgliedsdaten bleiben, wie zuvor, nur für Mitglieder sichtbar.
+        allow get: if isMember() || (signedIn() && request.auth.uid == memberUid);
+        allow list: if isMember();
 
         // Rolle ändern: nur der Owner, und nur die Rolle selbst – Name und
         // Beitrittsdatum bleiben unangetastet.

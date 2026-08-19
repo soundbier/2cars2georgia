@@ -251,7 +251,11 @@ describe('Roadtrip-Abschottung', () => {
     await seedTripWithCrew(TRIP);
     const db = outsiderDb();
 
-    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}`)));
+    // Das Wurzeldokument selbst darf per get() gelesen werden (siehe
+    // firestore.rules, "Henne-Ei-Problem" – createRoadtrip/joinRoadtrip
+    // brauchen genau das, bevor eine Mitgliedschaft existiert). Alles
+    // dahinter bleibt gesperrt.
+    await assertSucceeds(getDoc(doc(db, `roadtrips/${TRIP}`)));
     await assertFails(getDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
     await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/events/e2`), validEvent));
     await assertFails(deleteDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
@@ -292,6 +296,19 @@ describe('Roadtrip-Dokument', () => {
         createdAt: serverTimestamp()
       })
     );
+  });
+
+  it('erlaubt einer fremden Person die Existenzprüfung vor Anlegen/Beitreten', async () => {
+    // Reproduziert src/lib/membership.ts: findFreeTripId() prüft per get(),
+    // ob eine Slug-ID schon vergeben ist, joinRoadtrip() prüft so die
+    // Existenz der Ziel-ID – beides passiert, bevor die aufrufende Person
+    // Mitglied ist.
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    const snap = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}`)));
+    expect(snap.exists()).toBe(true);
+
+    const missing = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/unbekannte-id`)));
+    expect(missing.exists()).toBe(false);
   });
 
   it('verweigert das Anlegen ohne vorhandenes Profil', async () => {
@@ -453,6 +470,15 @@ describe('Mitgliedschaften', () => {
   it('lässt Nicht-Mitglieder die Mitgliederliste nicht lesen', async () => {
     await seedTripWithCrew(TRIP);
     await assertFails(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}/members/${OWNER_UID}`)));
+  });
+
+  it('erlaubt einer fremden Person nur die eigene, noch nicht existierende Mitgliedschaft zu lesen', async () => {
+    // Reproduziert joinRoadtrip(): bevor das Mitglieds-Dokument angelegt
+    // wird, liest der Client per get(), ob es (durch einen früheren Versuch)
+    // schon existiert.
+    await seedTripWithCrew(TRIP);
+    const snap = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`)));
+    expect(snap.exists()).toBe(false);
   });
 });
 
