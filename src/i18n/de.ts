@@ -29,6 +29,7 @@ export const de = {
   'nav.logbook': 'Logbuch',
   'nav.costs': 'Kasse',
   'nav.more': 'Mehr',
+  'nav.settings': 'Einstellungen',
 
   // --- Allgemein --------------------------------------------------------
   'common.save': 'Speichern',
@@ -467,6 +468,7 @@ export const de = {
 
   // --- Kombüse -----------------------------------------------------------
   'kombuese.sectionTitle': 'Kombüse',
+  'kombuese.overviewSubtitle': 'Speiseplan, Gerichte, Einkaufsliste und Lager',
   'kombuese.mealPlan': 'Speiseplan',
   'kombuese.mealPlanValue': 'Wer isst wann was',
   'kombuese.dishes': 'Gerichte',

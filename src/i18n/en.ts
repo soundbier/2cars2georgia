@@ -24,6 +24,7 @@ export const en: Translations = {
   'nav.logbook': 'Log',
   'nav.costs': 'Kitty',
   'nav.more': 'More',
+  'nav.settings': 'Settings',
 
   // --- Common -----------------------------------------------------------
   'common.save': 'Save',
@@ -453,6 +454,7 @@ export const en: Translations = {
 
   // --- Galley --------------------------------------------------------------
   'kombuese.sectionTitle': 'Galley',
+  'kombuese.overviewSubtitle': 'Meal plan, dishes, shopping list and inventory',
   'kombuese.mealPlan': 'Meal plan',
   'kombuese.mealPlanValue': 'Who eats what, when',
   'kombuese.dishes': 'Dishes',

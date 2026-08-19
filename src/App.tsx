@@ -6,6 +6,8 @@ import {
   BookOpen,
   Wallet,
   Settings as SettingsIcon,
+  UtensilsCrossed,
+  MoreHorizontal,
   Compass,
   LucideIcon
 } from 'lucide-react';
@@ -31,6 +33,7 @@ import CrewSettings from './pages/settings/CrewSettings';
 import QuickLogSettings from './pages/settings/QuickLogSettings';
 import ExportSettings from './pages/settings/ExportSettings';
 import TrashSettings from './pages/settings/TrashSettings';
+import Verpflegung from './pages/kombuese/Verpflegung';
 import MealPlan from './pages/kombuese/MealPlan';
 import Dishes from './pages/kombuese/Dishes';
 import ShoppingList from './pages/kombuese/ShoppingList';
@@ -43,8 +46,13 @@ const NAV_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = 
   { to: '/', labelKey: 'nav.cockpit', icon: Gauge },
   { to: '/map', labelKey: 'nav.map', icon: MapIcon },
   { to: '/stats', labelKey: 'nav.logbook', icon: BookOpen },
-  { to: '/costs', labelKey: 'nav.costs', icon: Wallet },
-  { to: '/settings', labelKey: 'nav.more', icon: SettingsIcon }
+  { to: '/costs', labelKey: 'nav.costs', icon: Wallet }
+];
+
+/** Ziele des "Mehr"-Dropups, siehe Bottom-Navigation weiter unten. */
+const MORE_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = [
+  { to: '/settings/verpflegung', labelKey: 'kombuese.sectionTitle', icon: UtensilsCrossed },
+  { to: '/settings', labelKey: 'nav.settings', icon: SettingsIcon }
 ];
 
 /**
@@ -59,6 +67,7 @@ function CrewGate() {
   const { users, loading } = useCrew();
   const [newName, setNewName] = useState('');
   const [joining, setJoining] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { notify } = useToast();
   const t = useT();
 
@@ -180,13 +189,36 @@ function CrewGate() {
             <Route path="/settings/quicklogs" element={<QuickLogSettings currentUser={user} />} />
             <Route path="/settings/export" element={<ExportSettings users={users} />} />
             <Route path="/settings/papierkorb" element={<TrashSettings currentUser={user} />} />
-            <Route path="/settings/speiseplan" element={<MealPlan currentUser={user} />} />
-            <Route path="/settings/gerichte" element={<Dishes currentUser={user} />} />
-            <Route path="/settings/einkaufsliste" element={<ShoppingList currentUser={user} />} />
-            <Route path="/settings/lager" element={<Inventory currentUser={user} />} />
+            <Route path="/settings/verpflegung" element={<Verpflegung />} />
+            <Route path="/settings/verpflegung/speiseplan" element={<MealPlan currentUser={user} />} />
+            <Route path="/settings/verpflegung/gerichte" element={<Dishes currentUser={user} />} />
+            <Route
+              path="/settings/verpflegung/einkaufsliste"
+              element={<ShoppingList currentUser={user} />}
+            />
+            <Route path="/settings/verpflegung/lager" element={<Inventory currentUser={user} />} />
             <Route path="/datenschutz" element={<Privacy />} />
           </Routes>
         </div>
+        {moreOpen && (
+          <div className="more-backdrop" onClick={() => setMoreOpen(false)} />
+        )}
+        {moreOpen && (
+          <div className="more-dropup">
+            {MORE_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/settings'}
+                onClick={() => setMoreOpen(false)}
+                className={({ isActive }) => `more-dropup-item ${isActive ? 'active' : ''}`}
+              >
+                <Icon size={20} strokeWidth={2} />
+                <span>{t(labelKey)}</span>
+              </NavLink>
+            ))}
+          </div>
+        )}
         <nav className="bottom-nav">
           {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
             <NavLink
@@ -199,6 +231,15 @@ function CrewGate() {
               <span>{t(labelKey)}</span>
             </NavLink>
           ))}
+          <button
+            type="button"
+            className={`nav-item ${moreOpen ? 'active' : ''}`}
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            <MoreHorizontal size={20} strokeWidth={2} />
+            <span>{t('nav.more')}</span>
+          </button>
         </nav>
         <SyncStatusBanner />
       </BrowserRouter>
