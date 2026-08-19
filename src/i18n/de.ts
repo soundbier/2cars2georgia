@@ -357,7 +357,7 @@ export const de = {
     'Diese App wird privat im Freundeskreis betrieben, nicht gewerblich. Trotzdem verarbeitet sie Standort-, Namens- und Kostendaten der Crew – deshalb hier transparent, was womit passiert.',
   'privacy.controller': 'Verantwortliche Stelle',
   'privacy.controllerPlaceholder':
-    '[Name/Kontakt der Person eintragen, die diesen Roadtrip bzw. das Firebase-Projekt betreibt – z.B. „Vorname Nachname, E-Mail“.]',
+    'Lukas Gehrke, LukasGehrke@gmx.de; 2cars2georgia, 2cars2georgia@gmx.de ',
   'privacy.dataTitle': 'Welche Daten werden verarbeitet',
   'privacy.dataGps': 'Standort (GPS):',
   'privacy.dataGpsText':
