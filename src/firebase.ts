@@ -5,7 +5,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager
 } from "firebase/firestore";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,13 +18,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Zusätzliche Bremse gegen automatisiertes Durchprobieren von
-// Roadtrip-Namen/-Passwörtern (siehe lib/attemptThrottle.ts für die rein
-// clientseitige Variante): App Check bestätigt serverseitig, dass Anfragen
-// von der echten App kommen statt von einem Skript, und blockt den Rest ab –
-// sobald in der Firebase Console für Auth/Firestore aktiviert (siehe
-// README). Ohne VITE_RECAPTCHA_SITE_KEY bleibt es inaktiv, App und Rules
-// verhalten sich dann exakt wie zuvor.
+// Zusätzliche Bremse gegen automatisiertes Durchprobieren (z.B. von
+// Anmeldedaten oder Roadtrip-IDs): App Check bestätigt serverseitig, dass
+// Anfragen von der echten App kommen statt von einem Skript, und blockt den
+// Rest ab – sobald in der Firebase Console für Auth/Firestore aktiviert
+// (siehe README). Ohne VITE_RECAPTCHA_SITE_KEY bleibt es inaktiv, App und
+// Rules verhalten sich dann exakt wie zuvor.
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 if (recaptchaSiteKey) {
   if (import.meta.env.DEV) {
@@ -45,11 +44,14 @@ export const db = initializeFirestore(app, {
   })
 });
 
-// Meldet die Crew am Roadtrip an (siehe lib/roadtrip.ts) – pro Roadtrip gibt
-// es einen technischen Auth-User, dessen Passwort das gemeinsame
-// Roadtrip-Passwort ist. `browserLocalPersistence` hält die Anmeldung über
-// Neustarts hinweg, damit nicht jedes Mal erneut das Passwort nötig ist.
+// Persönliche Firebase-Auth-Konten (E-Mail/Passwort oder Google, siehe
+// lib/authAccount.ts) – jede Person hat eine eigene UID, unabhängig vom
+// Roadtrip. `browserLocalPersistence` hält die Anmeldung über Neustarts
+// hinweg, damit nicht jedes Mal erneut angemeldet werden muss.
 export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch((err) =>
   console.error('Auth-Persistenz konnte nicht gesetzt werden:', err)
 );
+
+/** Google-Anmeldung, siehe lib/authAccount.ts. */
+export const googleProvider = new GoogleAuthProvider();

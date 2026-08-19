@@ -1,45 +1,108 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { isAdminSession, tripIdFromUser } from '../lib/roadtrip';
+import { CrewRole } from '../types';
+
+const STORAGE_KEY_TRIP_ID = 'active_trip_id';
 
 interface RoadtripContextValue {
   /** true, solange der Auth-Status noch nicht bekannt ist (erster Start). */
+  authLoading: boolean;
+  /** Firebase-Auth-User dieses Geräts, oder null ohne Anmeldung. */
+  authUser: User | null;
+  /** true, solange Auth-Status oder (bei vorhandenem User) das Profil noch nicht bekannt sind. */
   loading: boolean;
-  /** ID des angemeldeten Roadtrips, oder null solange niemand angemeldet ist. */
+  /** Anzeigename aus users/{uid}, oder null solange noch kein Profil angelegt wurde. */
+  displayName: string | null;
+  /** ID des aktuell ausgewählten Roadtrips, oder null solange keiner aktiv ist. */
   tripId: string | null;
   /** Anzeigename des Roadtrips, fällt auf die ID zurück solange er noch lädt. */
   tripName: string | null;
+  /** Rolle der angemeldeten Person in diesem Roadtrip, siehe lib/permissions.ts. */
+  role: CrewRole | null;
   /**
-   * Läuft die Sitzung dieses Geräts über den Admin-Zugang? Entscheidend ist
-   * die gleichnamige Prüfung in firestore.rules – hier steht sie nur, damit
-   * die Oberfläche nicht Aktionen anbietet, die der Server ablehnen würde.
+   * Owner-Rolle in diesem Roadtrip? Entscheidend ist die gleichnamige Prüfung
+   * in firestore.rules – hier steht sie nur, damit die Oberfläche nicht
+   * Aktionen anbietet, die der Server ablehnen würde.
    */
   isAdmin: boolean;
+  /** Wählt einen Roadtrip als aktiv aus (nach Erstellen oder Beitreten). */
+  selectTrip: (tripId: string) => void;
+  /** Verlässt den aktuell ausgewählten Roadtrip auf diesem Gerät (Mitgliedschaft bleibt bestehen). */
+  clearTrip: () => void;
 }
 
 const RoadtripContext = createContext<RoadtripContextValue | null>(null);
 
 /**
- * Hält den Firebase-Auth-Status des Geräts (= "in welchem Roadtrip bin ich
- * angemeldet") und stellt ihn app-weit bereit. Alle Firestore-Pfade der
- * anderen Hooks/Seiten hängen von `tripId` ab – ohne Anmeldung existiert
- * schlicht kein Pfad, unter dem gelesen/geschrieben werden könnte.
+ * Hält den Firebase-Auth-Status, das Profil (users/{uid}) und die
+ * Mitgliedschaft im aktuell ausgewählten Roadtrip und stellt beides app-weit
+ * bereit. Alle Firestore-Pfade der anderen Hooks/Seiten hängen von `tripId`
+ * ab – ohne bestätigte Mitgliedschaft (roadtrips/{tripId}/members/{uid})
+ * lässt firestore.rules dort nichts lesen oder schreiben.
  */
 export function RoadtripProvider({ children }: { children: ReactNode }) {
-  const [loading, setLoading] = useState(true);
-  const [tripId, setTripId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+
+  const [tripId, setTripId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY_TRIP_ID));
   const [tripName, setTripName] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<CrewRole | null>(null);
+  const [membershipLoading, setMembershipLoading] = useState(true);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
-      setTripId(tripIdFromUser(user));
-      setIsAdmin(isAdminSession(user));
-      setLoading(false);
+      setAuthUser(user);
+      setAuthLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!authUser) {
+      setDisplayName(null);
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    return onSnapshot(
+      doc(db, 'users', authUser.uid),
+      (snap) => {
+        setDisplayName(snap.exists() ? ((snap.data().displayName as string | undefined) ?? null) : null);
+        setProfileLoading(false);
+      },
+      () => setProfileLoading(false)
+    );
+  }, [authUser]);
+
+  // Mitgliedschaft im aktiven Roadtrip: existiert kein Dokument (mehr) für
+  // diese UID – sei es weil nie beigetreten oder weil entfernt – gilt der
+  // Roadtrip als nicht mehr aktiv und die Auswahl wird zurückgesetzt.
+  useEffect(() => {
+    if (!authUser || !tripId) {
+      setRole(null);
+      setMembershipLoading(false);
+      return;
+    }
+    setMembershipLoading(true);
+    return onSnapshot(
+      doc(db, 'roadtrips', tripId, 'members', authUser.uid),
+      (snap) => {
+        if (snap.exists()) {
+          setRole((snap.data().role as CrewRole | undefined) ?? 'member');
+        } else {
+          setRole(null);
+          setTripId(null);
+          localStorage.removeItem(STORAGE_KEY_TRIP_ID);
+        }
+        setMembershipLoading(false);
+      },
+      () => setMembershipLoading(false)
+    );
+  }, [authUser, tripId]);
 
   useEffect(() => {
     if (!tripId) {
@@ -51,9 +114,32 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
     });
   }, [tripId]);
 
+  const selectTrip = (id: string) => {
+    localStorage.setItem(STORAGE_KEY_TRIP_ID, id);
+    setTripId(id);
+  };
+
+  const clearTrip = () => {
+    localStorage.removeItem(STORAGE_KEY_TRIP_ID);
+    setTripId(null);
+  };
+
+  const loading = authLoading || (authUser != null && (profileLoading || (tripId != null && membershipLoading)));
+
   const value = useMemo(
-    () => ({ loading, tripId, tripName, isAdmin }),
-    [loading, tripId, tripName, isAdmin]
+    () => ({
+      authLoading,
+      authUser,
+      loading,
+      displayName,
+      tripId: role ? tripId : null,
+      tripName: role ? tripName : null,
+      role,
+      isAdmin: role === 'owner',
+      selectTrip,
+      clearTrip
+    }),
+    [authLoading, authUser, loading, displayName, tripId, tripName, role]
   );
 
   return <RoadtripContext.Provider value={value}>{children}</RoadtripContext.Provider>;

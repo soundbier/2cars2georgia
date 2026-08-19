@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
-import { Compass, KeyRound, Plus, LifeBuoy, ShieldCheck, X } from 'lucide-react';
-import { createRoadtrip, joinRoadtrip, recoverRoadtrip, MIN_PASSWORD_LENGTH, RoadtripAuthError } from '../lib/roadtrip';
-import { msUntilUnlocked, recordAttemptFailure, recordAttemptSuccess } from '../lib/attemptThrottle';
+import { Compass, Plus, LogIn, ShieldCheck, X } from 'lucide-react';
+import { useRoadtrip } from '../hooks/useRoadtrip';
+import { createRoadtrip, joinRoadtrip, MembershipError } from '../lib/membership';
 import { useT } from '../i18n';
 import { PrivacyContent } from './Privacy';
 import { Button, Input, useToast } from '../components/ui';
@@ -9,95 +9,50 @@ import './RoadtripGate.css';
 
 type Mode = 'join' | 'create';
 
-interface RoadtripGateProps {
-  /**
-   * Feuert, sobald ein neuer Roadtrip inklusive Wiederherstellungscode
-   * angelegt ist. Der Code muss außerhalb dieser Komponente angezeigt
-   * werden: Sobald createRoadtrip erfolgreich ist, ändert sich der
-   * Auth-Status und App.tsx blendet auf die Crew-Anmeldung um – dieser
-   * Screen hier wäre zu dem Zeitpunkt schon unmontiert.
-   */
-  onRoadtripCreated: (tripName: string, recoveryCode: string) => void;
-}
-
 /**
- * Vorgelagerter Screen vor der eigentlichen Crew-Anmeldung: Ohne einen
- * bestehenden oder neu angelegten Roadtrip gibt es keinen Firestore-Zugriff
- * (siehe firestore.rules) – wer den Link kennt, kommt also nicht mehr ohne
- * Passwort an Daten.
+ * Screen zwischen Profil und App: Angemeldete Person ohne aktiven Roadtrip
+ * erstellt einen neuen oder tritt einem bestehenden bei. Anders als früher
+ * gibt es kein Roadtrip-Passwort mehr – Schutz ist die echte Anmeldung
+ * (siehe firestore.rules), die Roadtrip-ID dient nur als Beitritts-Code.
  */
-export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
+export default function RoadtripGate() {
+  const { authUser, displayName, selectTrip } = useRoadtrip();
   const [mode, setMode] = useState<Mode>('join');
   const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  // Nur im Erstellen-Tab: Reisezeitraum, siehe hooks/useSettings.ts
-  // (useTripDates) und den Kombüse-Speiseplan, der ihn braucht.
+  const [joinId, setJoinId] = useState('');
   const [tripStartDate, setTripStartDate] = useState('');
   const [tripEndDate, setTripEndDate] = useState('');
-  // Nur relevant im Beitreten-Tab: Passwort-Feld wird zum Code-Feld.
-  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const { notify } = useToast();
   const t = useT();
 
-  const resetForm = () => {
-    setPassword('');
-    setPasswordConfirm('');
-    setAdminPassword('');
-    setTripStartDate('');
-    setTripEndDate('');
-    setUseRecoveryCode(false);
-  };
-
   const switchMode = (next: Mode) => {
     setMode(next);
-    resetForm();
+    setName('');
+    setJoinId('');
+    setTripStartDate('');
+    setTripEndDate('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
-
-    // Rein clientseitige Bremse gegen ungezieltes Durchprobieren im Browser
-    // – kein Ersatz für echten Schutz, siehe lib/attemptThrottle.ts.
-    const waitMs = msUntilUnlocked();
-    if (waitMs > 0) {
-      notify(t('gate.throttled', { seconds: Math.ceil(waitMs / 1000) }), 'danger');
-      return;
-    }
-
-    if (mode === 'create' && password !== passwordConfirm) {
-      notify(t('gate.passwordMismatch'), 'danger');
-      return;
-    }
+    if (submitting || !authUser || !displayName) return;
 
     setSubmitting(true);
     try {
       if (mode === 'create') {
-        const result = await createRoadtrip(name, password, adminPassword, tripStartDate, tripEndDate);
-        recordAttemptSuccess();
-        onRoadtripCreated(result.tripName, result.recoveryCode);
-      } else if (useRecoveryCode) {
-        await recoverRoadtrip(name, password);
-        recordAttemptSuccess();
-        notify(t('gate.recoverySuccess'), 'success');
+        const result = await createRoadtrip(authUser.uid, displayName, name, tripStartDate, tripEndDate);
+        selectTrip(result.tripId);
+        notify(t('trip.createdSuccess', { tripName: result.tripName }), 'success');
       } else {
-        await joinRoadtrip(name, password);
-        recordAttemptSuccess();
-        notify(t('gate.joinSuccess'), 'success');
+        const result = await joinRoadtrip(authUser.uid, displayName, joinId.trim());
+        selectTrip(result.tripId);
+        notify(t('trip.joinSuccess', { tripName: result.tripName }), 'success');
       }
-      // Kein manuelles Weiterleiten nötig: onAuthStateChanged in
-      // RoadtripProvider übernimmt den Wechsel zur Crew-Anmeldung.
     } catch (err) {
-      recordAttemptFailure();
-      const code = err instanceof RoadtripAuthError ? err.code : 'unknown';
-      notify(
-        t(`authError.${code}` as Parameters<typeof t>[0], { min: MIN_PASSWORD_LENGTH }),
-        'danger'
-      );
+      const code = err instanceof MembershipError ? err.code : 'unknown';
+      notify(t(`tripError.${code}` as Parameters<typeof t>[0]), 'danger');
     } finally {
       setSubmitting(false);
     }
@@ -108,9 +63,7 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
       <div className="roadtrip-gate-head">
         <Compass size={26} />
         <h1 className="page-title">2cars2georgia</h1>
-        <p className="helper-text">
-          {mode === 'join' ? t('gate.joinHint') : t('gate.createHint')}
-        </p>
+        <p className="helper-text">{mode === 'join' ? t('trip.joinHint') : t('trip.createHint')}</p>
       </div>
 
       <div className="roadtrip-gate-tabs" role="tablist">
@@ -121,7 +74,7 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
           className={`roadtrip-gate-tab ${mode === 'join' ? 'active' : ''}`}
           onClick={() => switchMode('join')}
         >
-          {t('gate.tabJoin')}
+          {t('trip.tabJoin')}
         </button>
         <button
           type="button"
@@ -130,97 +83,57 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
           className={`roadtrip-gate-tab ${mode === 'create' ? 'active' : ''}`}
           onClick={() => switchMode('create')}
         >
-          {t('gate.tabCreate')}
+          {t('trip.tabCreate')}
         </button>
       </div>
 
       <form className="roadtrip-gate-form stack" onSubmit={handleSubmit}>
-        <Input
-          autoFocus
-          placeholder={t('gate.namePlaceholder')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <Input
-          type={useRecoveryCode ? 'text' : 'password'}
-          placeholder={useRecoveryCode ? t('gate.recoveryCodePlaceholder') : t('gate.passwordPlaceholder')}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          minLength={mode === 'create' ? MIN_PASSWORD_LENGTH : undefined}
-          required
-          autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
-        />
-        {mode === 'create' && (
+        {mode === 'join' ? (
+          <Input
+            autoFocus
+            placeholder={t('trip.joinIdPlaceholder')}
+            value={joinId}
+            onChange={(e) => setJoinId(e.target.value)}
+            required
+          />
+        ) : (
           <>
             <Input
-              type="password"
-              placeholder={t('gate.passwordConfirmPlaceholder')}
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              minLength={MIN_PASSWORD_LENGTH}
+              autoFocus
+              placeholder={t('trip.namePlaceholder')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
-              autoComplete="new-password"
             />
-            <Input
-              type="password"
-              placeholder={t('gate.adminPasswordPlaceholder')}
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              minLength={MIN_PASSWORD_LENGTH}
-              required
-              autoComplete="new-password"
-            />
-            <p className="helper-text roadtrip-gate-hint">{t('gate.adminPasswordHint')}</p>
             <div className="row roadtrip-gate-dates">
               <Input
                 type="date"
-                aria-label={t('gate.startDatePlaceholder')}
+                aria-label={t('trip.startDatePlaceholder')}
                 value={tripStartDate}
                 onChange={(e) => setTripStartDate(e.target.value)}
                 required
               />
               <Input
                 type="date"
-                aria-label={t('gate.endDatePlaceholder')}
+                aria-label={t('trip.endDatePlaceholder')}
                 value={tripEndDate}
                 onChange={(e) => setTripEndDate(e.target.value)}
                 min={tripStartDate || undefined}
                 required
               />
             </div>
-            <p className="helper-text roadtrip-gate-hint">{t('gate.tripDatesHint')}</p>
+            <p className="helper-text roadtrip-gate-hint">{t('trip.tripDatesHint')}</p>
           </>
         )}
 
         <Button type="submit" fullWidth disabled={submitting}>
-          {mode === 'create' ? <Plus size={18} /> : <KeyRound size={18} />}
-          {submitting
-            ? t('gate.submitting')
-            : mode === 'create'
-              ? t('gate.createSubmit')
-              : useRecoveryCode
-                ? t('gate.recoverySubmit')
-                : t('gate.joinSubmit')}
+          {mode === 'create' ? <Plus size={18} /> : <LogIn size={18} />}
+          {submitting ? t('trip.submitting') : mode === 'create' ? t('trip.createSubmit') : t('trip.joinSubmit')}
         </Button>
-
-        {mode === 'join' && (
-          <button
-            type="button"
-            className="roadtrip-gate-recovery-link"
-            onClick={() => {
-              setUseRecoveryCode((v) => !v);
-              setPassword('');
-            }}
-          >
-            <LifeBuoy size={14} />
-            {useRecoveryCode ? t('gate.usePassword') : t('gate.useRecoveryCode')}
-          </button>
-        )}
       </form>
 
       <p className="helper-text roadtrip-gate-hint">
-        {mode === 'create' ? t('gate.createFootnote') : t('gate.joinFootnote')}
+        {mode === 'create' ? t('trip.createFootnote') : t('trip.joinFootnote')}
       </p>
 
       <button type="button" className="roadtrip-gate-privacy-link" onClick={() => setShowPrivacy(true)}>

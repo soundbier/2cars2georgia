@@ -76,14 +76,14 @@ function TripDatesForm() {
         <div className="row">
           <Input
             type="date"
-            aria-label={t('gate.startDatePlaceholder')}
+            aria-label={t('trip.startDatePlaceholder')}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             required
           />
           <Input
             type="date"
-            aria-label={t('gate.endDatePlaceholder')}
+            aria-label={t('trip.endDatePlaceholder')}
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate || undefined}

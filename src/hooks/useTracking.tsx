@@ -43,7 +43,7 @@ const TrackingContext = createContext<TrackingContextValue | null>(null);
  */
 export function TrackingProvider({ user, children }: { user: string; children: ReactNode }) {
   const { preferences } = usePreferences();
-  const { tripId } = useRoadtrip();
+  const { tripId, authUser } = useRoadtrip();
   const t = useT();
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +59,10 @@ export function TrackingProvider({ user, children }: { user: string; children: R
   // Letzter bekannter Kurs und der Punkt, von dem aus er gemessen wurde.
   const headingRef = useRef<number | null>(null);
   const headingAnchorRef = useRef<Coordinates | null>(null);
+  // Über eine Ref gelesen, damit ein neues User-Objekt (gleiche Person,
+  // andere Referenz) den Geolocation-Watcher nicht neu startet.
+  const authUidRef = useRef<string | null>(authUser?.uid ?? null);
+  authUidRef.current = authUser?.uid ?? null;
 
   useEffect(() => {
     isTrackingRef.current = isTracking;
@@ -121,7 +125,12 @@ export function TrackingProvider({ user, children }: { user: string; children: R
         if (now - lastSavedTimestampRef.current < trackIntervalRef.current) return;
 
         lastSavedTimestampRef.current = now;
-        const point: GpsPoint = { timestamp: now, author: user, ...next };
+        const point: GpsPoint = {
+          timestamp: now,
+          author: user,
+          ...(authUidRef.current ? { authorId: authUidRef.current } : {}),
+          ...next
+        };
         trackWrite(addDoc(collection(db, tripPath(tripId, 'track')), point)).catch((err) => {
           console.error('GPS-Speicherfehler:', err);
         });

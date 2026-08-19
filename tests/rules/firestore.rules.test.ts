@@ -16,6 +16,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
  * sprechen. Ein Fehler hier ist kein UI-Bug, sondern ein offenes Scheunentor;
  * deshalb prüfen wir beide Richtungen: Was erlaubt sein muss, und was nicht.
  *
+ * Zugriffsmodell (siehe firestore.rules und src/lib/membership.ts): jede
+ * Person hat eine echte Firebase-Auth-UID, Mitgliedschaft und Rolle stehen
+ * unter roadtrips/{tripId}/members/{uid}.
+ *
  * Ausführen:
  *   npm run test:rules:emulator
  */
@@ -23,27 +27,22 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 const TRIP = 'sommertour-2026';
 const OTHER_TRIP = 'fremde-tour';
 
+const OWNER_UID = 'uid-owner';
+const MEMBER_UID = 'uid-member';
+const READONLY_UID = 'uid-readonly';
+const OUTSIDER_UID = 'uid-outsider';
+
 let testEnv: RulesTestEnvironment;
 
-/** Firestore-Handle eines am Roadtrip angemeldeten Geräts. */
-function tripDb(tripId: string) {
-  return testEnv.authenticatedContext(`uid-${tripId}`, {
-    email: `${tripId}@2cars2georgia.trip`,
-    email_verified: false
-  }).firestore();
+/** Firestore-Handle einer angemeldeten Person mit der gegebenen UID. */
+function userDb(uid: string) {
+  return testEnv.authenticatedContext(uid, { email: `${uid}@example.com` }).firestore();
 }
 
-/**
- * Firestore-Handle eines Geräts, das über den Admin-Zugang desselben
- * Roadtrips angemeldet ist (eigener Auth-User mit eigenem Passwort, siehe
- * src/lib/roadtrip.ts). Gleicher lokaler Teil der E-Mail, andere Domain.
- */
-function adminDb(tripId: string) {
-  return testEnv.authenticatedContext(`uid-admin-${tripId}`, {
-    email: `${tripId}@2cars2georgia.admin`,
-    email_verified: false
-  }).firestore();
-}
+const ownerDb = () => userDb(OWNER_UID);
+const memberDb = () => userDb(MEMBER_UID);
+const readonlyDb = () => userDb(READONLY_UID);
+const outsiderDb = () => userDb(OUTSIDER_UID);
 
 function anonymousDb() {
   return testEnv.unauthenticatedContext().firestore();
@@ -152,9 +151,95 @@ async function seed(path: string, value: Record<string, unknown>) {
   });
 }
 
+/**
+ * Legt einen Roadtrip mit Owner-, Member- und Readonly-Mitgliedschaft an –
+ * der Standard-Ausgangszustand für die meisten Tests hier.
+ */
+async function seedTripWithCrew(tripId: string) {
+  await seed(`roadtrips/${tripId}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+  await seed(`roadtrips/${tripId}/members/${OWNER_UID}`, {
+    displayName: 'Owner',
+    role: 'owner',
+    joinedAt: NOW
+  });
+  await seed(`roadtrips/${tripId}/members/${MEMBER_UID}`, {
+    displayName: 'Member',
+    role: 'member',
+    joinedAt: NOW
+  });
+  await seed(`roadtrips/${tripId}/members/${READONLY_UID}`, {
+    displayName: 'Readonly',
+    role: 'readonly',
+    joinedAt: NOW
+  });
+}
+
+describe('Profile & eindeutige Anzeigenamen', () => {
+  it('verweigert nicht angemeldeten Geräten jeden Zugriff auf Profile', async () => {
+    const db = anonymousDb();
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}`), { displayName: 'Owner', email: 'x@example.com', createdAt: NOW })
+    );
+    await assertFails(setDoc(doc(db, 'usernames/owner'), { uid: OWNER_UID, createdAt: NOW }));
+  });
+
+  it('legt users/{uid} nur für die eigene UID mit passender E-Mail und Server-Zeitstempel an', async () => {
+    const db = ownerDb();
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}`), {
+        displayName: 'Owner',
+        email: `${OWNER_UID}@example.com`,
+        createdAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      setDoc(doc(db, `users/${MEMBER_UID}`), {
+        displayName: 'Fremd',
+        email: 'x@example.com',
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert eine E-Mail, die nicht zum Auth-Token passt', async () => {
+    await assertFails(
+      setDoc(doc(ownerDb(), `users/${OWNER_UID}`), {
+        displayName: 'Owner',
+        email: 'jemand-anderes@example.com',
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert das Ändern eines einmal angelegten Profils', async () => {
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: `${OWNER_UID}@example.com`, createdAt: NOW });
+    await assertFails(
+      setDoc(doc(ownerDb(), `users/${OWNER_UID}`), {
+        displayName: 'Neu',
+        email: `${OWNER_UID}@example.com`,
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('reserviert einen Anzeigenamen nur für die eigene UID', async () => {
+    await assertSucceeds(
+      setDoc(doc(ownerDb(), 'usernames/owner'), { uid: OWNER_UID, createdAt: serverTimestamp() })
+    );
+    await assertFails(
+      setDoc(doc(memberDb(), 'usernames/owner2'), { uid: OWNER_UID, createdAt: serverTimestamp() })
+    );
+  });
+
+  it('verweigert das Überschreiben eines bereits reservierten Namens', async () => {
+    await seed('usernames/leon', { uid: OWNER_UID, createdAt: NOW });
+    await assertFails(setDoc(doc(memberDb(), 'usernames/leon'), { uid: MEMBER_UID, createdAt: serverTimestamp() }));
+  });
+});
+
 describe('Roadtrip-Abschottung', () => {
   it('verweigert nicht angemeldeten Geräten jeden Zugriff', async () => {
-    await seed(`roadtrips/${TRIP}/events/e1`, validEvent);
+    await seedTripWithCrew(TRIP);
     const db = anonymousDb();
 
     await assertFails(getDoc(doc(db, `roadtrips/${TRIP}`)));
@@ -162,19 +247,19 @@ describe('Roadtrip-Abschottung', () => {
     await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/events/e2`), validEvent));
   });
 
-  it('lässt ein angemeldetes Gerät nicht in einen fremden Roadtrip sehen', async () => {
-    await seed(`roadtrips/${OTHER_TRIP}/events/e1`, validEvent);
-    const db = tripDb(TRIP);
+  it('lässt eine angemeldete, aber fremde Person nicht in den Roadtrip sehen', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = outsiderDb();
 
-    await assertFails(getDoc(doc(db, `roadtrips/${OTHER_TRIP}`)));
-    await assertFails(getDoc(doc(db, `roadtrips/${OTHER_TRIP}/events/e1`)));
-    await assertFails(setDoc(doc(db, `roadtrips/${OTHER_TRIP}/events/e2`), validEvent));
-    await assertFails(deleteDoc(doc(db, `roadtrips/${OTHER_TRIP}/events/e1`)));
+    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}`)));
+    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
+    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/events/e2`), validEvent));
+    await assertFails(deleteDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
   });
 
-  it('erlaubt Lesen und Schreiben im eigenen Roadtrip', async () => {
-    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026' });
-    const db = tripDb(TRIP);
+  it('erlaubt Lesen und Schreiben einem Mitglied', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
 
     await assertSucceeds(getDoc(doc(db, `roadtrips/${TRIP}`)));
     await assertSucceeds(setDoc(doc(db, `roadtrips/${TRIP}/events/e1`), validEvent));
@@ -183,12 +268,13 @@ describe('Roadtrip-Abschottung', () => {
   it('sperrt Collections, die keine eigene Regel haben', async () => {
     // Schutz gegen die frühere Sammelfreigabe: Eine neue Collection soll nicht
     // still mitfreigegeben sein, sondern eine bewusste Regeländerung brauchen.
-    const db = tripDb(TRIP);
-    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/beliebig/x`), { a: 1 }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), `roadtrips/${TRIP}/beliebig/x`), { a: 1 }));
   });
 
   it('sperrt die alten Top-Level-Collections', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, 'events/e1'), validEvent));
     await assertFails(setDoc(doc(db, 'track/p1'), validTrackPoint));
     await assertFails(getDoc(doc(db, 'settings/general')));
@@ -196,85 +282,225 @@ describe('Roadtrip-Abschottung', () => {
 });
 
 describe('Roadtrip-Dokument', () => {
-  it('erlaubt das Anlegen mit Name und Server-Zeitstempel', async () => {
-    const db = tripDb(TRIP);
+  it('erlaubt das Anlegen mit Name, Owner und Server-Zeitstempel', async () => {
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: 'x@example.com', createdAt: NOW });
+    const db = ownerDb();
     await assertSucceeds(
-      setDoc(doc(db, `roadtrips/${TRIP}`), { name: 'Sommertour 2026', createdAt: serverTimestamp() })
+      setDoc(doc(db, `roadtrips/${TRIP}`), {
+        name: 'Sommertour 2026',
+        ownerUid: OWNER_UID,
+        createdAt: serverTimestamp()
+      })
     );
   });
 
-  it('verweigert das Anlegen unter fremder ID', async () => {
-    const db = tripDb(TRIP);
+  it('verweigert das Anlegen ohne vorhandenes Profil', async () => {
+    const db = ownerDb();
     await assertFails(
-      setDoc(doc(db, `roadtrips/${OTHER_TRIP}`), { name: 'Fremd', createdAt: serverTimestamp() })
+      setDoc(doc(db, `roadtrips/${TRIP}`), {
+        name: 'Sommertour 2026',
+        ownerUid: OWNER_UID,
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert einen ownerUid, der nicht der eigenen UID entspricht', async () => {
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: 'x@example.com', createdAt: NOW });
+    await assertFails(
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}`), {
+        name: 'Sommertour 2026',
+        ownerUid: MEMBER_UID,
+        createdAt: serverTimestamp()
+      })
     );
   });
 
   it('verweigert zusätzliche Felder', async () => {
-    const db = tripDb(TRIP);
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: 'x@example.com', createdAt: NOW });
     await assertFails(
-      setDoc(doc(db, `roadtrips/${TRIP}`), {
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}`), {
         name: 'Sommertour 2026',
+        ownerUid: OWNER_UID,
         createdAt: serverTimestamp(),
-        istAdmin: true
+        adminPassword: 'x'
       })
     );
   });
 
   it('verweigert einen leeren oder übergroßen Namen', async () => {
-    const db = tripDb(TRIP);
-    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}`), { name: '', createdAt: serverTimestamp() }));
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: 'x@example.com', createdAt: NOW });
+    const db = ownerDb();
     await assertFails(
-      setDoc(doc(db, `roadtrips/${TRIP}`), { name: 'x'.repeat(81), createdAt: serverTimestamp() })
+      setDoc(doc(db, `roadtrips/${TRIP}`), { name: '', ownerUid: OWNER_UID, createdAt: serverTimestamp() })
+    );
+    await assertFails(
+      setDoc(doc(db, `roadtrips/${TRIP}`), {
+        name: 'x'.repeat(81),
+        ownerUid: OWNER_UID,
+        createdAt: serverTimestamp()
+      })
     );
   });
 
   it('verweigert einen selbst gesetzten Zeitstempel', async () => {
-    const db = tripDb(TRIP);
-    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}`), { name: 'Tour', createdAt: NOW }));
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: 'x@example.com', createdAt: NOW });
+    await assertFails(
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}`), { name: 'Tour', ownerUid: OWNER_UID, createdAt: NOW })
+    );
   });
 
-  it('verweigert Ändern und Löschen', async () => {
-    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026' });
-    const db = tripDb(TRIP);
+  it('verweigert Ändern für alle Rollen', async () => {
+    await seedTripWithCrew(TRIP);
+    const rename = (db: ReturnType<typeof ownerDb>) =>
+      setDoc(doc(db, `roadtrips/${TRIP}`), {
+        name: 'Umbenannt',
+        ownerUid: OWNER_UID,
+        createdAt: serverTimestamp()
+      });
+    await assertFails(rename(ownerDb()));
+    await assertFails(rename(memberDb()));
+  });
 
-    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}`), { name: 'Umbenannt', createdAt: serverTimestamp() }));
-    await assertFails(deleteDoc(doc(db, `roadtrips/${TRIP}`)));
+  it('erlaubt das endgültige Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(deleteDoc(doc(memberDb(), `roadtrips/${TRIP}`)));
+    await assertFails(deleteDoc(doc(readonlyDb(), `roadtrips/${TRIP}`)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), `roadtrips/${TRIP}`)));
+  });
+
+  it('erlaubt der anlegenden Person das Aufräumen eines Roadtrips ohne eigene Mitgliedschaft', async () => {
+    // Simuliert einen fehlgeschlagenen zweiten Schritt in createRoadtrip()
+    // (siehe src/lib/membership.ts): Der Roadtrip-Datensatz existiert, aber
+    // die Owner-Mitgliedschaft wurde nie angelegt.
+    await seed(`roadtrips/${TRIP}`, { name: 'Halb fertig', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertFails(deleteDoc(doc(memberDb(), `roadtrips/${TRIP}`)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), `roadtrips/${TRIP}`)));
+  });
+});
+
+describe('Mitgliedschaften', () => {
+  it('lässt eine angemeldete Person sich selbst als member eintragen', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertSucceeds(
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
+        displayName: 'Member',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert das Selbst-Eintragen als owner ohne ownerUid-Übereinstimmung', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertFails(
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
+        displayName: 'Member',
+        role: 'owner',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('erlaubt der anlegenden Person, sich selbst als owner einzutragen', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertSucceeds(
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${OWNER_UID}`), {
+        displayName: 'Owner',
+        role: 'owner',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert das Eintragen für eine andere UID', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertFails(
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+        displayName: 'Fremd',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('erlaubt nur dem Owner, die Rolle eines Mitglieds zu ändern', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(updateDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${READONLY_UID}`), { role: 'owner' }));
+    await assertSucceeds(
+      updateDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${READONLY_UID}`), { role: 'member' })
+    );
+  });
+
+  it('verweigert das Ändern von Anzeigename oder Beitrittsdatum über ein Rollen-Update', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(
+      updateDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), { displayName: 'Umbenannt' })
+    );
+  });
+
+  it('erlaubt dem Owner, jedes Mitglied zu entfernen', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(deleteDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${READONLY_UID}`)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${READONLY_UID}`)));
+  });
+
+  it('erlaubt jeder Person, sich selbst zu entfernen (Roadtrip verlassen)', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(deleteDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`)));
+  });
+
+  it('lässt Nicht-Mitglieder die Mitgliederliste nicht lesen', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}/members/${OWNER_UID}`)));
   });
 });
 
 describe('Trackpunkte', () => {
   const path = `roadtrips/${TRIP}/track/p1`;
 
-  it('nimmt einen gültigen Punkt an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validTrackPoint));
+  it('nimmt einen gültigen Punkt von Owner und Member an, aber nicht von Readonly', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validTrackPoint));
+    await assertFails(setDoc(doc(readonlyDb(), `${path}-2`), validTrackPoint));
   });
 
   it('nimmt einen Punkt ohne bekannten Kurs an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), { ...validTrackPoint, headingDeg: null }));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), { ...validTrackPoint, headingDeg: null }));
+  });
+
+  it('nimmt eine optionale authorId nur an, wenn sie der eigenen UID entspricht', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), { ...validTrackPoint, authorId: MEMBER_UID }));
+    await assertFails(setDoc(doc(memberDb(), `${path}-2`), { ...validTrackPoint, authorId: OWNER_UID }));
   });
 
   it('weist unmögliche Koordinaten ab', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, lat: 91 }));
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, lng: 181 }));
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, lat: '52.52' }));
   });
 
   it('weist absurde Geschwindigkeiten ab', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, speedKmh: -1 }));
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, speedKmh: 99999 }));
   });
 
   it('weist einen unplausiblen Zeitstempel ab', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, timestamp: 0 }));
     await assertFails(setDoc(doc(db, path), { ...validTrackPoint, timestamp: '2026' }));
   });
 
   it('weist fehlende und unbekannte Felder ab', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     const { speedKmh, ...ohneSpeed } = validTrackPoint;
     void speedKmh;
     await assertFails(setDoc(doc(db, path), ohneSpeed));
@@ -282,22 +508,23 @@ describe('Trackpunkte', () => {
   });
 
   it('weist einen übergroßen Autorennamen ab', async () => {
-    await assertFails(
-      setDoc(doc(tripDb(TRIP), path), { ...validTrackPoint, author: 'x'.repeat(61) })
-    );
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validTrackPoint, author: 'x'.repeat(61) }));
   });
 
   it('lässt Punkte nur anhängen, nicht ändern', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validTrackPoint);
     // Trackpunkte sind die Rohaufzeichnung der Tour – nachträgliches Umschreiben
     // würde Strecke und Statistik unbemerkt verfälschen.
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validTrackPoint, speedKmh: 200 }));
+    await assertFails(setDoc(doc(memberDb(), path), { ...validTrackPoint, speedKmh: 200 }));
   });
 
-  it('erlaubt das endgültige Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das endgültige Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validTrackPoint);
-    await assertFails(deleteDoc(doc(tripDb(TRIP), path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertFails(deleteDoc(doc(memberDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -305,58 +532,73 @@ describe('Logbuch-Ereignisse', () => {
   const path = `roadtrips/${TRIP}/events/e1`;
 
   it('nimmt ein gültiges Ereignis mit und ohne Notiz an', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertSucceeds(setDoc(doc(db, path), validEvent));
     await assertSucceeds(setDoc(doc(db, path), { ...validEvent, note: 'Wartezeit 20 min' }));
   });
 
+  it('verweigert Readonly das Anlegen', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(readonlyDb(), path), validEvent));
+  });
+
   it('weist einen leeren Titel ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validEvent, title: '' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validEvent, title: '' }));
   });
 
   it('weist überlange Texte ab', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validEvent, title: 'x'.repeat(121) }));
     await assertFails(setDoc(doc(db, path), { ...validEvent, note: 'x'.repeat(2001) }));
   });
 
   it('weist unbekannte Felder ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validEvent, extra: true }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validEvent, extra: true }));
   });
 
   it('prüft auch beim Ändern das Ergebnis', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validEvent);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(setDoc(doc(db, path), { ...validEvent, title: 'Schleuse Charlottenburg' }));
     await assertFails(setDoc(doc(db, path), { ...validEvent, lat: 999 }));
   });
 
   it('erlaubt das weiche Löschen über deletedAt', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validEvent);
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), { ...validEvent, deletedAt: NOW }));
+    await assertSucceeds(setDoc(doc(memberDb(), path), { ...validEvent, deletedAt: NOW }));
   });
 
   it('erlaubt das weiche Löschen als Teil-Update, so wie die App es schickt', async () => {
     // Die App schickt beim Löschen nur { deletedAt }, nicht das ganze Dokument –
     // die Regeln prüfen deshalb den zusammengeführten Stand.
+    await seedTripWithCrew(TRIP);
     await seed(path, validEvent);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
   });
 
   it('weist ein deletedAt ab, das kein plausibler Zeitstempel ist', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validEvent, deletedAt: 'gestern' }));
     await assertFails(setDoc(doc(db, path), { ...validEvent, deletedAt: 0 }));
   });
 
-  it('erlaubt das endgültige Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das endgültige Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validEvent);
     // Für die Crew führt der Weg über den Papierkorb (deletedAt), nicht über
     // das endgültige Entfernen.
-    await assertFails(deleteDoc(doc(tripDb(TRIP), path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertFails(deleteDoc(doc(memberDb(), path)));
+    await assertFails(deleteDoc(doc(readonlyDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -364,21 +606,25 @@ describe('Ausgaben', () => {
   const path = `roadtrips/${TRIP}/expenses/x1`;
 
   it('nimmt eine gültige Ausgabe an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validExpense));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validExpense));
   });
 
   it('weist negative und absurd hohe Beträge ab', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validExpense, amountEuro: -1 }));
     await assertFails(setDoc(doc(db, path), { ...validExpense, amountEuro: 1_000_001 }));
   });
 
   it('weist einen Betrag ab, der kein Zahlenwert ist', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validExpense, amountEuro: '84,50' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validExpense, amountEuro: '84,50' }));
   });
 
   it('verlangt einen Zahler', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validExpense, paidBy: '' }));
     const { paidBy, ...ohneZahler } = validExpense;
     void paidBy;
@@ -386,25 +632,28 @@ describe('Ausgaben', () => {
   });
 
   it('erlaubt das weiche Löschen über deletedAt', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validExpense);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(setDoc(doc(db, path), { ...validExpense, deletedAt: NOW }));
     await assertFails(setDoc(doc(db, path), { ...validExpense, deletedAt: 0 }));
   });
 
   it('erlaubt das weiche Löschen als Teil-Update, so wie die App es schickt', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validExpense);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
   });
 
-  it('erlaubt Ändern der Crew, endgültiges Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt Ändern der Crew, endgültiges Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validExpense);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(setDoc(doc(db, path), { ...validExpense, amountEuro: 90 }));
     await assertFails(deleteDoc(doc(db, path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -412,28 +661,33 @@ describe('Gerichte', () => {
   const path = `roadtrips/${TRIP}/dishes/curry`;
 
   it('nimmt ein gültiges Gericht an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validDish));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validDish));
   });
 
   it('weist eine unbekannte Mahlzeit ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validDish, mealType: 'brunch' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validDish, mealType: 'brunch' }));
   });
 
   it('weist Zutaten ab, die keine Liste sind', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validDish, ingredients: 'viel' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validDish, ingredients: 'viel' }));
   });
 
   it('deckelt die Zutatenliste', async () => {
+    await seedTripWithCrew(TRIP);
     const zuVieleZutaten = Array.from({ length: 31 }, (_, i) => ({ name: `Zutat ${i}`, quantity: 1, unit: 'Stück' }));
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validDish, ingredients: zuVieleZutaten }));
+    await assertFails(setDoc(doc(memberDb(), path), { ...validDish, ingredients: zuVieleZutaten }));
   });
 
-  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validDish);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertFails(deleteDoc(doc(db, path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -441,23 +695,27 @@ describe('Speiseplan-Einträge', () => {
   const path = `roadtrips/${TRIP}/mealPlanEntries/e1`;
 
   it('nimmt einen gültigen Eintrag an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validMealPlanEntry));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validMealPlanEntry));
   });
 
   it('weist ein Datum in falschem Format ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validMealPlanEntry, date: '3.7.2026' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validMealPlanEntry, date: '3.7.2026' }));
   });
 
   it('weist eine unbekannte Mahlzeit ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validMealPlanEntry, mealType: 'brunch' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validMealPlanEntry, mealType: 'brunch' }));
   });
 
-  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validMealPlanEntry);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertFails(deleteDoc(doc(db, path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -465,24 +723,28 @@ describe('Lager', () => {
   const path = `roadtrips/${TRIP}/inventory/i1`;
 
   it('nimmt einen gültigen Lagerposten an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validInventoryItem));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validInventoryItem));
   });
 
   it('weist eine negative Menge ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validInventoryItem, quantity: -1 }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validInventoryItem, quantity: -1 }));
   });
 
   it('erlaubt das Anpassen der Menge als Teil-Update, so wie es die App beim Kochen tut', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validInventoryItem);
-    await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { quantity: 2 }));
+    await assertSucceeds(updateDoc(doc(memberDb(), path), { quantity: 2 }));
   });
 
-  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validInventoryItem);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertFails(deleteDoc(doc(db, path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -490,24 +752,28 @@ describe('Einkaufsliste (manuell)', () => {
   const path = `roadtrips/${TRIP}/shoppingListExtras/s1`;
 
   it('nimmt einen gültigen manuellen Posten an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validShoppingListExtra));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validShoppingListExtra));
   });
 
   it('verlangt, dass checked ein Wahrheitswert ist', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validShoppingListExtra, checked: 'ja' }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validShoppingListExtra, checked: 'ja' }));
   });
 
   it('erlaubt das Abhaken als Teil-Update', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validShoppingListExtra);
-    await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { checked: true }));
+    await assertSucceeds(updateDoc(doc(memberDb(), path), { checked: true }));
   });
 
-  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das weiche Löschen, endgültiges Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validShoppingListExtra);
-    const db = tripDb(TRIP);
+    const db = memberDb();
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertFails(deleteDoc(doc(db, path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
@@ -515,179 +781,112 @@ describe('Einkaufsliste (Abhaken berechneter Posten)', () => {
   const path = `roadtrips/${TRIP}/shoppingListChecks/paprika-stück`;
 
   it('nimmt einen gültigen Abhak-Status an', async () => {
-    await assertSucceeds(setDoc(doc(tripDb(TRIP), path), validShoppingListCheck));
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validShoppingListCheck));
   });
 
   it('weist ein fehlendes Pflichtfeld ab', async () => {
+    await seedTripWithCrew(TRIP);
     const { checkedBy, ...ohneCheckedBy } = validShoppingListCheck;
     void checkedBy;
-    await assertFails(setDoc(doc(tripDb(TRIP), path), ohneCheckedBy));
+    await assertFails(setDoc(doc(memberDb(), path), ohneCheckedBy));
   });
 
-  it('erlaubt das Umschalten ohne Admin-Zugang', async () => {
+  it('erlaubt das Umschalten ohne Owner-Zugang', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validShoppingListCheck);
     await assertSucceeds(
-      updateDoc(doc(tripDb(TRIP), path), { checked: false, checkedBy: 'Niklas', checkedAt: NOW })
+      updateDoc(doc(memberDb(), path), { checked: false, checkedBy: 'Niklas', checkedAt: NOW })
     );
   });
 });
 
 describe('Einstellungen', () => {
-  it('erlaubt Crew-Liste und Schnell-Logs', async () => {
-    const db = tripDb(TRIP);
+  it('erlaubt Schnell-Logs der ganzen Crew, Reisezeitraum nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await assertSucceeds(
-      setDoc(doc(db, `roadtrips/${TRIP}/settings/general`), { users: ['Lukas', 'Leon'] })
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}/settings/general`), {
+        startDate: '2026-07-01',
+        endDate: '2026-07-14'
+      })
+    );
+    await assertFails(
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/general`), {
+        startDate: '2026-07-01',
+        endDate: '2026-07-14'
+      })
     );
     await assertSucceeds(
-      setDoc(doc(db, `roadtrips/${TRIP}/settings/quicklogs`), {
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/quicklogs`), {
         items: [{ id: 'pause', label: 'Pause', iconName: 'coffee' }]
       })
     );
   });
 
   it('weist ein unbekanntes Einstellungs-Dokument ab', async () => {
-    await assertFails(setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/geheim`), { a: 1 }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/geheim`), { a: 1 }));
   });
 
   it('weist das falsche Feld im richtigen Dokument ab', async () => {
-    const db = tripDb(TRIP);
-    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/settings/general`), { items: [] }));
-    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/settings/quicklogs`), { users: [] }));
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(ownerDb(), `roadtrips/${TRIP}/settings/general`), { items: [] }));
+    await assertFails(setDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/quicklogs`), { users: [] }));
   });
 
-  it('deckelt die Listenlänge', async () => {
-    const zuVieleNamen = Array.from({ length: 51 }, (_, i) => `Crew ${i}`);
-    await assertFails(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), { users: zuVieleNamen })
-    );
-  });
-
-  it('verweigert das Löschen der Einstellungen', async () => {
-    await seed(`roadtrips/${TRIP}/settings/general`, { users: ['Lukas'] });
-    await assertFails(deleteDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`)));
-  });
-
-  it('erlaubt eine Rollenzuordnung mit bekannten Werten', async () => {
-    await assertSucceeds(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
-        users: ['Lukas', 'Leon'],
-        roles: { Lukas: 'owner', Leon: 'readonly' }
-      })
-    );
-  });
-
-  it('erlaubt die Crew-Liste weiterhin ganz ohne roles-Feld', async () => {
-    await assertSucceeds(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), { users: ['Lukas'] })
-    );
-  });
-
-  it('weist eine unbekannte Rolle ab', async () => {
-    await assertFails(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
-        users: ['Lukas'],
-        roles: { Lukas: 'admin' }
-      })
-    );
-  });
-
-  it('weist roles als falschen Typ ab', async () => {
-    await assertFails(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
-        users: ['Lukas'],
-        roles: ['owner']
-      })
-    );
-  });
-
-  it('erlaubt einen Reisezeitraum in settings/general', async () => {
-    await assertSucceeds(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
-        users: ['Lukas'],
-        startDate: '2026-07-01',
-        endDate: '2026-07-14'
-      })
-    );
+  it('lässt bestehende (Alt-)Felder users/roles weiterhin zu, ohne sie zu verlangen', async () => {
+    // Bestehende Roadtrips tragen users/roles noch in settings/general (vor
+    // der Umstellung auf members/). Die Feldprüfung darf daran nicht scheitern.
+    await seedTripWithCrew(TRIP);
+    await seed(`roadtrips/${TRIP}/settings/general`, { users: ['Lukas', 'Leon'], roles: { Lukas: 'owner' } });
+    await assertSucceeds(getDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/general`)));
   });
 
   it('weist ein Datum in falschem Format ab', async () => {
+    await seedTripWithCrew(TRIP);
     await assertFails(
-      setDoc(doc(tripDb(TRIP), `roadtrips/${TRIP}/settings/general`), {
-        users: ['Lukas'],
-        startDate: '1.7.2026'
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}/settings/general`), { startDate: '1.7.2026' })
+    );
+  });
+
+  it('erlaubt der Crew weiterhin die Schnell-Logs, aber nicht Readonly', async () => {
+    await seedTripWithCrew(TRIP);
+    const quicklogs = `roadtrips/${TRIP}/settings/quicklogs`;
+    await seed(quicklogs, { items: [{ id: 'pause', label: 'Pause', iconName: 'coffee' }] });
+
+    await assertSucceeds(
+      updateDoc(doc(memberDb(), quicklogs), {
+        items: [{ id: 'pause', label: 'Kaffeepause', iconName: 'coffee' }]
+      })
+    );
+    await assertFails(
+      updateDoc(doc(readonlyDb(), quicklogs), {
+        items: [{ id: 'pause', label: 'Kaffeepause', iconName: 'coffee' }]
       })
     );
   });
 
-  it('lässt den Reisezeitraum beim Beitreten unangetastet', async () => {
-    const path = `roadtrips/${TRIP}/settings/general`;
-    await seed(path, { users: [], startDate: '2026-07-01', endDate: '2026-07-14' });
-
-    // Der Join-Schreibvorgang berührt nur "users" (arrayUnion-Merge) – das
-    // Datum bleibt dabei automatisch erhalten, ohne dass die Regel es
-    // gesondert prüfen muss.
-    await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { users: ['Lukas'] }));
-    const snap = await getDoc(doc(tripDb(TRIP), path));
-    expect(snap.data()?.startDate).toBe('2026-07-01');
-    expect(snap.data()?.endDate).toBe('2026-07-14');
-  });
-
-  describe('Crew verwalten', () => {
-    const path = `roadtrips/${TRIP}/settings/general`;
-
-    it('lässt ein Crewmitglied sich selbst eintragen', async () => {
-      await seed(path, { users: ['Lukas'], roles: { Lukas: 'owner' } });
-
-      await assertSucceeds(updateDoc(doc(tripDb(TRIP), path), { users: ['Lukas', 'Leon'] }));
-    });
-
-    it('verweigert der Crew das Entfernen von Mitgliedern', async () => {
-      await seed(path, { users: ['Lukas', 'Leon'], roles: { Lukas: 'owner' } });
-
-      await assertFails(updateDoc(doc(tripDb(TRIP), path), { users: ['Lukas'] }));
-      await assertSucceeds(updateDoc(doc(adminDb(TRIP), path), { users: ['Lukas'] }));
-    });
-
-    it('verweigert der Crew das Vergeben von Rollen', async () => {
-      await seed(path, { users: ['Lukas', 'Leon'], roles: { Lukas: 'owner' } });
-
-      // Der eigentliche Punkt: Ohne diese Schranke könnte sich jedes Gerät
-      // mit dem Roadtrip-Passwort selbst zum Owner machen.
-      await assertFails(
-        updateDoc(doc(tripDb(TRIP), path), { roles: { Lukas: 'owner', Leon: 'owner' } })
-      );
-      await assertSucceeds(
-        updateDoc(doc(adminDb(TRIP), path), { roles: { Lukas: 'owner', Leon: 'owner' } })
-      );
-    });
-
-    it('erlaubt der Crew weiterhin die Schnell-Logs', async () => {
-      const quicklogs = `roadtrips/${TRIP}/settings/quicklogs`;
-      await seed(quicklogs, { items: [{ id: 'pause', label: 'Pause', iconName: 'coffee' }] });
-
-      await assertSucceeds(
-        updateDoc(doc(tripDb(TRIP), quicklogs), {
-          items: [{ id: 'pause', label: 'Kaffeepause', iconName: 'coffee' }]
-        })
-      );
-    });
+  it('erlaubt das Löschen der Einstellungen nur dem Owner (Roadtrip-Löschung)', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(`roadtrips/${TRIP}/settings/general`, { startDate: '2026-07-01' });
+    await assertFails(deleteDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/general`)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), `roadtrips/${TRIP}/settings/general`)));
   });
 });
 
 describe('Fehlerprotokoll', () => {
   const path = `roadtrips/${TRIP}/errors/f1`;
 
-  it('nimmt einen Eintrag mit und ohne Zusatzangaben an', async () => {
-    const db = tripDb(TRIP);
-    await assertSucceeds(setDoc(doc(db, path), validError));
-    // Bewusst ein zweites Dokument: Ein erneutes setDoc auf denselben Pfad wäre
-    // ein Update und damit regelwidrig (siehe Test weiter unten).
+  it('nimmt einen Eintrag von jeder Rolle an, auch Readonly', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validError));
     await assertSucceeds(
-      setDoc(doc(db, `roadtrips/${TRIP}/errors/f2`), {
+      setDoc(doc(readonlyDb(), `roadtrips/${TRIP}/errors/f2`), {
         ...validError,
         stack: 'at Foo (bundle.js:1:1)',
         context: 'render',
         author: 'Lukas',
+        authorId: READONLY_UID,
         appVersion: '0.1.0',
         userAgent: 'Mozilla/5.0',
         url: 'https://example.invalid/map'
@@ -695,8 +894,14 @@ describe('Fehlerprotokoll', () => {
     );
   });
 
+  it('verweigert eine authorId, die nicht der eigenen UID entspricht', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validError, authorId: OWNER_UID }));
+  });
+
   it('verlangt eine Meldung', async () => {
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { timestamp: NOW }));
     await assertFails(setDoc(doc(db, path), { ...validError, message: '' }));
   });
@@ -704,25 +909,31 @@ describe('Fehlerprotokoll', () => {
   it('deckelt die Größe eines Eintrags', async () => {
     // Ohne Deckel wäre ausgerechnet der Fehlerkanal der bequemste Weg, die
     // Datenbank vollzuschreiben – er nimmt beliebigen Text entgegen.
-    const db = tripDb(TRIP);
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
     await assertFails(setDoc(doc(db, path), { ...validError, message: 'x'.repeat(1001) }));
     await assertFails(setDoc(doc(db, path), { ...validError, stack: 'x'.repeat(4001) }));
   });
 
   it('lässt Einträge nicht nachträglich ändern', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validError);
-    await assertFails(setDoc(doc(tripDb(TRIP), path), { ...validError, message: 'harmlos' }));
+    await assertFails(setDoc(doc(memberDb(), path), { ...validError, message: 'harmlos' }));
   });
 
-  it('erlaubt das Löschen nur dem Admin-Zugang', async () => {
+  it('erlaubt das Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
     await seed(path, validError);
-    await assertFails(deleteDoc(doc(tripDb(TRIP), path)));
-    await assertSucceeds(deleteDoc(doc(adminDb(TRIP), path)));
+    await assertFails(deleteDoc(doc(memberDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 
-  it('bleibt für fremde Roadtrips unlesbar', async () => {
+  it('bleibt für Nicht-Mitglieder unlesbar', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(`roadtrips/${OTHER_TRIP}`, { name: 'Fremd', ownerUid: OUTSIDER_UID, createdAt: NOW });
     await seed(`roadtrips/${OTHER_TRIP}/errors/f1`, validError);
-    await assertFails(getDoc(doc(tripDb(TRIP), `roadtrips/${OTHER_TRIP}/errors/f1`)));
+    // memberDb() gehört zur Crew von TRIP, aber nicht zu OTHER_TRIP.
+    await assertFails(getDoc(doc(memberDb(), `roadtrips/${OTHER_TRIP}/errors/f1`)));
   });
 });
 
