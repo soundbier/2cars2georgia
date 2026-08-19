@@ -115,6 +115,7 @@ export type RoadtripErrorCode =
   | 'passwordTooShort'
   | 'adminPasswordSameAsTrip'
   | 'adminAlreadyExists'
+  | 'invalidTripDates'
   | 'wrongCredentials'
   | 'tooManyAttempts'
   | 'missingName'
@@ -175,7 +176,9 @@ async function resolveTripName(tripId: string, fallback: string): Promise<string
 export async function createRoadtrip(
   name: string,
   password: string,
-  adminPassword: string
+  adminPassword: string,
+  tripStartDate: string,
+  tripEndDate: string
 ): Promise<CreateRoadtripResult> {
   const trimmedName = name.trim();
   const tripId = slugifyTripName(trimmedName);
@@ -183,6 +186,9 @@ export async function createRoadtrip(
   if (password.length < MIN_PASSWORD_LENGTH) throw new RoadtripAuthError('passwordTooShort');
   if (adminPassword.length < MIN_PASSWORD_LENGTH) throw new RoadtripAuthError('passwordTooShort');
   if (adminPassword === password) throw new RoadtripAuthError('adminPasswordSameAsTrip');
+  if (!tripStartDate || !tripEndDate || tripEndDate < tripStartDate) {
+    throw new RoadtripAuthError('invalidTripDates');
+  }
 
   const recoveryCode = generateRecoveryCode();
 
@@ -192,6 +198,16 @@ export async function createRoadtrip(
       name: trimmedName,
       createdAt: serverTimestamp()
     });
+    // Der Reisezeitraum kann nicht auf dem Roadtrip-Dokument selbst liegen
+    // (das ist laut firestore.rules nach dem Anlegen unveränderlich) – er
+    // steht stattdessen in settings/general, mit einer noch leeren
+    // Crew-Liste. Wer sich als Erstes einträgt (CrewGate), ergänzt später
+    // nur noch "users" per arrayUnion und lässt das Datum unangetastet.
+    await setDoc(
+      doc(db, 'roadtrips', tripId, 'settings', 'general'),
+      { users: [], startDate: tripStartDate, endDate: tripEndDate },
+      { merge: true }
+    );
     // Erzeugt die weiteren Auth-User; wechselt dabei jeweils die aktive
     // Sitzung auf den neu angelegten User.
     await createUserWithEmailAndPassword(auth, recoveryEmail(tripId), recoveryCode);

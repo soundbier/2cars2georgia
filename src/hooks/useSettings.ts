@@ -115,3 +115,42 @@ export function useCrew() {
 
   return { users, roles, loading };
 }
+
+/**
+ * Reisezeitraum des Roadtrips (settings/general, Felder "startDate" und
+ * "endDate", je 'YYYY-MM-DD'). Beide fehlen bei Roadtrips, die vor dieser
+ * Funktion angelegt wurden – kein Fehlerfall, der Speiseplan zeigt dann
+ * einen Hinweis zum Nachtragen statt eines Kalenders, und das Cockpit lässt
+ * "Tag X von Y" schlicht weg.
+ */
+export function useTripDates(): { startDate?: string; endDate?: string; loading: boolean } {
+  const { tripId } = useRoadtrip();
+  const [startDate, setStartDate] = useState<string | undefined>(undefined);
+  const [endDate, setEndDate] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tripId) {
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setLoading(false);
+      return;
+    }
+    const docRef = doc(db, tripPath(tripId, 'settings', 'general'));
+    return onSnapshot(
+      docRef,
+      (docSnap) => {
+        const data = docSnap.exists() ? docSnap.data() : undefined;
+        setStartDate(data?.startDate as string | undefined);
+        setEndDate(data?.endDate as string | undefined);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Firestore-Fehler (settings/general):', err);
+        setLoading(false);
+      }
+    );
+  }, [tripId]);
+
+  return { startDate, endDate, loading };
+}

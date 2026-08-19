@@ -92,6 +92,23 @@ service cloud.firestore {
       return data()[field] is number && data()[field] >= -180 && data()[field] <= 180;
     }
 
+    // Kalendertag als 'YYYY-MM-DD', z.B. Reisezeitraum oder Speiseplan-Tag.
+    function isDateString(field) {
+      return data()[field] is string && data()[field].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isOptionalDateString(field) {
+      return !(field in data()) || isDateString(field);
+    }
+
+    function isMealType() {
+      return data().mealType in ['breakfast', 'lunch', 'dinner'];
+    }
+
+    function isQuantity(field) {
+      return data()[field] is number && data()[field] >= 0 && data()[field] <= 100000;
+    }
+
     // --- Roadtrip-Wurzel -------------------------------------------------
 
     match /roadtrips/{tripId} {
@@ -174,6 +191,108 @@ service cloud.firestore {
         allow delete: if isAdminSession(tripId);
       }
 
+      // --- Kombüse: Gerichte -----------------------------------------------
+      // Zutaten sind ein eingebettetes Array (siehe src/types.ts, Ingredient) –
+      // Firestore-Regeln können den Inhalt eines Array-of-Maps nicht tief je
+      // Element validieren, deshalb bleibt es bei Listenart und -länge. Das
+      // ist konsistent mit dem übrigen Vertrauensmodell dieser Datei: Wer das
+      // Roadtrip-Passwort hat, ist vertraute Crew.
+      match /dishes/{dishId} {
+        function isDish() {
+          return fieldsAre(['name', 'mealType', 'ingredients', 'author', 'timestamp'], ['note', 'deletedAt'])
+            && isText('name', 120)
+            && isMealType()
+            && data().ingredients is list
+            && data().ingredients.size() <= 30
+            && isText('author', 60)
+            && isEpochMillis('timestamp')
+            && isOptionalText('note', 500)
+            && isOptionalEpochMillis('deletedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isDish();
+        allow delete: if isAdminSession(tripId);
+      }
+
+      // --- Kombüse: Speiseplan ----------------------------------------------
+      // Ordnet ein Gericht einem Kalendertag und einer Mahlzeit zu. Mehrere
+      // Einträge pro Tag+Mahlzeit sind erlaubt (mehrere Optionen zur Auswahl).
+      match /mealPlanEntries/{entryId} {
+        function isMealPlanEntry() {
+          return fieldsAre(['date', 'mealType', 'dishId', 'author', 'timestamp'], ['deletedAt'])
+            && isDateString('date')
+            && isMealType()
+            && isText('dishId', 64)
+            && isText('author', 60)
+            && isEpochMillis('timestamp')
+            && isOptionalEpochMillis('deletedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isMealPlanEntry();
+        allow delete: if isAdminSession(tripId);
+      }
+
+      // --- Kombüse: Lager ----------------------------------------------------
+      // Die Menge wird laufend angepasst (siehe src/pages/kombuese/Inventory.tsx) –
+      // das ist ein gewöhnliches update, keine Sonderregel nötig.
+      match /inventory/{itemId} {
+        function isInventoryItem() {
+          return fieldsAre(['name', 'quantity', 'unit', 'location', 'author', 'timestamp'], ['deletedAt'])
+            && isText('name', 80)
+            && isQuantity('quantity')
+            && isText('unit', 20)
+            && isText('location', 60)
+            && isText('author', 60)
+            && isEpochMillis('timestamp')
+            && isOptionalEpochMillis('deletedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isInventoryItem();
+        allow delete: if isAdminSession(tripId);
+      }
+
+      // --- Kombüse: Einkaufsliste (manuelle Posten) ---------------------------
+      // Posten ohne Bezug zu einem Rezept, z.B. Gas oder Müllbeutel – der
+      // Abhak-Status liegt hier direkt am Dokument, anders als bei den aus dem
+      // Speiseplan berechneten Zeilen (siehe shoppingListChecks unten).
+      match /shoppingListExtras/{itemId} {
+        function isShoppingListExtra() {
+          return fieldsAre(['name', 'quantity', 'unit', 'checked', 'author', 'timestamp'], ['deletedAt'])
+            && isText('name', 80)
+            && isQuantity('quantity')
+            && isText('unit', 20)
+            && data().checked is bool
+            && isText('author', 60)
+            && isEpochMillis('timestamp')
+            && isOptionalEpochMillis('deletedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isShoppingListExtra();
+        allow delete: if isAdminSession(tripId);
+      }
+
+      // --- Kombüse: Einkaufsliste (Abhaken berechneter Posten) ----------------
+      // Für aus dem Speiseplan berechnete Zeilen (siehe src/lib/shoppingList.ts)
+      // gibt es kein eigenes Dokument – der Abhak-Status liegt unter einem aus
+      // Name+Einheit normalisierten Schlüssel. Rein reversibles Abhaken, daher
+      // ohne Admin-Schranke; kein delete, verwaiste Einträge für nicht mehr
+      // benötigte Zutaten sind harmlos und werden nicht aufgeräumt.
+      match /shoppingListChecks/{checkKey} {
+        function isShoppingListCheck() {
+          return fieldsAre(['checked', 'checkedBy', 'checkedAt'], [])
+            && data().checked is bool
+            && isText('checkedBy', 60)
+            && isEpochMillis('checkedAt');
+        }
+
+        allow read: if ownsTrip(tripId);
+        allow create, update: if ownsTrip(tripId) && isShoppingListCheck();
+      }
+
       // --- Roadtrip-weite Einstellungen ------------------------------------
       // Genau zwei Dokumente: "general" (Crew-Liste + Rollen) und "quicklogs"
       // (Schnell-Log-Kategorien), siehe src/hooks/useSettings.ts.
@@ -194,10 +313,16 @@ service cloud.firestore {
 
         function isSettingsDoc() {
           return (docId == 'general'
-                  && fieldsAre(['users'], ['roles'])
+                  && fieldsAre(['users'], ['roles', 'startDate', 'endDate'])
                   && data().users is list
                   && data().users.size() <= 50
-                  && isValidRolesMap())
+                  && isValidRolesMap()
+                  // Reisezeitraum, gebraucht vom Kombüse-Speiseplan und der
+                  // Tagesanzeige im Cockpit. Liegt hier statt auf
+                  // roadtrips/{tripId}, weil dieses Dokument laut Regel weiter
+                  // unten nach dem Anlegen unveränderlich ist.
+                  && isOptionalDateString('startDate')
+                  && isOptionalDateString('endDate'))
               || (docId == 'quicklogs'
                   && fieldsAre(['items'], [])
                   && data().items is list

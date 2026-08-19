@@ -1,15 +1,25 @@
 import { useMemo, useState } from 'react';
 import { deleteDoc, deleteField, doc, updateDoc } from 'firebase/firestore';
-import { RotateCcw, Trash2, BookOpen, Wallet, ShieldCheck } from 'lucide-react';
+import {
+  RotateCcw,
+  Trash2,
+  BookOpen,
+  Wallet,
+  ShieldCheck,
+  UtensilsCrossed,
+  CalendarDays,
+  Package,
+  ShoppingCart
+} from 'lucide-react';
 import { db } from '../../firebase';
 import { useCollection } from '../../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { writeOptimistically } from '../../lib/writeOutcome';
-import { deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
+import { activeOnly, deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
 import { useT } from '../../i18n';
-import { Expense, LogEvent } from '../../types';
+import { Dish, Expense, InventoryItem, LogEvent, MealPlanEntry, ShoppingListExtra } from '../../types';
 import {
   Button,
   Section,
@@ -24,7 +34,16 @@ import '../Settings.css';
 
 const RETENTION_DAYS = Math.round(TRASH_RETENTION_MS / (24 * 60 * 60 * 1000));
 
-type TrashCollection = 'events' | 'expenses';
+type TrashCollection = 'events' | 'expenses' | 'dishes' | 'mealPlanEntries' | 'inventory' | 'shoppingListExtras';
+
+const ICON_BY_COLLECTION: Record<TrashCollection, typeof BookOpen> = {
+  events: BookOpen,
+  expenses: Wallet,
+  dishes: UtensilsCrossed,
+  mealPlanEntries: CalendarDays,
+  inventory: Package,
+  shoppingListExtras: ShoppingCart
+};
 
 interface TrashItem {
   id: string;
@@ -47,9 +66,25 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
 
   const events = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'desc');
   const expenses = useCollection<Expense>(tripId ? tripPath(tripId, 'expenses') : null, 'timestamp', 'desc');
+  const dishes = useCollection<Dish>(tripId ? tripPath(tripId, 'dishes') : null, 'timestamp', 'desc');
+  const mealPlanEntries = useCollection<MealPlanEntry>(
+    tripId ? tripPath(tripId, 'mealPlanEntries') : null,
+    'timestamp',
+    'desc'
+  );
+  const inventory = useCollection<InventoryItem>(tripId ? tripPath(tripId, 'inventory') : null, 'timestamp', 'desc');
+  const shoppingListExtras = useCollection<ShoppingListExtra>(
+    tripId ? tripPath(tripId, 'shoppingListExtras') : null,
+    'timestamp',
+    'desc'
+  );
 
   const items = useMemo<TrashItem[]>(() => {
     const labelByType = new Map(quickLogs.map((q) => [q.id, q.label]));
+    // Für Speiseplan-Einträge im Papierkorb: der Gerichtname, nicht die id.
+    // Nachschlagen nur unter den noch aktiven Gerichten – ist das Gericht
+    // selbst gelöscht, bleibt die id als Fallback stehen.
+    const dishNameById = new Map(activeOnly(dishes).map((dish) => [dish.id!, dish.name]));
 
     const deletedEvents = deletedOnly(events).map<TrashItem>((event) => ({
       id: event.id!,
@@ -67,8 +102,47 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
       deletedAt: expense.deletedAt!
     }));
 
-    return [...deletedEvents, ...deletedExpenses].sort((a, b) => b.deletedAt - a.deletedAt);
-  }, [events, expenses, quickLogs]);
+    const deletedDishes = deletedOnly(dishes).map<TrashItem>((dish) => ({
+      id: dish.id!,
+      collectionName: 'dishes',
+      title: dish.name,
+      subtitle: t(`mealType.${dish.mealType}`),
+      deletedAt: dish.deletedAt!
+    }));
+
+    const deletedMealPlanEntries = deletedOnly(mealPlanEntries).map<TrashItem>((entry) => ({
+      id: entry.id!,
+      collectionName: 'mealPlanEntries',
+      title: dishNameById.get(entry.dishId) ?? entry.dishId,
+      subtitle: `${entry.date} · ${t(`mealType.${entry.mealType}`)}`,
+      deletedAt: entry.deletedAt!
+    }));
+
+    const deletedInventory = deletedOnly(inventory).map<TrashItem>((item) => ({
+      id: item.id!,
+      collectionName: 'inventory',
+      title: item.name,
+      subtitle: `${item.quantity} ${item.unit} · ${item.location}`,
+      deletedAt: item.deletedAt!
+    }));
+
+    const deletedExtras = deletedOnly(shoppingListExtras).map<TrashItem>((extra) => ({
+      id: extra.id!,
+      collectionName: 'shoppingListExtras',
+      title: extra.name,
+      subtitle: `${extra.quantity} ${extra.unit}`,
+      deletedAt: extra.deletedAt!
+    }));
+
+    return [
+      ...deletedEvents,
+      ...deletedExpenses,
+      ...deletedDishes,
+      ...deletedMealPlanEntries,
+      ...deletedInventory,
+      ...deletedExtras
+    ].sort((a, b) => b.deletedAt - a.deletedAt);
+  }, [events, expenses, dishes, mealPlanEntries, inventory, shoppingListExtras, quickLogs, t]);
 
   const expiredCount = useMemo(() => items.filter((item) => isExpired(item)).length, [items]);
 
@@ -124,16 +198,11 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
           <div className="settings-list">
             {items.map((item) => {
               const daysLeft = retentionDaysLeft(item);
+              const Icon = ICON_BY_COLLECTION[item.collectionName];
               return (
                 <ListItem
                   key={`${item.collectionName}-${item.id}`}
-                  leading={
-                    item.collectionName === 'events' ? (
-                      <BookOpen size={18} strokeWidth={1.75} color="var(--color-accent)" />
-                    ) : (
-                      <Wallet size={18} strokeWidth={1.75} color="var(--color-accent)" />
-                    )
-                  }
+                  leading={<Icon size={18} strokeWidth={1.75} color="var(--color-accent)" />}
                   title={item.title}
                   subtitle={`${item.subtitle} · ${
                     daysLeft > 0 ? t('trash.daysLeft', { count: daysLeft }) : t('trash.expired')

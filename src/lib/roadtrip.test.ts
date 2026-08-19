@@ -156,7 +156,13 @@ describe('generateRecoveryCode', () => {
 
 describe('createRoadtrip', () => {
   it('legt Haupt-, Wiederherstellungs- und Admin-Account an und meldet am Ende wieder den Hauptaccount an', async () => {
-    const result = await createRoadtrip('  Sommertour 2026 ', 'geheim123', 'adminpass1');
+    const result = await createRoadtrip(
+      '  Sommertour 2026 ',
+      'geheim123',
+      'adminpass1',
+      '2026-07-01',
+      '2026-07-14'
+    );
 
     expect(result.tripId).toBe('sommertour-2026');
     expect(result.tripName).toBe('Sommertour 2026');
@@ -193,15 +199,36 @@ describe('createRoadtrip', () => {
       { path: 'roadtrips/sommertour-2026' },
       { name: 'Sommertour 2026', createdAt: 'SERVER_TIMESTAMP' }
     );
+    // Der Reisezeitraum landet in settings/general, nicht auf dem
+    // unveränderlichen Roadtrip-Dokument – mit einer noch leeren Crew-Liste,
+    // die das erste Crewmitglied beim Beitreten per arrayUnion ergänzt.
+    expect(setDoc).toHaveBeenCalledWith(
+      { path: 'roadtrips/sommertour-2026/settings/general' },
+      { users: [], startDate: '2026-07-01', endDate: '2026-07-14' },
+      { merge: true }
+    );
+  });
+
+  it('lehnt ein Enddatum vor dem Startdatum ab, bevor Firebase überhaupt gefragt wird', async () => {
+    const code = await errorCode(
+      createRoadtrip('Ostsee', 'geheim123', 'adminpass1', '2026-07-14', '2026-07-01')
+    );
+
+    expect(code).toBe('invalidTripDates');
+    expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
   it('lehnt einen Namen ohne verwertbare Zeichen ab', async () => {
-    await expect(errorCode(createRoadtrip('###', 'geheim123', 'adminpass1'))).resolves.toBe('missingName');
+    await expect(
+      errorCode(createRoadtrip('###', 'geheim123', 'adminpass1', '2026-07-01', '2026-07-14'))
+    ).resolves.toBe('missingName');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
   });
 
   it('lehnt zu kurze Passwörter ab, bevor Firebase überhaupt gefragt wird', async () => {
-    const code = await errorCode(createRoadtrip('Ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1), 'adminpass1'));
+    const code = await errorCode(
+      createRoadtrip('Ostsee', 'a'.repeat(MIN_PASSWORD_LENGTH - 1), 'adminpass1', '2026-07-01', '2026-07-14')
+    );
 
     expect(code).toBe('passwordTooShort');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
@@ -209,12 +236,14 @@ describe('createRoadtrip', () => {
 
   it('übersetzt einen belegten Namen in einen eigenen Fehlercode', async () => {
     createUserWithEmailAndPassword.mockRejectedValueOnce(authError('auth/email-already-in-use'));
-    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123', 'adminpass1'))).resolves.toBe('nameTaken');
+    await expect(
+      errorCode(createRoadtrip('Ostsee', 'geheim123', 'adminpass1', '2026-07-01', '2026-07-14'))
+    ).resolves.toBe('nameTaken');
   });
 
   it('lehnt ein zu kurzes Admin-Passwort ab, bevor Firebase überhaupt gefragt wird', async () => {
     const code = await errorCode(
-      createRoadtrip('Ostsee', 'geheim123', 'a'.repeat(MIN_PASSWORD_LENGTH - 1))
+      createRoadtrip('Ostsee', 'geheim123', 'a'.repeat(MIN_PASSWORD_LENGTH - 1), '2026-07-01', '2026-07-14')
     );
 
     expect(code).toBe('passwordTooShort');
@@ -224,7 +253,9 @@ describe('createRoadtrip', () => {
   it('lehnt ein Admin-Passwort ab, das dem Roadtrip-Passwort entspricht', async () => {
     // Sonst wäre es keine zweite Schranke: Das Roadtrip-Passwort kennt die
     // ganze Crew.
-    const code = await errorCode(createRoadtrip('Ostsee', 'geheim123', 'geheim123'));
+    const code = await errorCode(
+      createRoadtrip('Ostsee', 'geheim123', 'geheim123', '2026-07-01', '2026-07-14')
+    );
 
     expect(code).toBe('adminPasswordSameAsTrip');
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
@@ -237,7 +268,9 @@ describe('createRoadtrip', () => {
     });
     createUserWithEmailAndPassword.mockRejectedValueOnce(new Error('netzwerk kaputt'));
 
-    await expect(errorCode(createRoadtrip('Ostsee', 'geheim123', 'adminpass1'))).resolves.toBe('unknown');
+    await expect(
+      errorCode(createRoadtrip('Ostsee', 'geheim123', 'adminpass1', '2026-07-01', '2026-07-14'))
+    ).resolves.toBe('unknown');
 
     // Zum Zeitpunkt des Fehlers war der Hauptaccount currentUser – der wird
     // best-effort wieder gelöscht, damit der Name nicht dauerhaft blockiert.

@@ -31,6 +31,10 @@ import CrewSettings from './pages/settings/CrewSettings';
 import QuickLogSettings from './pages/settings/QuickLogSettings';
 import ExportSettings from './pages/settings/ExportSettings';
 import TrashSettings from './pages/settings/TrashSettings';
+import MealPlan from './pages/kombuese/MealPlan';
+import Dishes from './pages/kombuese/Dishes';
+import ShoppingList from './pages/kombuese/ShoppingList';
+import Inventory from './pages/kombuese/Inventory';
 import Privacy from './pages/Privacy';
 
 const STORAGE_KEY_USER = 'boat_user';
@@ -176,6 +180,10 @@ function CrewGate() {
             <Route path="/settings/quicklogs" element={<QuickLogSettings currentUser={user} />} />
             <Route path="/settings/export" element={<ExportSettings users={users} />} />
             <Route path="/settings/papierkorb" element={<TrashSettings currentUser={user} />} />
+            <Route path="/settings/speiseplan" element={<MealPlan currentUser={user} />} />
+            <Route path="/settings/gerichte" element={<Dishes currentUser={user} />} />
+            <Route path="/settings/einkaufsliste" element={<ShoppingList currentUser={user} />} />
+            <Route path="/settings/lager" element={<Inventory currentUser={user} />} />
             <Route path="/datenschutz" element={<Privacy />} />
           </Routes>
         </div>

@@ -1,0 +1,80 @@
+/* Gemeinsame Bausteine der vier Kombüse-Seiten (Gerichte, Speiseplan,
+   Einkaufsliste, Lager). Reuses Settings.css für Listen/Zeilen – hier stehen
+   nur die Teile, für die es dort keine Entsprechung gibt. */
+
+/* --- Zutatenliste im Gericht-Formular ----------------------------------- */
+.kombuese-ingredient-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.kombuese-ingredient-row {
+  align-items: center;
+}
+
+.kombuese-ingredient-name {
+  flex: 2;
+  min-width: 0;
+}
+
+.kombuese-ingredient-quantity {
+  flex: 1;
+  min-width: 0;
+}
+
+.kombuese-ingredient-unit {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Mengen-Stepper (Lager) ---------------------------------------------- */
+.kombuese-quantity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.kombuese-quantity-value {
+  min-width: 3.5ch;
+  text-align: center;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* --- Einkaufsliste: abgehakte Zeile --------------------------------------- */
+.kombuese-shopping-item-checked {
+  color: var(--color-text-tertiary);
+  text-decoration: line-through;
+}
+
+/* --- Speiseplan: Tagesgruppe ---------------------------------------------- */
+.kombuese-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kombuese-day:last-child {
+  border-bottom: none;
+}
+
+.kombuese-day-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.kombuese-meal-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.kombuese-meal-group-label {
+  color: var(--color-text-tertiary);
+}

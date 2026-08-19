@@ -7,7 +7,7 @@ import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { useCollection } from '../hooks/useCollection';
 import { usePermissions } from '../hooks/usePermissions';
 import { trackWrite } from '../lib/pendingWrites';
-import { useQuickLogs } from '../hooks/useSettings';
+import { useQuickLogs, useTripDates } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { activeOnly } from '../lib/trash';
@@ -45,11 +45,31 @@ function isToday(timestamp: number): boolean {
   );
 }
 
+/** Tag X von Y, nur während der Roadtrip tatsächlich läuft (heute zwischen
+ * Start- und Enddatum, beide inklusive). Davor/danach oder ganz ohne
+ * hinterlegtes Datum bleibt die Anzeige schlicht weg, statt einen
+ * Sonderfall-Text einzuführen – siehe Kombüse-Speiseplan für das Nachtragen
+ * des Reisezeitraums. */
+function dayOfTrip(startDate: string | undefined, endDate: string | undefined): { day: number; total: number } | null {
+  if (!startDate || !endDate) return null;
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  if (todayUtc.getTime() < start.getTime() || todayUtc.getTime() > end.getTime()) return null;
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const day = Math.round((todayUtc.getTime() - start.getTime()) / msPerDay) + 1;
+  const total = Math.round((end.getTime() - start.getTime()) / msPerDay) + 1;
+  return { day, total };
+}
+
 export default function Dashboard({ user }: { user: string }) {
   const { position, error, isTracking, setIsTracking, isPaused, setIsPaused } = useTracking();
   const { tripId, tripName } = useRoadtrip();
   const { canEdit } = usePermissions(user);
   const quickLogs = useQuickLogs();
+  const { startDate, endDate } = useTripDates();
   const { preferences } = usePreferences();
   const [isLogging, setIsLogging] = useState(false);
   const [showAllQuickLogs, setShowAllQuickLogs] = useState(false);
@@ -124,6 +144,7 @@ export default function Dashboard({ user }: { user: string }) {
 
   const visibleQuickLogs = showAllQuickLogs ? quickLogs : quickLogs.slice(0, VISIBLE_QUICK_LOGS);
   const hiddenQuickLogCount = Math.max(0, quickLogs.length - VISIBLE_QUICK_LOGS);
+  const tripDay = dayOfTrip(startDate, endDate);
 
   return (
     <div className="cockpit">
@@ -174,6 +195,14 @@ export default function Dashboard({ user }: { user: string }) {
         </div>
 
         <dl className="instrument-readout">
+          {tripDay && (
+            <div className="instrument-readout-item">
+              <dt className="label">{t('cockpit.tripDayLabel')}</dt>
+              <dd className="instrument-readout-value">
+                {t('cockpit.dayOfTrip', { day: tripDay.day, total: tripDay.total })}
+              </dd>
+            </div>
+          )}
           <div className="instrument-readout-item">
             <dt className="label">{t('logbook.distance')}</dt>
             <dd className="instrument-readout-value">

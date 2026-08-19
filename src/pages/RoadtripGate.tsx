@@ -32,6 +32,10 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  // Nur im Erstellen-Tab: Reisezeitraum, siehe hooks/useSettings.ts
+  // (useTripDates) und den Kombüse-Speiseplan, der ihn braucht.
+  const [tripStartDate, setTripStartDate] = useState('');
+  const [tripEndDate, setTripEndDate] = useState('');
   // Nur relevant im Beitreten-Tab: Passwort-Feld wird zum Code-Feld.
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -43,6 +47,8 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
     setPassword('');
     setPasswordConfirm('');
     setAdminPassword('');
+    setTripStartDate('');
+    setTripEndDate('');
     setUseRecoveryCode(false);
   };
 
@@ -71,7 +77,7 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
     setSubmitting(true);
     try {
       if (mode === 'create') {
-        const result = await createRoadtrip(name, password, adminPassword);
+        const result = await createRoadtrip(name, password, adminPassword, tripStartDate, tripEndDate);
         recordAttemptSuccess();
         onRoadtripCreated(result.tripName, result.recoveryCode);
       } else if (useRecoveryCode) {
@@ -166,6 +172,24 @@ export default function RoadtripGate({ onRoadtripCreated }: RoadtripGateProps) {
               autoComplete="new-password"
             />
             <p className="helper-text roadtrip-gate-hint">{t('gate.adminPasswordHint')}</p>
+            <div className="row roadtrip-gate-dates">
+              <Input
+                type="date"
+                aria-label={t('gate.startDatePlaceholder')}
+                value={tripStartDate}
+                onChange={(e) => setTripStartDate(e.target.value)}
+                required
+              />
+              <Input
+                type="date"
+                aria-label={t('gate.endDatePlaceholder')}
+                value={tripEndDate}
+                onChange={(e) => setTripEndDate(e.target.value)}
+                min={tripStartDate || undefined}
+                required
+              />
+            </div>
+            <p className="helper-text roadtrip-gate-hint">{t('gate.tripDatesHint')}</p>
           </>
         )}
 

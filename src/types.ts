@@ -127,3 +127,81 @@ export interface Expense {
   /** Gesetzt, sobald die Ausgabe im Papierkorb liegt – siehe lib/trash.ts. */
   deletedAt?: number;
 }
+
+// ============================================================
+// Kombüse: Essensplanung, Einkaufsliste, Lager
+// ============================================================
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
+
+/** Eine Zutat innerhalb eines Gerichts. `unit` ist bewusst Freitext (kg, Stück,
+ * Glas, Dose, Sack …) statt eines festen Katalogs – die Bordküche braucht
+ * beides, Gewichts- wie Gebinde-Einheiten. Die Einkaufsliste zählt zwei
+ * Zutaten nur zusammen, wenn Name UND Einheit normalisiert übereinstimmen
+ * (siehe lib/shoppingList.ts) – es findet keine Einheiten-Umrechnung statt. */
+export interface Ingredient {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface Dish {
+  id?: string;
+  name: string;
+  mealType: MealType;
+  ingredients: Ingredient[];
+  note?: string;
+  author: string;
+  timestamp: number;
+  /** Gesetzt, sobald das Gericht im Papierkorb liegt – siehe lib/trash.ts. */
+  deletedAt?: number;
+}
+
+/** Ordnet ein Gericht einem Kalendertag und einer Mahlzeit zu. Mehrere
+ * Einträge pro Tag+Mahlzeit sind erlaubt (z.B. mehrere Frühstücks-Optionen
+ * zur Auswahl). */
+export interface MealPlanEntry {
+  id?: string;
+  /** 'YYYY-MM-DD' */
+  date: string;
+  mealType: MealType;
+  dishId: string;
+  author: string;
+  timestamp: number;
+  deletedAt?: number;
+}
+
+export interface InventoryItem {
+  id?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  /** Freitext, z.B. "Trockenlager", "Kühlbox", "Bilge". */
+  location: string;
+  author: string;
+  timestamp: number;
+  deletedAt?: number;
+}
+
+/** Manuell zur Einkaufsliste hinzugefügter Posten ohne Bezug zu einem
+ * Rezept, z.B. Gas oder Müllbeutel. */
+export interface ShoppingListExtra {
+  id?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  checked: boolean;
+  author: string;
+  timestamp: number;
+  deletedAt?: number;
+}
+
+/** Abhak-Status eines aus dem Speiseplan berechneten Einkaufspostens (siehe
+ * lib/shoppingList.ts). Dafür gibt es kein eigenes Gericht-übergreifendes
+ * Dokument – der Datensatz liegt unter einem aus Name+Einheit normalisierten
+ * Schlüssel in roadtrips/{tripId}/shoppingListChecks/{key}. */
+export interface ShoppingListCheck {
+  checked: boolean;
+  checkedBy: string;
+  checkedAt: number;
+}
