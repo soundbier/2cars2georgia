@@ -44,6 +44,14 @@ export const en: Translations = {
   // --- Crew sign-in -----------------------------------------------------
   'crewGate.title': 'Who is aboard?',
   'crewGate.hint': 'Assign this device to a crew member to record position and log entries.',
+  'crewGate.firstMemberHint':
+    'This roadtrip has no crew yet. Add yourself as the first member – you will manage the crew afterwards.',
+  'crewGate.firstMemberLabel': 'Your name',
+  'crewGate.newHere': 'New here? Add yourself',
+  'crewGate.namePlaceholder': 'Name',
+  'crewGate.join': 'Join',
+  'crewGate.nameTaken': '{name} is already aboard – pick the name above.',
+  'crewGate.joinFailed': 'Could not join.',
 
   // --- Roadtrip gate ----------------------------------------------------
   'gate.joinHint': "Enter the roadtrip's name and the crew password to join.",

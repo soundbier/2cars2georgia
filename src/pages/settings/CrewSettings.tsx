@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove, deleteField, FieldValue } from 'firebase/firestore';
+import { doc, updateDoc, arrayRemove, deleteField, FieldValue } from 'firebase/firestore';
 import { UserPlus, Trash2, ShieldCheck } from 'lucide-react';
 import { db } from '../../firebase';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
@@ -7,6 +7,7 @@ import { useCrew } from '../../hooks/useSettings';
 import { usePermissions } from '../../hooks/usePermissions';
 import { CREW_ROLES, ROLE_LABEL_KEY, countOwners, getEffectiveRole } from '../../lib/permissions';
 import { trackWrite } from '../../lib/pendingWrites';
+import { MAX_CREW_NAME_LENGTH, addCrewMember, isCrewNameTaken, normalizeCrewName } from '../../lib/crew';
 import { getUserColor } from '../../lib/userColors';
 import { useT } from '../../i18n';
 import { CrewRole } from '../../types';
@@ -43,16 +44,18 @@ export default function CrewSettings({ currentUser, users }: Props) {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = newUser.trim();
+    const name = normalizeCrewName(newUser);
     if (!name) return;
-    if (users.some((u) => u.toLowerCase() === name.toLowerCase())) {
+    if (isCrewNameTaken(users, name)) {
       notify(t('crew.alreadyAboard', { name }), 'danger');
       return;
     }
+    if (!tripId) return;
     try {
       // Neue Mitglieder starten als Mitfahrer – die Rolle lässt sich danach
-      // jederzeit über die Auswahl unten ändern.
-      await saveCrew({ users: arrayUnion(name), [`roles.${name}`]: 'member' });
+      // jederzeit über die Auswahl unten ändern. Derselbe Helfer wie beim
+      // Selbst-Eintragen im CrewGate, damit beide Wege dasselbe schreiben.
+      await trackWrite(addCrewMember(tripId, name, 'member'));
       setNewUser('');
     } catch (err) {
       console.error(err);
@@ -113,6 +116,7 @@ export default function CrewSettings({ currentUser, users }: Props) {
             <Input
               placeholder={t('crew.newNamePlaceholder')}
               value={newUser}
+              maxLength={MAX_CREW_NAME_LENGTH}
               onChange={(e) => setNewUser(e.target.value)}
             />
             <IconButton type="submit" label={t('crew.addMember')} tone="accent" disabled={!newUser.trim()}>

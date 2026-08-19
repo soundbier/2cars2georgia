@@ -9,12 +9,19 @@ import {
   Compass,
   LucideIcon
 } from 'lucide-react';
-import { ToastProvider } from './components/ui';
+import { Button, Input, ToastProvider, useToast } from './components/ui';
 import { I18nProvider, useT, TranslationKey } from './i18n';
 import { TrackingProvider } from './hooks/useTracking';
 import { PreferencesProvider } from './hooks/usePreferences';
 import { RoadtripProvider, useRoadtrip } from './hooks/useRoadtrip';
 import { setSentryContext } from './lib/sentry';
+import {
+  MAX_CREW_NAME_LENGTH,
+  addCrewMember,
+  isCrewNameTaken,
+  joiningRole,
+  normalizeCrewName
+} from './lib/crew';
 import { setErrorLogContext } from './lib/errorLog';
 import { useCrew } from './hooks/useSettings';
 import { UpdatePrompt } from './UpdatePrompt';
@@ -52,6 +59,9 @@ function CrewGate() {
   const { tripId } = useRoadtrip();
   const [user, setUser] = useState<string>(() => localStorage.getItem(STORAGE_KEY_USER) ?? '');
   const { users, loading } = useCrew();
+  const [newName, setNewName] = useState('');
+  const [joining, setJoining] = useState(false);
+  const { notify } = useToast();
   const t = useT();
 
   // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) dem Roadtrip und
@@ -70,6 +80,31 @@ function CrewGate() {
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY_USER);
     setUser('');
+  };
+
+  /**
+   * Beitritt ohne Umweg über ein anderes Gerät: Wer den Roadtrip-Zugang hat,
+   * trägt sich hier selbst als Crewmitglied ein. Der Owner kann die Liste
+   * später jederzeit in den Einstellungen korrigieren.
+   */
+  const joinCrew = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = normalizeCrewName(newName);
+    if (!name || !tripId) return;
+    if (isCrewNameTaken(users, name)) {
+      notify(t('crewGate.nameTaken', { name }), 'danger');
+      return;
+    }
+    setJoining(true);
+    try {
+      await addCrewMember(tripId, name, joiningRole(users));
+      login(name);
+    } catch (err) {
+      console.error(err);
+      notify(t('crewGate.joinFailed'), 'danger');
+    } finally {
+      setJoining(false);
+    }
   };
 
   // Nur der Login-Screen braucht die Crew-Liste. Wer bereits angemeldet ist,
@@ -91,16 +126,37 @@ function CrewGate() {
         <div className="login-screen-head">
           <Compass size={26} />
           <h1 className="page-title">{t('crewGate.title')}</h1>
-          <p className="helper-text">{t('crewGate.hint')}</p>
+          <p className="helper-text">
+            {users.length === 0 ? t('crewGate.firstMemberHint') : t('crewGate.hint')}
+          </p>
         </div>
-        <div className="login-screen-list">
-          {users.map((name) => (
-            <button key={name} className="login-user" onClick={() => login(name)}>
-              <span className="avatar">{name.charAt(0).toUpperCase()}</span>
-              <span>{name}</span>
-            </button>
-          ))}
-        </div>
+        {users.length > 0 && (
+          <div className="login-screen-list">
+            {users.map((name) => (
+              <button key={name} className="login-user" onClick={() => login(name)}>
+                <span className="avatar">{name.charAt(0).toUpperCase()}</span>
+                <span>{name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <form className="login-join" onSubmit={joinCrew}>
+          <label className="label" htmlFor="crew-join-name">
+            {users.length === 0 ? t('crewGate.firstMemberLabel') : t('crewGate.newHere')}
+          </label>
+          <div className="row">
+            <Input
+              id="crew-join-name"
+              placeholder={t('crewGate.namePlaceholder')}
+              value={newName}
+              maxLength={MAX_CREW_NAME_LENGTH}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <Button type="submit" disabled={!normalizeCrewName(newName) || joining}>
+              {t('crewGate.join')}
+            </Button>
+          </div>
+        </form>
       </div>
     );
   }

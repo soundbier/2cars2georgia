@@ -55,8 +55,11 @@ export const DEFAULT_QUICK_LOG_SEEDS: QuickLogSeed[] = [
   { id: 'panne', labelKey: 'quickLogs.default.panne', iconName: 'alert-triangle' }
 ];
 
-// Fallback, solange settings/general in Firestore noch nicht existiert.
-export const DEFAULT_USERS = ['Lukas', 'Leon', 'Niklas', 'Elias'];
+// Bewusst gibt es KEINE vorgegebene Crew-Liste: Ein frisch angelegter
+// Roadtrip startet ohne Mitglieder, und jede Person trägt sich beim ersten
+// Start selbst ein (siehe CrewGate in App.tsx). Vorher standen hier vier
+// feste Vornamen, die in jedem fremden Roadtrip auftauchten und erst von
+// Hand gelöscht werden mussten.
 
 /**
  * Rolle eines Crewmitglieds innerhalb des Roadtrips, siehe lib/permissions.ts:

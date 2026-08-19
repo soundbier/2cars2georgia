@@ -190,6 +190,19 @@ button {
   flex-shrink: 0;
 }
 
+.login-join {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-self: center;
+  width: 100%;
+  max-width: 320px;
+}
+
+.login-join .field-control {
+  flex: 1;
+}
+
 .login-user .avatar {
   width: 32px;
   height: 32px;

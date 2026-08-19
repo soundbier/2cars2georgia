@@ -49,6 +49,14 @@ export const de = {
   // --- Crew-Anmeldung ---------------------------------------------------
   'crewGate.title': 'Wer ist an Bord?',
   'crewGate.hint': 'Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.',
+  'crewGate.firstMemberHint':
+    'Dieser Roadtrip hat noch keine Crew. Trag dich als erstes Mitglied ein – du verwaltest die Crew danach.',
+  'crewGate.firstMemberLabel': 'Dein Name',
+  'crewGate.newHere': 'Neu dabei? Trag dich ein',
+  'crewGate.namePlaceholder': 'Name',
+  'crewGate.join': 'Beitreten',
+  'crewGate.nameTaken': '{name} ist bereits an Bord – oben auswählen.',
+  'crewGate.joinFailed': 'Beitreten fehlgeschlagen.',
 
   // --- Roadtrip-Gate ----------------------------------------------------
   'gate.joinHint': 'Roadtrip-Namen und Passwort der Crew eingeben, um beizutreten.',
