@@ -1,17 +1,22 @@
 rules_version = '2';
 
-// Zugriffsmodell: Pro Roadtrip existiert ein technischer Firebase-Auth-User
-// (E-Mail "<roadtrip-id>@2cars2georgia.trip", Passwort = Roadtrip-Passwort,
-// siehe src/lib/roadtrip.ts). Lesen/Schreiben unter roadtrips/{tripId}/...
-// ist nur erlaubt, wenn der angemeldete Auth-User zu genau diesem tripId
-// gehört – das UI-Passwort-Gate allein wäre kein echter Schutz, da jeder mit
-// der Firebase-Config direkt gegen Firestore schreiben könnte.
+// Zugriffsmodell: Persönliche Firebase-Auth-Konten (E-Mail/Passwort oder
+// Google, siehe src/lib/authAccount.ts) – jede Person hat eine eigene,
+// echte UID (request.auth.uid). Ein Roadtrip ist kein technischer Auth-User
+// mehr, sondern ein Dokument unter roadtrips/{tripId} mit einer
+// Mitgliedschafts-Collection roadtrips/{tripId}/members/{uid} (siehe
+// src/lib/membership.ts): Lesen/Schreiben ist nur erlaubt, wer dort ein
+// Mitgliedschafts-Dokument hat, und die dort gespeicherte Rolle (owner /
+// member / readonly, siehe src/lib/permissions.ts) bestimmt, was erlaubt
+// ist – nicht die Oberfläche.
 //
-// Zusätzlich validiert jede Collection ihre Dokumente. Wer das gemeinsame
-// Roadtrip-Passwort kennt, darf zwar schreiben – aber nicht beliebig viel und
-// nicht in beliebiger Form. Ohne diese Schranken könnte ein einzelnes Gerät
-// (oder ein Skript mit dem Passwort) die Datenbank mit Müll fluten und damit
-// echte Kosten verursachen.
+// Zusätzlich gibt es users/{uid} (Profil: Anzeigename, E-Mail,
+// Erstellungsdatum) und usernames/{normalizedName} (Reservierung für
+// eindeutige Anzeigenamen, siehe src/lib/username.ts).
+//
+// Zusätzlich validiert jede Collection ihre Dokumente wie zuvor: erlaubte
+// Felder, Datentypen, maximale Längen, Wertebereiche. Diese Prüfungen sind
+// unverändert aus der vorherigen Fassung übernommen.
 //
 // Bewusst gibt es KEINEN rekursiven Wildcard mehr unterhalb eines Roadtrips:
 // Jede Collection ist einzeln aufgeführt. Eine neue Collection braucht damit
@@ -19,34 +24,6 @@ rules_version = '2';
 // rutschen. Die Regeln sind in tests/rules/firestore.rules.test.ts abgedeckt.
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Identität ------------------------------------------------------
-
-    function signedIn() {
-      return request.auth != null && request.auth.token.email is string;
-    }
-
-    function signedInTripId() {
-      return request.auth.token.email.split('@')[0];
-    }
-
-    function ownsTrip(tripId) {
-      return signedIn() && signedInTripId() == tripId;
-    }
-
-    // Adminsitzung: derselbe Roadtrip, aber über den Admin-Zugang angemeldet
-    // (eigener Auth-User "<tripId>@2cars2georgia.admin" mit eigenem Passwort,
-    // siehe src/lib/roadtrip.ts). Die Rollen in settings/general taugen dafür
-    // nicht – die kann jedes Gerät mit dem Roadtrip-Passwort selbst
-    // umschreiben, die E-Mail der Sitzung dagegen nicht.
-    //
-    // Adminpflichtig ist bewusst nur, was sich nicht rückgängig machen lässt
-    // oder die Crew umbaut: endgültiges Löschen und das Verwalten von
-    // Mitgliedern/Rollen. Der Alltag (Einträge anlegen, ändern, in den
-    // Papierkorb legen) bleibt für die ganze Crew offen.
-    function isAdminSession(tripId) {
-      return ownsTrip(tripId) && request.auth.token.email.matches('.*@2cars2georgia[.]admin');
-    }
 
     // --- Bausteine für die Feldprüfung ----------------------------------
 
@@ -109,29 +86,143 @@ service cloud.firestore {
       return data()[field] is number && data()[field] >= 0 && data()[field] <= 100000;
     }
 
+    // Optionales authorId (echte UID statt Anzeigename) – ergänzend zu
+    // `author`, siehe src/types.ts. Wo gesetzt, muss es der eigenen UID
+    // entsprechen: sonst könnte ein Mitglied Einträge im Namen einer anderen
+    // Person erzeugen.
+    function isOptionalAuthorId() {
+      return !('authorId' in data()) || data().authorId == request.auth.uid;
+    }
+
+    // --- Identität: Profile & eindeutige Anzeigenamen --------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // usernames/{normalizedName}: reserviert einen Anzeigenamen für genau
+    // eine UID. Wird immer gemeinsam mit users/{uid} in derselben
+    // Transaktion angelegt (siehe src/lib/username.ts) – beide oder keins.
+    match /usernames/{normalizedName} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && fieldsAre(['uid', 'createdAt'], [])
+        && data().uid == request.auth.uid
+        && data().createdAt == request.time;
+      // Kein Umbenennen/Freigeben: ein einmal vergebener Anzeigename bleibt
+      // reserviert, auch wenn users/{uid} nie geschrieben würde.
+      allow update, delete: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && fieldsAre(['displayName', 'email', 'createdAt'], [])
+        && isText('displayName', 60)
+        && data().email == request.auth.token.email
+        && data().createdAt == request.time;
+      // Kein Umbenennen: der Anzeigename ist über usernames/ reserviert,
+      // eine Änderung hier würde die Reservierung veraisen lassen.
+      allow update, delete: if false;
+    }
+
     // --- Roadtrip-Wurzel -------------------------------------------------
 
     match /roadtrips/{tripId} {
-      // Anlegen passiert direkt nach createUserWithEmailAndPassword, der neue
-      // Auth-User ist zu dem Zeitpunkt bereits angemeldet.
-      allow create: if ownsTrip(tripId)
-        && fieldsAre(['name', 'createdAt'], [])
+      // Mitglied dieses Roadtrips? Die Rolle steht direkt am
+      // Mitgliedschafts-Dokument – kein impliziter Fallback mehr wie früher
+      // in lib/permissions.ts (getEffectiveRole), jede Rolle ist explizit.
+      function isMember() {
+        return signedIn()
+          && exists(/databases/$(database)/documents/roadtrips/$(tripId)/members/$(request.auth.uid));
+      }
+
+      function myRole() {
+        return get(/databases/$(database)/documents/roadtrips/$(tripId)/members/$(request.auth.uid)).data.role;
+      }
+
+      function isOwner() {
+        return isMember() && myRole() == 'owner';
+      }
+
+      // Owner + member dürfen anlegen/ändern, readonly nur lesen.
+      function canWrite() {
+        return isMember() && myRole() != 'readonly';
+      }
+
+      // Anlegen: jede angemeldete Person mit Profil darf einen neuen
+      // Roadtrip anlegen und wird dabei automatisch dessen Owner (siehe
+      // src/lib/membership.ts – die Owner-Mitgliedschaft entsteht in einem
+      // zweiten, separaten Schreibvorgang direkt danach).
+      allow create: if signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && fieldsAre(['name', 'createdAt', 'ownerUid'], [])
         && isText('name', 80)
+        && data().ownerUid == request.auth.uid
         && data().createdAt == request.time;
 
-      allow read: if ownsTrip(tripId);
+      allow read: if isMember();
 
-      // Name/Erstellungsdatum eines Roadtrips ändern sich nach dem Anlegen nicht.
-      allow update, delete: if false;
+      // Name/Erstellungsdatum/Owner eines Roadtrips ändern sich nach dem Anlegen nicht.
+      allow update: if false;
+
+      // Löschen: der Owner darf den Roadtrip endgültig löschen (siehe
+      // src/lib/membership.ts, deleteRoadtripCascade – die Untercollections
+      // werden dort einzeln geleert, da es keine serverseitige Kaskade ohne
+      // Cloud Functions gibt). Zusätzlich: Aufräumen eines halb angelegten
+      // Roadtrips, bei dem der zweite Schritt (Owner-Mitgliedschaft
+      // anlegen) fehlgeschlagen ist – nur die Person, die ihn angelegt hat,
+      // und nur solange sie selbst kein Mitglied ist.
+      allow delete: if isOwner()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid && !isMember());
+
+      // --- Mitgliedschaften ------------------------------------------------
+      match /members/{memberUid} {
+        // Beitreten: jede angemeldete Person trägt sich selbst als normales
+        // Mitglied ein (siehe src/lib/membership.ts, joinRoadtrip). Wer den
+        // Roadtrip anlegt, wird stattdessen Owner – nur zulässig, wenn die
+        // aufrufende Person laut roadtrips/{tripId}.ownerUid tatsächlich die
+        // Person ist, die ihn gerade angelegt hat.
+        allow create: if signedIn()
+          && request.auth.uid == memberUid
+          && fieldsAre(['displayName', 'role', 'joinedAt'], [])
+          && isText('displayName', 60)
+          && data().joinedAt == request.time
+          && (
+            data().role == 'member'
+            || (data().role == 'owner'
+                && get(/databases/$(database)/documents/roadtrips/$(tripId)).data.ownerUid == request.auth.uid)
+          );
+
+        allow read: if isMember();
+
+        // Rolle ändern: nur der Owner, und nur die Rolle selbst – Name und
+        // Beitrittsdatum bleiben unangetastet.
+        allow update: if isOwner()
+          && fieldsAre(['displayName', 'role', 'joinedAt'], [])
+          && data().role in ['owner', 'member', 'readonly']
+          && data().displayName == resource.data.displayName
+          && data().joinedAt == resource.data.joinedAt;
+
+        // Entfernen: der Owner darf jedes Mitglied entfernen, jede Person
+        // darf sich selbst entfernen (den Roadtrip verlassen). Es gibt
+        // bewusst keine serverseitige "letzter Owner"-Sperre – das wäre eine
+        // Zählung über die ganze Collection, die Firestore-Regeln nicht
+        // leisten; die Oberfläche warnt davor (siehe lib/permissions.ts,
+        // countOwners).
+        allow delete: if (isOwner() && request.auth.uid != memberUid) || request.auth.uid == memberUid;
+      }
 
       // --- GPS-Spur ------------------------------------------------------
       // Die mit Abstand größte Collection: Bei kurzem Aufzeichnungsintervall
       // entstehen tausende Punkte pro Tour. Entsprechend eng ist die Prüfung.
       match /track/{pointId} {
         function isTrackPoint() {
-          return fieldsAre(['timestamp', 'author', 'lat', 'lng', 'speedKmh', 'headingDeg'], [])
+          return fieldsAre(['timestamp', 'author', 'lat', 'lng', 'speedKmh', 'headingDeg'], ['authorId'])
             && isEpochMillis('timestamp')
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isLatitude('lat')
             && isLongitude('lng')
             && data().speedKmh is number
@@ -143,19 +234,20 @@ service cloud.firestore {
                 || (data().headingDeg is number && data().headingDeg >= 0 && data().headingDeg <= 360));
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create: if ownsTrip(tripId) && isTrackPoint();
+        allow read: if isMember();
+        allow create: if canWrite() && isTrackPoint();
         // Trackpunkte werden nur angehängt, nie nachträglich verändert.
         allow update: if false;
-        allow delete: if isAdminSession(tripId);
+        allow delete: if isOwner();
       }
 
       // --- Logbuch -------------------------------------------------------
       match /events/{eventId} {
         function isLogEvent() {
-          return fieldsAre(['timestamp', 'author', 'type', 'title', 'lat', 'lng'], ['note', 'deletedAt'])
+          return fieldsAre(['timestamp', 'author', 'type', 'title', 'lat', 'lng'], ['note', 'deletedAt', 'authorId'])
             && isEpochMillis('timestamp')
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isText('type', 40)
             && isText('title', 120)
             && isOptionalText('note', 2000)
@@ -164,20 +256,23 @@ service cloud.firestore {
             && isLongitude('lng');
         }
 
-        allow read: if ownsTrip(tripId);
+        allow read: if isMember();
         // Der Papierkorb (deletedAt) ist der Weg für die Crew; endgültig
-        // entfernen darf nur der Admin-Zugang.
-        allow create, update: if ownsTrip(tripId) && isLogEvent();
-        allow delete: if isAdminSession(tripId);
+        // entfernen darf nur der Owner.
+        allow create, update: if canWrite() && isLogEvent();
+        allow delete: if isOwner();
       }
 
       // --- Bordkasse -----------------------------------------------------
       match /expenses/{expenseId} {
         function isExpense() {
-          return fieldsAre(['timestamp', 'author', 'paidBy', 'title', 'amountEuro', 'category'], ['deletedAt'])
+          return fieldsAre(
+            ['timestamp', 'author', 'paidBy', 'title', 'amountEuro', 'category'],
+            ['deletedAt', 'authorId'])
             && isOptionalEpochMillis('deletedAt')
             && isEpochMillis('timestamp')
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isText('paidBy', 60)
             && isText('title', 120)
             && data().amountEuro is number
@@ -186,33 +281,36 @@ service cloud.firestore {
             && isText('category', 40);
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isExpense();
-        allow delete: if isAdminSession(tripId);
+        allow read: if isMember();
+        allow create, update: if canWrite() && isExpense();
+        allow delete: if isOwner();
       }
 
       // --- Kombüse: Gerichte -----------------------------------------------
       // Zutaten sind ein eingebettetes Array (siehe src/types.ts, Ingredient) –
       // Firestore-Regeln können den Inhalt eines Array-of-Maps nicht tief je
       // Element validieren, deshalb bleibt es bei Listenart und -länge. Das
-      // ist konsistent mit dem übrigen Vertrauensmodell dieser Datei: Wer das
-      // Roadtrip-Passwort hat, ist vertraute Crew.
+      // ist konsistent mit dem übrigen Vertrauensmodell dieser Datei: Wer
+      // Mitglied ist, ist vertraute Crew.
       match /dishes/{dishId} {
         function isDish() {
-          return fieldsAre(['name', 'mealType', 'ingredients', 'author', 'timestamp'], ['note', 'deletedAt'])
+          return fieldsAre(
+            ['name', 'mealType', 'ingredients', 'author', 'timestamp'],
+            ['note', 'deletedAt', 'authorId'])
             && isText('name', 120)
             && isMealType()
             && data().ingredients is list
             && data().ingredients.size() <= 30
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isEpochMillis('timestamp')
             && isOptionalText('note', 500)
             && isOptionalEpochMillis('deletedAt');
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isDish();
-        allow delete: if isAdminSession(tripId);
+        allow read: if isMember();
+        allow create, update: if canWrite() && isDish();
+        allow delete: if isOwner();
       }
 
       // --- Kombüse: Speiseplan ----------------------------------------------
@@ -220,18 +318,19 @@ service cloud.firestore {
       // Einträge pro Tag+Mahlzeit sind erlaubt (mehrere Optionen zur Auswahl).
       match /mealPlanEntries/{entryId} {
         function isMealPlanEntry() {
-          return fieldsAre(['date', 'mealType', 'dishId', 'author', 'timestamp'], ['deletedAt'])
+          return fieldsAre(['date', 'mealType', 'dishId', 'author', 'timestamp'], ['deletedAt', 'authorId'])
             && isDateString('date')
             && isMealType()
             && isText('dishId', 64)
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isEpochMillis('timestamp')
             && isOptionalEpochMillis('deletedAt');
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isMealPlanEntry();
-        allow delete: if isAdminSession(tripId);
+        allow read: if isMember();
+        allow create, update: if canWrite() && isMealPlanEntry();
+        allow delete: if isOwner();
       }
 
       // --- Kombüse: Lager ----------------------------------------------------
@@ -239,19 +338,22 @@ service cloud.firestore {
       // das ist ein gewöhnliches update, keine Sonderregel nötig.
       match /inventory/{itemId} {
         function isInventoryItem() {
-          return fieldsAre(['name', 'quantity', 'unit', 'location', 'author', 'timestamp'], ['deletedAt'])
+          return fieldsAre(
+            ['name', 'quantity', 'unit', 'location', 'author', 'timestamp'],
+            ['deletedAt', 'authorId'])
             && isText('name', 80)
             && isQuantity('quantity')
             && isText('unit', 20)
             && isText('location', 60)
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isEpochMillis('timestamp')
             && isOptionalEpochMillis('deletedAt');
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isInventoryItem();
-        allow delete: if isAdminSession(tripId);
+        allow read: if isMember();
+        allow create, update: if canWrite() && isInventoryItem();
+        allow delete: if isOwner();
       }
 
       // --- Kombüse: Einkaufsliste (manuelle Posten) ---------------------------
@@ -260,27 +362,30 @@ service cloud.firestore {
       // Speiseplan berechneten Zeilen (siehe shoppingListChecks unten).
       match /shoppingListExtras/{itemId} {
         function isShoppingListExtra() {
-          return fieldsAre(['name', 'quantity', 'unit', 'checked', 'author', 'timestamp'], ['deletedAt'])
+          return fieldsAre(
+            ['name', 'quantity', 'unit', 'checked', 'author', 'timestamp'],
+            ['deletedAt', 'authorId'])
             && isText('name', 80)
             && isQuantity('quantity')
             && isText('unit', 20)
             && data().checked is bool
             && isText('author', 60)
+            && isOptionalAuthorId()
             && isEpochMillis('timestamp')
             && isOptionalEpochMillis('deletedAt');
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isShoppingListExtra();
-        allow delete: if isAdminSession(tripId);
+        allow read: if isMember();
+        allow create, update: if canWrite() && isShoppingListExtra();
+        allow delete: if isOwner();
       }
 
       // --- Kombüse: Einkaufsliste (Abhaken berechneter Posten) ----------------
       // Für aus dem Speiseplan berechnete Zeilen (siehe src/lib/shoppingList.ts)
       // gibt es kein eigenes Dokument – der Abhak-Status liegt unter einem aus
       // Name+Einheit normalisierten Schlüssel. Rein reversibles Abhaken, daher
-      // ohne Admin-Schranke; kein delete, verwaiste Einträge für nicht mehr
-      // benötigte Zutaten sind harmlos und werden nicht aufgeräumt.
+      // ohne Owner-Schranke; ein delete ist nur für das Aufräumen beim
+      // Roadtrip-Löschen nötig (siehe lib/membership.ts).
       match /shoppingListChecks/{checkKey} {
         function isShoppingListCheck() {
           return fieldsAre(['checked', 'checkedBy', 'checkedAt'], [])
@@ -289,22 +394,23 @@ service cloud.firestore {
             && isEpochMillis('checkedAt');
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create, update: if ownsTrip(tripId) && isShoppingListCheck();
+        allow read: if isMember();
+        allow create, update: if canWrite() && isShoppingListCheck();
+        allow delete: if isOwner();
       }
 
       // --- Roadtrip-weite Einstellungen ------------------------------------
-      // Genau zwei Dokumente: "general" (Crew-Liste + Rollen) und "quicklogs"
-      // (Schnell-Log-Kategorien), siehe src/hooks/useSettings.ts.
+      // Genau zwei Dokumente: "general" (Reisezeitraum) und "quicklogs"
+      // (Schnell-Log-Kategorien), siehe src/hooks/useSettings.ts. Die Crew
+      // (frühere Felder "users"/"roles") lebt jetzt in members/ – bleibt hier
+      // als optionales, unverändertes Altfeld zugelassen, damit bereits
+      // bestehende Dokumente nicht an der Feldprüfung scheitern.
       match /settings/{docId} {
-        // Rollenzuordnung ist optional (siehe src/lib/permissions.ts):
-        // Solange niemand explizit eine Rolle vergeben hat, fehlt das Feld
-        // ganz. Wer/was das im Client wie "Owner darf verwalten" durchsetzt,
-        // ist UI-Konvention, keine serverseitige Autorisierung – dafür fehlt
-        // dem Roadtrip-weiten Auth-User die nötige Einzelidentität pro
-        // Crewmitglied (siehe Kommentar am Dateianfang). Geprüft wird hier
-        // nur die Form: eine Map von Name auf einen der drei bekannten Werte.
-        function isValidRolesMap() {
+        function isLegacyUsersList() {
+          return !('users' in data()) || (data().users is list && data().users.size() <= 50);
+        }
+
+        function isLegacyRolesMap() {
           return !('roles' in data())
             || (data().roles is map
                 && data().roles.size() <= 50
@@ -313,14 +419,11 @@ service cloud.firestore {
 
         function isSettingsDoc() {
           return (docId == 'general'
-                  && fieldsAre(['users'], ['roles', 'startDate', 'endDate'])
-                  && data().users is list
-                  && data().users.size() <= 50
-                  && isValidRolesMap()
+                  && fieldsAre([], ['users', 'roles', 'startDate', 'endDate'])
+                  && isLegacyUsersList()
+                  && isLegacyRolesMap()
                   // Reisezeitraum, gebraucht vom Kombüse-Speiseplan und der
-                  // Tagesanzeige im Cockpit. Liegt hier statt auf
-                  // roadtrips/{tripId}, weil dieses Dokument laut Regel weiter
-                  // unten nach dem Anlegen unveränderlich ist.
+                  // Tagesanzeige im Cockpit.
                   && isOptionalDateString('startDate')
                   && isOptionalDateString('endDate'))
               || (docId == 'quicklogs'
@@ -329,25 +432,13 @@ service cloud.firestore {
                   && data().items.size() <= 50);
         }
 
-        // Beitreten darf jedes Gerät der Crew: Namen zur Liste hinzufügen,
-        // ohne jemanden zu entfernen und ohne Rollen anzufassen (siehe
-        // CrewGate in src/App.tsx). Wer entfernt oder Rollen vergibt, braucht
-        // den Admin-Zugang – sonst könnte sich jedes Crewmitglied selbst zum
-        // Owner machen und die Rollen wären reine Dekoration.
-        function isJoinOnly() {
-          return docId == 'general'
-            && data().users.hasAll(resource.data.users)
-            && data().get('roles', {}) == resource.data.get('roles', {});
-        }
-
-        allow read: if ownsTrip(tripId);
-        // Das erste Crewmitglied legt das Dokument an und wird dabei Owner –
-        // zu dem Zeitpunkt gibt es noch niemanden, der das absegnen könnte.
-        allow create: if ownsTrip(tripId) && isSettingsDoc();
-        allow update: if ownsTrip(tripId)
-          && isSettingsDoc()
-          && (isAdminSession(tripId) || docId == 'quicklogs' || isJoinOnly());
-        allow delete: if false;
+        allow read: if isMember();
+        // Reisezeitraum ist Roadtrip-Konfiguration: nur der Owner legt sie an
+        // oder ändert sie. Die Schnell-Log-Kategorien bleiben für die ganze
+        // Crew offen.
+        allow create, update: if isSettingsDoc()
+          && ((docId == 'general' && isOwner()) || (docId == 'quicklogs' && canWrite()));
+        allow delete: if isOwner();
       }
 
       // --- Fehlerprotokoll -------------------------------------------------
@@ -356,27 +447,26 @@ service cloud.firestore {
       match /errors/{errorId} {
         function isErrorEntry() {
           return fieldsAre(['timestamp', 'message'],
-                           ['stack', 'context', 'author', 'appVersion', 'userAgent', 'url'])
+                           ['stack', 'context', 'author', 'authorId', 'appVersion', 'userAgent', 'url'])
             && isEpochMillis('timestamp')
             && isText('message', 1000)
             && isOptionalText('stack', 4000)
             && isOptionalText('context', 200)
             && isOptionalText('author', 60)
+            && isOptionalAuthorId()
             && isOptionalText('appVersion', 40)
             && isOptionalText('userAgent', 500)
             && isOptionalText('url', 500);
         }
 
-        allow read: if ownsTrip(tripId);
-        allow create: if ownsTrip(tripId) && isErrorEntry();
+        allow read: if isMember();
+        allow create: if isMember() && isErrorEntry();
         allow update: if false;
-        allow delete: if isAdminSession(tripId);
+        allow delete: if isOwner();
       }
     }
 
     // Alles außerhalb der oben aufgeführten Pfade ist gesperrt – Firestore
-    // verweigert ohne passende allow-Regel ohnehin jeden Zugriff. Das gilt
-    // insbesondere für die alten, nicht mehr genutzten Top-Level-Collections
-    // track/events/expenses/settings.
+    // verweigert ohne passende allow-Regel ohnehin jeden Zugriff.
   }
 }

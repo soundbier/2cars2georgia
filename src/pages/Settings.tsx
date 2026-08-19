@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -17,8 +17,8 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePreferences } from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
 import { usePermissions } from '../hooks/usePermissions';
-import { leaveRoadtrip } from '../lib/roadtrip';
-import { AdminAccessSection } from '../components/AdminAccessSection';
+import { signOutAccount } from '../lib/authAccount';
+import { deleteRoadtripCascade } from '../lib/membership';
 import { useQuickLogs } from '../hooks/useSettings';
 import { ROLE_LABEL_KEY } from '../lib/permissions';
 import { getUserColor } from '../lib/userColors';
@@ -32,14 +32,15 @@ import {
   PageHeader,
   Toggle,
   SegmentedControl,
-  Select
+  Select,
+  ConfirmDialog,
+  useToast
 } from '../components/ui';
 import './Settings.css';
 
 interface Props {
   currentUser: string;
   users: string[];
-  onLogout: () => void;
 }
 
 // Einheitenkürzel sind international dieselben und bleiben deshalb hier.
@@ -98,23 +99,47 @@ function SettingLink({
   );
 }
 
-export default function Settings({ currentUser, users, onLogout }: Props) {
+export default function Settings({ currentUser, users }: Props) {
   const isOnline = useOnlineStatus();
   const quickLogs = useQuickLogs();
   const { preferences, setPreference } = usePreferences();
-  const { tripName } = useRoadtrip();
-  const { role } = usePermissions(currentUser);
+  const { tripId, tripName, authUser, clearTrip } = useRoadtrip();
+  const { role, canDeleteRoadtrip } = usePermissions(currentUser);
   const { language, setLanguage } = useI18n();
+  const { notify } = useToast();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const t = useT();
 
-  const handleLeaveRoadtrip = async () => {
-    // Profil zuerst abmelden, damit das Gerät nicht mit dem Nutzernamen
-    // eines fremden Roadtrips im Gate landet.
-    onLogout();
+  // Nur die Auswahl auf diesem Gerät zurücksetzen – die Mitgliedschaft
+  // (roadtrips/{tripId}/members/{uid}) bleibt bestehen, ein erneutes
+  // Beitreten über die Roadtrip-ID reicht.
+  const handleLeaveRoadtrip = () => {
+    clearTrip();
+  };
+
+  const handleSignOut = async () => {
     try {
-      await leaveRoadtrip();
+      await signOutAccount();
     } catch (err) {
-      console.error('Roadtrip konnte nicht verlassen werden:', err);
+      console.error('Abmelden fehlgeschlagen:', err);
+    }
+  };
+
+  const handleDeleteRoadtrip = async () => {
+    if (!tripId || !authUser || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteRoadtripCascade(tripId, authUser.uid);
+      // Kein manuelles Weiterleiten nötig: Der eigene onSnapshot auf
+      // members/{uid} in useRoadtrip stellt fest, dass die Mitgliedschaft
+      // weg ist, und blendet zurück auf das Roadtrip-Gate um.
+    } catch (err) {
+      console.error('Roadtrip konnte nicht gelöscht werden:', err);
+      notify(t('trip.deleteFailed'), 'danger');
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -262,8 +287,6 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
         </div>
       </Section>
 
-      <AdminAccessSection />
-
       <Section title={t('settings.data')}>
         <div className="settings-list">
           <SettingLink
@@ -297,14 +320,33 @@ export default function Settings({ currentUser, users, onLogout }: Props) {
           <span className="mono-num helper-text">{__APP_VERSION__}</span>
         </SettingRow>
         <div className="stack">
-          <Button variant="secondary" fullWidth onClick={onLogout}>
-            <LogOut size={18} /> {t('settings.logout')}
-          </Button>
-          <Button variant="destructive" fullWidth onClick={handleLeaveRoadtrip}>
+          <Button variant="secondary" fullWidth onClick={handleLeaveRoadtrip}>
             <DoorOpen size={18} /> {t('settings.leaveRoadtrip')}
+          </Button>
+          <Button variant="destructive" fullWidth onClick={handleSignOut}>
+            <LogOut size={18} /> {t('settings.logout')}
           </Button>
         </div>
       </Section>
+
+      {canDeleteRoadtrip && (
+        <Section title={t('trip.deleteTitle')}>
+          <p className="helper-text">{t('trip.deleteHint')}</p>
+          <Button variant="destructive" fullWidth onClick={() => setConfirmingDelete(true)}>
+            <Trash2 size={18} /> {t('trip.deleteButton')}
+          </Button>
+        </Section>
+      )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={t('trip.deleteConfirmTitle', { tripName: tripName ?? '' })}
+        description={t('trip.deleteConfirmDescription')}
+        confirmLabel={deleting ? t('trip.deleteInProgress') : t('common.delete')}
+        destructive
+        onConfirm={handleDeleteRoadtrip}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

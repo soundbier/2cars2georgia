@@ -47,85 +47,86 @@ export const de = {
   'common.undo': 'Rückgängig',
   'common.connecting': 'Verbinde mit Server …',
 
-  // --- Crew-Anmeldung ---------------------------------------------------
-  'crewGate.title': 'Wer ist an Bord?',
-  'crewGate.hint': 'Gerät einem Crewmitglied zuordnen, um Position und Logs zu erfassen.',
-  'crewGate.firstMemberHint':
-    'Dieser Roadtrip hat noch keine Crew. Trag dich als erstes Mitglied ein – du verwaltest die Crew danach.',
-  'crewGate.firstMemberLabel': 'Dein Name',
-  'crewGate.newHere': 'Neu dabei? Trag dich ein',
-  'crewGate.namePlaceholder': 'Name',
-  'crewGate.join': 'Beitreten',
-  'crewGate.nameTaken': '{name} ist bereits an Bord – oben auswählen.',
-  'crewGate.joinFailed': 'Beitreten fehlgeschlagen.',
+  // --- Anmeldung (persönliches Konto, siehe lib/authAccount.ts) ----------
+  'auth.signInHint': 'Mit E-Mail und Passwort anmelden.',
+  'auth.signUpHint': 'Neues Konto mit E-Mail und Passwort anlegen.',
+  'auth.tabSignIn': 'Anmelden',
+  'auth.tabSignUp': 'Registrieren',
+  'auth.emailPlaceholder': 'E-Mail-Adresse',
+  'auth.passwordPlaceholder': 'Passwort',
+  'auth.passwordConfirmPlaceholder': 'Passwort bestätigen',
+  'auth.submitting': 'Einen Moment …',
+  'auth.signInSubmit': 'Anmelden',
+  'auth.signUpSubmit': 'Konto anlegen',
+  'auth.orDivider': 'oder',
+  'auth.google': 'Mit Google anmelden',
+  'auth.forgotPassword': 'Passwort vergessen?',
+  'auth.resetNeedsEmail': 'Bitte zuerst die E-Mail-Adresse eingeben.',
+  'auth.resetSent': 'E-Mail zum Zurücksetzen des Passworts wurde verschickt.',
+  'auth.passwordMismatch': 'Die Passwörter stimmen nicht überein.',
 
-  // --- Roadtrip-Gate ----------------------------------------------------
-  'gate.joinHint': 'Roadtrip-Namen und Passwort der Crew eingeben, um beizutreten.',
-  'gate.createHint': 'Neuen Roadtrip anlegen und ein Passwort für die Crew festlegen.',
-  'gate.tabJoin': 'Beitreten',
-  'gate.tabCreate': 'Roadtrip erstellen',
-  'gate.namePlaceholder': 'Roadtrip-Name, z.B. Sommertour 2026',
-  'gate.passwordPlaceholder': 'Passwort',
-  'gate.recoveryCodePlaceholder': 'Wiederherstellungscode',
-  'gate.passwordConfirmPlaceholder': 'Passwort bestätigen',
-  'gate.submitting': 'Einen Moment …',
-  'gate.createSubmit': 'Roadtrip anlegen',
-  'gate.recoverySubmit': 'Mit Code anmelden',
-  'gate.joinSubmit': 'Beitreten',
-  'gate.usePassword': 'Doch mit normalem Passwort beitreten',
-  'gate.useRecoveryCode': 'Passwort vergessen? Mit Wiederherstellungscode anmelden',
-  'gate.createFootnote':
-    'Nach dem Anlegen zeigen wir dir einmalig einen Wiederherstellungscode – damit kommt ihr auch dann noch rein, wenn das Passwort mal vergessen wird.',
-  'gate.joinFootnote':
-    'Das Passwort teilst du der Crew z.B. persönlich oder per Chat mit – nur damit können andere diesem Roadtrip beitreten und Einträge sehen oder ändern.',
-  'gate.throttled': 'Zu viele Fehlversuche. Bitte {seconds} Sekunden warten.',
-  'gate.passwordMismatch': 'Die Passwörter stimmen nicht überein.',
-  'gate.recoverySuccess': 'Über Wiederherstellungscode angemeldet',
-  'gate.joinSuccess': 'Roadtrip beigetreten',
-
-  // --- Fehler der Anmeldung (Codes aus lib/roadtrip.ts) -----------------
-  'authError.nameTaken':
-    'Dieser Roadtrip-Name ist bereits vergeben. Wähle einen anderen Namen oder tritt dem bestehenden Roadtrip bei.',
-  'authError.wrongCredentials': 'Roadtrip-Name oder Passwort ist falsch.',
+  // --- Fehler der Anmeldung (Codes aus lib/authAccount.ts) ---------------
+  'authError.invalidEmail': 'Diese E-Mail-Adresse ist ungültig.',
+  'authError.emailInUse': 'Für diese E-Mail-Adresse existiert bereits ein Konto. Stattdessen anmelden?',
+  'authError.weakPassword': 'Das Passwort muss mindestens {min} Zeichen haben.',
+  'authError.wrongCredentials': 'E-Mail-Adresse oder Passwort ist falsch.',
   'authError.tooManyAttempts': 'Zu viele Versuche. Bitte kurz warten und erneut probieren.',
+  'authError.popupClosed': 'Anmeldefenster wurde geschlossen, bevor die Anmeldung abgeschlossen war.',
   'authError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
-  'authError.missingName': 'Bitte einen Namen für den Roadtrip eingeben.',
-  'authError.passwordTooShort': 'Das Passwort muss mindestens {min} Zeichen haben.',
-  'authError.adminPasswordSameAsTrip':
-    'Das Admin-Passwort muss sich vom Roadtrip-Passwort unterscheiden – sonst kennt es die ganze Crew.',
-  'authError.adminAlreadyExists': 'Für diesen Roadtrip ist bereits ein Admin-Passwort eingerichtet.',
-  'authError.invalidTripDates': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
-  'gate.adminPasswordPlaceholder': 'Admin-Passwort',
-  'gate.adminPasswordHint':
-    'Zweites, eigenes Passwort für endgültiges Löschen und das Verwalten der Crew. Nicht an alle weitergeben.',
-  'gate.startDatePlaceholder': 'Start der Reise',
-  'gate.endDatePlaceholder': 'Ende der Reise',
-  'gate.tripDatesHint': 'Der Reisezeitraum wird für den Speiseplan und die Tagesanzeige im Cockpit gebraucht.',
-  'admin.title': 'Admin-Zugang',
-  'admin.subtitle': 'Endgültiges Löschen und Crew verwalten',
-  'admin.active': 'Admin-Modus aktiv',
-  'admin.activeHint':
-    'Dieses Gerät darf endgültig löschen und die Crew verwalten. Zum Beenden den Roadtrip verlassen und normal wieder anmelden.',
-  'admin.enterHint':
-    'Mit dem Admin-Passwort anmelden, um endgültig zu löschen oder die Crew zu verwalten.',
-  'admin.passwordPlaceholder': 'Admin-Passwort',
-  'admin.start': 'Admin-Modus starten',
-  'admin.entered': 'Admin-Modus aktiv',
-  'admin.setUpTitle': 'Noch kein Admin-Passwort?',
-  'admin.setUpHint':
-    'Roadtrips, die vor dieser Funktion angelegt wurden, haben noch keinen Admin-Zugang. Wer das Roadtrip-Passwort kennt, kann ihn hier einmalig einrichten – am besten sofort, denn danach ist er belegt.',
-  'admin.setUp': 'Admin-Zugang einrichten',
-  'admin.setUpSuccess': 'Admin-Zugang eingerichtet – dieses Gerät ist jetzt im Admin-Modus.',
-  'admin.requiredForPurge': 'Endgültiges Löschen ist nur im Admin-Modus möglich.',
-  'admin.requiredForCrew': 'Mitglieder entfernen und Rollen vergeben ist nur im Admin-Modus möglich.',
 
-  // --- Wiederherstellungscode ------------------------------------------
-  'recovery.title': 'Wiederherstellungscode für „{tripName}“',
-  'recovery.description':
-    'Falls die Crew das Roadtrip-Passwort vergisst, kommt ihr nur mit diesem Code zurück an eure Daten. Er wird nirgends gespeichert und danach nie wieder angezeigt – jetzt sicher notieren (z.B. Passwort-Manager oder Papier).',
+  // --- Profil / Anzeigename (siehe lib/username.ts) -----------------------
+  'profile.title': 'Wie sollen wir dich nennen?',
+  'profile.hint': 'Dein Anzeigename ist für die ganze Crew sichtbar und muss eindeutig sein.',
+  'profile.namePlaceholder': 'Anzeigename',
+  'profile.submit': 'Weiter',
+
+  // --- Fehler beim Anzeigenamen (Codes aus lib/username.ts) --------------
+  'profileError.invalidName': 'Bitte einen gültigen Anzeigenamen eingeben.',
+  'profileError.nameTaken': 'Dieser Anzeigename ist bereits vergeben. Wähle einen anderen.',
+  'profileError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
+
+  // --- Roadtrip erstellen/beitreten (siehe lib/membership.ts) ------------
+  'trip.joinHint': 'Roadtrip-ID der Crew eingeben, um beizutreten.',
+  'trip.createHint': 'Neuen Roadtrip anlegen – du wirst automatisch Owner.',
+  'trip.tabJoin': 'Beitreten',
+  'trip.tabCreate': 'Roadtrip erstellen',
+  'trip.namePlaceholder': 'Roadtrip-Name, z.B. Sommertour 2026',
+  'trip.joinIdPlaceholder': 'Roadtrip-ID',
+  'trip.submitting': 'Einen Moment …',
+  'trip.createSubmit': 'Roadtrip anlegen',
+  'trip.joinSubmit': 'Beitreten',
+  'trip.startDatePlaceholder': 'Start der Reise',
+  'trip.endDatePlaceholder': 'Ende der Reise',
+  'trip.tripDatesHint': 'Der Reisezeitraum wird für den Speiseplan und die Tagesanzeige im Cockpit gebraucht.',
+  'trip.createFootnote':
+    'Nach dem Anlegen zeigen wir dir die Roadtrip-ID – die teilst du der Crew mit, damit sie beitreten kann.',
+  'trip.joinFootnote':
+    'Die Roadtrip-ID bekommst du vom Owner (siehe Einstellungen → Crew) – nur damit könnt ihr diesem Roadtrip beitreten.',
+  'trip.createdSuccess': '„{tripName}“ wurde angelegt.',
+  'trip.joinSuccess': '„{tripName}“ beigetreten.',
+
+  // --- Fehler bei Roadtrip erstellen/beitreten (Codes aus lib/membership.ts) --
+  'tripError.missingName': 'Bitte einen Namen bzw. eine Roadtrip-ID eingeben.',
+  'tripError.invalidTripDates': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
+  'tripError.tripNotFound': 'Kein Roadtrip mit dieser ID gefunden.',
+  'tripError.alreadyMember': 'Du bist diesem Roadtrip bereits beigetreten.',
+  'tripError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
+
+  'admin.requiredForPurge': 'Endgültiges Löschen ist nur dem Owner möglich.',
+
+  // --- Roadtrip endgültig löschen (Owner-Recht, siehe lib/membership.ts) --
+  'trip.deleteTitle': 'Roadtrip endgültig löschen',
+  'trip.deleteHint': 'Löscht den Roadtrip inklusive aller Einträge, Ausgaben und der Crew-Liste unwiderruflich.',
+  'trip.deleteButton': 'Roadtrip endgültig löschen',
+  'trip.deleteConfirmTitle': '„{tripName}“ endgültig löschen?',
+  'trip.deleteConfirmDescription':
+    'Alle Logs, Ausgaben, Gerichte und die Crew-Liste werden unwiderruflich gelöscht. Das kann nicht rückgängig gemacht werden.',
+  'trip.deleteInProgress': 'Wird gelöscht …',
+  'trip.deleteFailed': 'Löschen fehlgeschlagen. Bitte erneut versuchen.',
+
+  // --- Roadtrip-ID zum Einladen (siehe settings/CrewSettings.tsx) --------
   'recovery.copy': 'Kopieren',
   'recovery.copied': 'Kopiert',
-  'recovery.acknowledge': 'Ich habe den Code sicher gespeichert.',
 
   // --- Cockpit ----------------------------------------------------------
   'cockpit.title': 'Cockpit',
@@ -249,7 +250,7 @@ export const de = {
   'settings.title': 'Einstellungen',
   'settings.subtitle': 'Gerät, Anzeige und Daten dieser Reise',
   'settings.thisRoadtrip': 'Dieser Roadtrip',
-  'settings.roadtripProtected': 'Nur mit Roadtrip-Passwort erreichbar',
+  'settings.roadtripProtected': 'Nur für Mitglieder dieses Roadtrips sichtbar',
   'settings.thisDevice': 'Dieses Gerät',
   'settings.signedInProfile': 'Angemeldetes Profil',
   'settings.liveSync': 'Live-Sync',
@@ -285,7 +286,7 @@ export const de = {
   'settings.privacyValue': 'GPS, Namen und Kosten',
   'settings.app': 'App',
   'settings.version': 'Version',
-  'settings.logout': 'Profil abmelden',
+  'settings.logout': 'Konto abmelden',
   'settings.leaveRoadtrip': 'Roadtrip verlassen',
   'settings.crewCount_one': '{count} Mitglied',
   'settings.crewCount_other': '{count} Mitglieder',
@@ -296,11 +297,10 @@ export const de = {
   'crew.title': 'Crew',
   'crew.subtitle': 'Wer an Bord ist und Logs erfassen kann',
   'crew.section': 'Besatzung ({count})',
-  'crew.newNamePlaceholder': 'Neuer Name',
-  'crew.addMember': 'Crewmitglied hinzufügen',
+  'crew.inviteTitle': 'Crew einladen',
+  'crew.inviteHint': 'Diese Roadtrip-ID an die Crew weitergeben – wer sie kennt, kann beitreten.',
   'crew.removeMember': '{name} entfernen',
   'crew.self': '{name} (Du)',
-  'crew.alreadyAboard': '{name} ist bereits an Bord.',
   'crew.cannotRemoveSelf': 'Du kannst dich nicht selbst löschen.',
   'crew.removed': '{name} entfernt',
   'crew.removeTitle': 'Crewmitglied entfernen',
@@ -311,7 +311,7 @@ export const de = {
   'crew.role.readonly': 'Nur Lesen',
   'crew.roleLabel': 'Rolle von {name}',
   'crew.roleUpdated': '{name} ist jetzt {role}.',
-  'crew.onlyOwnerCanManage': 'Nur Owner können Crewmitglieder einladen, entfernen oder Rollen vergeben.',
+  'crew.onlyOwnerCanManage': 'Nur Owner können Crewmitglieder entfernen oder Rollen vergeben.',
   'crew.lastOwnerRequired': 'Mindestens ein Owner muss übrig bleiben.',
   'crew.readonlyHint': 'Nur-Lesen-Zugriff: Ansehen ist möglich, Ändern nicht.',
 

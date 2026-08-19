@@ -24,6 +24,7 @@ const LIMITS = {
   stack: 4000,
   context: 200,
   author: 60,
+  authorId: 128,
   appVersion: 40,
   userAgent: 500,
   url: 500
@@ -38,12 +39,18 @@ const DEDUPE_WINDOW_MS = 60_000;
 
 let tripId: string | null = null;
 let author: string | null = null;
+let authorId: string | null = null;
 const lastLogged = new Map<string, number>();
 
 /** Ordnet die Berichte dem angemeldeten Roadtrip/Crewmitglied zu (siehe App.tsx). */
-export function setErrorLogContext(nextTripId: string | null, nextAuthor: string | null): void {
+export function setErrorLogContext(
+  nextTripId: string | null,
+  nextAuthor: string | null,
+  nextAuthorId: string | null = null
+): void {
   tripId = nextTripId;
   author = nextAuthor;
+  authorId = nextAuthorId;
   lastLogged.clear();
 }
 
@@ -103,6 +110,7 @@ export function logError(err: unknown, context?: string): void {
   if (stack) entry.stack = clip(stack, LIMITS.stack);
   if (context) entry.context = clip(context, LIMITS.context);
   if (author) entry.author = clip(author, LIMITS.author);
+  if (authorId) entry.authorId = clip(authorId, LIMITS.authorId);
   const version = appVersion();
   if (version) entry.appVersion = clip(version, LIMITS.appVersion);
   if (typeof navigator !== 'undefined') entry.userAgent = clip(navigator.userAgent, LIMITS.userAgent);
@@ -129,5 +137,6 @@ export function installGlobalErrorLogging(): void {
 export function __resetErrorLogForTests(): void {
   tripId = null;
   author = null;
+  authorId = null;
   lastLogged.clear();
 }

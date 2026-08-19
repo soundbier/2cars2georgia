@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { useT } from '../i18n';
-import { DEFAULT_QUICK_LOG_SEEDS, CrewRoles, QuickLogConfig } from '../types';
+import { DEFAULT_QUICK_LOG_SEEDS, CrewRole, QuickLogConfig } from '../types';
 
 /**
  * Abonniert eine Liste aus der settings-Collection des aktuellen Roadtrips
@@ -74,46 +74,57 @@ export function useQuickLogs(): QuickLogConfig[] {
   return useSettingsList<QuickLogConfig>('quicklogs', 'items', defaults).items;
 }
 
+/** Ein Crewmitglied, wie unter roadtrips/{tripId}/members/{uid} gespeichert. */
+export interface CrewMember {
+  uid: string;
+  displayName: string;
+  role: CrewRole;
+}
+
 /**
- * Roadtrip-weit synchronisierte Crew-Liste inklusive Rollen
- * (settings/general, Felder "users" und optional "roles" – siehe
- * firestore.rules und lib/permissions.ts für die effektive Rolle).
+ * Roadtrip-weite Crew-Liste inklusive Rollen, gelesen aus der
+ * Mitgliedschafts-Collection `roadtrips/{tripId}/members` (siehe
+ * lib/membership.ts und firestore.rules). Jedes Mitglied ist eine echte
+ * Firebase-UID mit einer direkt am Dokument gespeicherten Rolle – anders als
+ * früher gibt es keine implizite Owner-Herleitung mehr, die Rolle steht
+ * immer explizit.
  *
- * Eigenständig statt über useSettingsList: Die Rollenzuordnung ist eine Map
- * ohne Standardwerte, die beim ersten Start bewusst NICHT mitgeschrieben
- * wird – ein Roadtrip ohne "roles"-Feld ist kein Fehlerfall, sondern der
- * Normalzustand vor der ersten expliziten Rollenvergabe.
+ * `users` bleibt zusätzlich als reine Namensliste erhalten, weil mehrere
+ * Seiten (Bordkasse-Abrechnung, Export) nur die Anzeigenamen brauchen.
  */
 export function useCrew() {
   const { tripId } = useRoadtrip();
-  const [users, setUsers] = useState<string[]>([]);
-  const [roles, setRoles] = useState<CrewRoles>({});
+  const [members, setMembers] = useState<CrewMember[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!tripId) {
-      setUsers([]);
-      setRoles({});
+      setMembers([]);
       setLoading(false);
       return;
     }
-    const docRef = doc(db, tripPath(tripId, 'settings', 'general'));
     return onSnapshot(
-      docRef,
-      (docSnap) => {
-        const data = docSnap.exists() ? docSnap.data() : undefined;
-        setUsers((data?.users as string[] | undefined) ?? []);
-        setRoles((data?.roles as CrewRoles | undefined) ?? {});
+      collection(db, tripPath(tripId, 'members')),
+      (snap) => {
+        setMembers(
+          snap.docs.map((d) => ({
+            uid: d.id,
+            displayName: (d.data().displayName as string | undefined) ?? d.id,
+            role: (d.data().role as CrewRole | undefined) ?? 'member'
+          }))
+        );
         setLoading(false);
       },
       (err) => {
-        console.error('Firestore-Fehler (settings/general):', err);
+        console.error('Firestore-Fehler (members):', err);
         setLoading(false);
       }
     );
   }, [tripId]);
 
-  return { users, roles, loading };
+  const users = useMemo(() => members.map((m) => m.displayName), [members]);
+
+  return { members, users, loading };
 }
 
 /**

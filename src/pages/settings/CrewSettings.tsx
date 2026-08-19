@@ -1,19 +1,17 @@
 import { useState } from 'react';
-import { doc, updateDoc, arrayRemove, deleteField, FieldValue } from 'firebase/firestore';
-import { UserPlus, Trash2, ShieldCheck } from 'lucide-react';
-import { db } from '../../firebase';
-import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
+import { Trash2, ShieldCheck, Copy, Check } from 'lucide-react';
+import { useRoadtrip } from '../../hooks/useRoadtrip';
 import { useCrew } from '../../hooks/useSettings';
 import { usePermissions } from '../../hooks/usePermissions';
-import { CREW_ROLES, ROLE_LABEL_KEY, countOwners, getEffectiveRole } from '../../lib/permissions';
+import { CREW_ROLES, ROLE_LABEL_KEY, countOwners } from '../../lib/permissions';
+import { removeMember, updateMemberRole } from '../../lib/membership';
 import { trackWrite } from '../../lib/pendingWrites';
-import { MAX_CREW_NAME_LENGTH, addCrewMember, isCrewNameTaken, normalizeCrewName } from '../../lib/crew';
 import { getUserColor } from '../../lib/userColors';
 import { useT } from '../../i18n';
 import { CrewRole } from '../../types';
 import {
+  Button,
   IconButton,
-  Input,
   Select,
   Section,
   ListItem,
@@ -23,64 +21,50 @@ import {
 } from '../../components/ui';
 import '../Settings.css';
 
-interface Props {
-  currentUser: string;
-  users: string[];
-}
-
-export default function CrewSettings({ currentUser, users }: Props) {
-  const { tripId, isAdmin } = useRoadtrip();
-  const { roles } = useCrew();
-  const { isOwner } = usePermissions(currentUser);
-  // Entfernen und Rollen vergeben verlangt laut firestore.rules den
-  // Admin-Zugang – die Owner-Rolle allein ist reine Anzeige, sie steht in
-  // denselben Daten, die sie schützen soll. Eintragen darf weiterhin jedes
-  // Crewmitglied, das ist offline unterwegs der Normalfall.
-  const canManage = isAdmin;
-  const [newUser, setNewUser] = useState('');
+/**
+ * Crew-Verwaltung eines Roadtrips: Liste der Mitglieder aus
+ * roadtrips/{tripId}/members (siehe hooks/useSettings.ts), Rollen
+ * vergeben und entfernen. Beitreten passiert nicht mehr hier, sondern
+ * eigenständig über die Roadtrip-ID (siehe lib/membership.ts) – wer die ID
+ * kennt, trägt sich selbst als Mitglied ein. Angemeldete Person und
+ * Mitgliederliste kommen direkt aus dem Kontext (useRoadtrip/useCrew), nicht
+ * mehr aus Props.
+ */
+export default function CrewSettings() {
+  const { tripId, authUser } = useRoadtrip();
+  const { members } = useCrew();
+  const { isOwner } = usePermissions();
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const { notify } = useToast();
   const t = useT();
 
-  const saveCrew = (change: Record<string, FieldValue | string>) => {
-    if (!tripId) return Promise.resolve();
-    return trackWrite(updateDoc(doc(db, tripPath(tripId, 'settings', 'general')), change));
-  };
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = normalizeCrewName(newUser);
-    if (!name) return;
-    if (isCrewNameTaken(users, name)) {
-      notify(t('crew.alreadyAboard', { name }), 'danger');
-      return;
-    }
+  const handleCopyTripId = async () => {
     if (!tripId) return;
     try {
-      // Nur der Name – eine Rolle vergibt erst der Admin-Zugang (siehe
-      // firestore.rules). Derselbe Helfer wie beim Selbst-Eintragen im
-      // CrewGate, damit beide Wege dasselbe schreiben.
-      await trackWrite(addCrewMember(tripId, name));
-      setNewUser('');
-    } catch (err) {
-      console.error(err);
-      notify(t('common.saveError'), 'danger');
+      await navigator.clipboard.writeText(tripId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard-API kann fehlen/verweigert werden – die ID steht ohnehin
+      // lesbar da, Abtippen bleibt möglich.
     }
   };
 
-  const handleRemoveClick = (name: string) => {
-    if (name === currentUser) {
+  const handleRemoveClick = (uid: string) => {
+    if (uid === authUser?.uid) {
       notify(t('crew.cannotRemoveSelf'), 'danger');
       return;
     }
-    setPendingRemoval(name);
+    setPendingRemoval(uid);
   };
 
   const confirmRemoveUser = async () => {
-    if (!pendingRemoval) return;
+    if (!pendingRemoval || !tripId) return;
+    const target = members.find((m) => m.uid === pendingRemoval);
     try {
-      await saveCrew({ users: arrayRemove(pendingRemoval), [`roles.${pendingRemoval}`]: deleteField() });
-      notify(t('crew.removed', { name: pendingRemoval }), 'success');
+      await trackWrite(removeMember(tripId, pendingRemoval));
+      notify(t('crew.removed', { name: target?.displayName ?? '' }), 'success');
     } catch (err) {
       console.error(err);
       notify(t('common.deleteError'), 'danger');
@@ -88,17 +72,21 @@ export default function CrewSettings({ currentUser, users }: Props) {
     setPendingRemoval(null);
   };
 
-  const handleRoleChange = async (name: string, role: CrewRole) => {
-    const current = getEffectiveRole(users, roles, name);
+  const handleRoleChange = async (uid: string, name: string, role: CrewRole) => {
+    if (!tripId) return;
+    const current = members.find((m) => m.uid === uid)?.role;
     if (current === role) return;
     // Mindestens ein Owner muss übrig bleiben, sonst kann niemand mehr die
-    // Crew verwalten – auch nicht, um den Fehler zu korrigieren.
-    if (current === 'owner' && role !== 'owner' && countOwners(users, roles) <= 1) {
+    // Crew verwalten – auch nicht, um den Fehler zu korrigieren. Nur eine
+    // UI-Warnung: firestore.rules kennt diese Zählung nicht (siehe
+    // lib/permissions.ts), das Gerät mit dem letzten Owner könnte sie
+    // theoretisch umgehen.
+    if (current === 'owner' && role !== 'owner' && countOwners(members) <= 1) {
       notify(t('crew.lastOwnerRequired'), 'danger');
       return;
     }
     try {
-      await saveCrew({ [`roles.${name}`]: role });
+      await trackWrite(updateMemberRole(tripId, uid, role));
       notify(t('crew.roleUpdated', { name, role: t(ROLE_LABEL_KEY[role]) }), 'success');
     } catch (err) {
       console.error(err);
@@ -115,88 +103,79 @@ export default function CrewSettings({ currentUser, users }: Props) {
         backLabel={t('settings.title')}
       />
 
-      <Section title={t('crew.section', { count: users.length })}>
-        {canManage || isOwner ? (
-          <form onSubmit={handleAddUser} className="row settings-add-form">
-            <Input
-              placeholder={t('crew.newNamePlaceholder')}
-              value={newUser}
-              maxLength={MAX_CREW_NAME_LENGTH}
-              onChange={(e) => setNewUser(e.target.value)}
-            />
-            <IconButton type="submit" label={t('crew.addMember')} tone="accent" disabled={!newUser.trim()}>
-              <UserPlus size={20} />
-            </IconButton>
-          </form>
-        ) : (
+      <Section title={t('crew.inviteTitle')}>
+        <p className="helper-text">{t('crew.inviteHint')}</p>
+        <div className="row settings-add-form">
+          <code className="recovery-code-value">{tripId}</code>
+          <Button type="button" variant="secondary" onClick={handleCopyTripId}>
+            {copied ? <Check size={16} /> : <Copy size={16} />}
+            {copied ? t('recovery.copied') : t('recovery.copy')}
+          </Button>
+        </div>
+      </Section>
+
+      <Section title={t('crew.section', { count: members.length })}>
+        {!isOwner && (
           <p className="helper-text setting-note">
             <ShieldCheck size={13} className="setting-note-icon" />
             {t('crew.onlyOwnerCanManage')}
           </p>
         )}
 
-        {isOwner && !canManage && (
-          <p className="helper-text setting-note">
-            <ShieldCheck size={13} className="setting-note-icon" />
-            {t('admin.requiredForCrew')}
-          </p>
-        )}
-
         <div className="settings-list">
-          {users.map((name) => {
-            const role = getEffectiveRole(users, roles, name);
-            return (
-              <ListItem
-                key={name}
-                leading={
-                  <span className="avatar" style={{ background: getUserColor(name), color: '#ffffff' }}>
-                    {name.charAt(0).toUpperCase()}
-                  </span>
-                }
-                title={
-                  name === currentUser ? (
-                    <span className="settings-list-self">{t('crew.self', { name })}</span>
-                  ) : (
-                    name
-                  )
-                }
-                subtitle={!canManage ? t(ROLE_LABEL_KEY[role]) : undefined}
-                trailing={
-                  canManage ? (
-                    <>
-                      <Select
-                        className="setting-select"
-                        aria-label={t('crew.roleLabel', { name })}
-                        value={role}
-                        onChange={(e) => handleRoleChange(name, e.target.value as CrewRole)}
-                      >
-                        {CREW_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {t(ROLE_LABEL_KEY[r])}
-                          </option>
-                        ))}
-                      </Select>
-                      <IconButton
-                        label={t('crew.removeMember', { name })}
-                        tone="danger"
-                        onClick={() => handleRemoveClick(name)}
-                        disabled={name === currentUser}
-                      >
-                        <Trash2 size={17} />
-                      </IconButton>
-                    </>
-                  ) : undefined
-                }
-              />
-            );
-          })}
+          {members.map(({ uid, displayName, role }) => (
+            <ListItem
+              key={uid}
+              leading={
+                <span className="avatar" style={{ background: getUserColor(displayName), color: '#ffffff' }}>
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              }
+              title={
+                uid === authUser?.uid ? (
+                  <span className="settings-list-self">{t('crew.self', { name: displayName })}</span>
+                ) : (
+                  displayName
+                )
+              }
+              subtitle={!isOwner ? t(ROLE_LABEL_KEY[role]) : undefined}
+              trailing={
+                isOwner ? (
+                  <>
+                    <Select
+                      className="setting-select"
+                      aria-label={t('crew.roleLabel', { name: displayName })}
+                      value={role}
+                      onChange={(e) => handleRoleChange(uid, displayName, e.target.value as CrewRole)}
+                    >
+                      {CREW_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {t(ROLE_LABEL_KEY[r])}
+                        </option>
+                      ))}
+                    </Select>
+                    <IconButton
+                      label={t('crew.removeMember', { name: displayName })}
+                      tone="danger"
+                      onClick={() => handleRemoveClick(uid)}
+                      disabled={uid === authUser?.uid}
+                    >
+                      <Trash2 size={17} />
+                    </IconButton>
+                  </>
+                ) : undefined
+              }
+            />
+          ))}
         </div>
       </Section>
 
       <ConfirmDialog
         open={pendingRemoval !== null}
         title={t('crew.removeTitle')}
-        description={t('crew.removeDescription', { name: pendingRemoval ?? '' })}
+        description={t('crew.removeDescription', {
+          name: members.find((m) => m.uid === pendingRemoval)?.displayName ?? ''
+        })}
         confirmLabel={t('common.remove')}
         destructive
         onConfirm={confirmRemoveUser}

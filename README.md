@@ -31,25 +31,32 @@ Die Displayschrift (Archivo Narrow, selbst gehostet) lässt sich mit
 `tools/font-preview.html` gegen Alternativen vergleichen: Die Datei zeigt die
 Kandidaten in den Größen aus `tokens.css` mit echten App-Zeichenketten.
 
-## Zugänge eines Roadtrips
+## Konten & Zugänge
 
-Pro Roadtrip gibt es drei technische Firebase-Auth-User mit demselben lokalen
-E-Mail-Teil (der Roadtrip-ID) und unterschiedlichen Domains – die
-Firestore-Regeln lesen daran ab, womit ein Gerät angemeldet ist:
+Jede Person meldet sich mit einem persönlichen Firebase-Auth-Konto an
+(E-Mail/Passwort oder Google, siehe `src/lib/authAccount.ts`) und legt beim
+ersten Login einen eindeutigen Anzeigenamen fest (`src/lib/username.ts`,
+serverseitig über `usernames/{normalizedName}` reserviert).
 
-| Domain | Passwort | Darf |
-| --- | --- | --- |
-| `@2cars2georgia.trip` | Roadtrip-Passwort (kennt die Crew) | alles im Alltag: Einträge anlegen, ändern, in den Papierkorb legen, sich selbst in die Crew eintragen |
-| `@2cars2georgia.admin` | Admin-Passwort (beim Anlegen vergeben) | zusätzlich: endgültig löschen, Mitglieder entfernen, Rollen vergeben |
-| `@2cars2georgia.recovery` | einmalig angezeigter Wiederherstellungscode | wie der Roadtrip-Zugang – der Weg zurück, wenn das Roadtrip-Passwort weg ist |
+Ein Roadtrip ist ein Dokument unter `roadtrips/{tripId}` mit einer
+Mitgliedschafts-Collection `roadtrips/{tripId}/members/{uid}`
+(`src/lib/membership.ts`). Wer einen Roadtrip anlegt, wird automatisch
+`owner`; Beitreten geschieht über die Roadtrip-ID (kein gemeinsames
+Passwort mehr).
 
-Der Admin-Modus wird bei Bedarf unter *Mehr → Admin-Zugang* gestartet und
-bleibt bis zum Verlassen des Roadtrips aktiv. Roadtrips, die vor dieser
-Funktion angelegt wurden, richten den Admin-Zugang dort einmalig ein.
+| Rolle | Darf |
+| --- | --- |
+| `owner` | alles: Einträge anlegen/ändern/löschen, Crew verwalten (Rollen vergeben, entfernen), Roadtrip endgültig löschen |
+| `member` | Einträge anlegen/ändern, in den Papierkorb legen – keine Crew-Verwaltung, kein endgültiges Löschen |
+| `readonly` | nur lesen |
 
-Die Rollen in `settings/general` (Owner/Mitfahrer/Read-only) sind davon
-unabhängig und steuern nur die Oberfläche – durchgesetzt wird ausschließlich,
-was in `firestore.rules` steht.
+Durchgesetzt wird ausschließlich, was in `firestore.rules` steht – die
+Rolle aus `members/{uid}` ist dort die alleinige Grundlage, nicht die
+Oberfläche.
+
+In der Firebase Console müssen unter Authentication die Anbieter
+„E-Mail/Passwort" und „Google" aktiviert sein, sonst schlagen die
+entsprechenden Anmeldewege fehl.
 
 ## Firestore-Regeln veröffentlichen
 

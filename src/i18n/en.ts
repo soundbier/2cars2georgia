@@ -42,84 +42,86 @@ export const en: Translations = {
   'common.undo': 'Undo',
   'common.connecting': 'Connecting to server …',
 
-  // --- Crew sign-in -----------------------------------------------------
-  'crewGate.title': 'Who is aboard?',
-  'crewGate.hint': 'Assign this device to a crew member to record position and log entries.',
-  'crewGate.firstMemberHint':
-    'This roadtrip has no crew yet. Add yourself as the first member – you will manage the crew afterwards.',
-  'crewGate.firstMemberLabel': 'Your name',
-  'crewGate.newHere': 'New here? Add yourself',
-  'crewGate.namePlaceholder': 'Name',
-  'crewGate.join': 'Join',
-  'crewGate.nameTaken': '{name} is already aboard – pick the name above.',
-  'crewGate.joinFailed': 'Could not join.',
+  // --- Sign-in (personal account, see lib/authAccount.ts) ---------------
+  'auth.signInHint': 'Sign in with email and password.',
+  'auth.signUpHint': 'Create a new account with email and password.',
+  'auth.tabSignIn': 'Sign in',
+  'auth.tabSignUp': 'Sign up',
+  'auth.emailPlaceholder': 'Email address',
+  'auth.passwordPlaceholder': 'Password',
+  'auth.passwordConfirmPlaceholder': 'Confirm password',
+  'auth.submitting': 'One moment …',
+  'auth.signInSubmit': 'Sign in',
+  'auth.signUpSubmit': 'Create account',
+  'auth.orDivider': 'or',
+  'auth.google': 'Sign in with Google',
+  'auth.forgotPassword': 'Forgot password?',
+  'auth.resetNeedsEmail': 'Please enter your email address first.',
+  'auth.resetSent': 'Password reset email has been sent.',
+  'auth.passwordMismatch': 'The passwords do not match.',
 
-  // --- Roadtrip gate ----------------------------------------------------
-  'gate.joinHint': "Enter the roadtrip's name and the crew password to join.",
-  'gate.createHint': 'Create a new roadtrip and set a password for the crew.',
-  'gate.tabJoin': 'Join',
-  'gate.tabCreate': 'Create roadtrip',
-  'gate.namePlaceholder': 'Roadtrip name, e.g. Summer Tour 2026',
-  'gate.passwordPlaceholder': 'Password',
-  'gate.recoveryCodePlaceholder': 'Recovery code',
-  'gate.passwordConfirmPlaceholder': 'Confirm password',
-  'gate.submitting': 'One moment …',
-  'gate.createSubmit': 'Create roadtrip',
-  'gate.recoverySubmit': 'Sign in with code',
-  'gate.joinSubmit': 'Join',
-  'gate.usePassword': 'Use the normal password instead',
-  'gate.useRecoveryCode': 'Forgot the password? Sign in with a recovery code',
-  'gate.createFootnote':
-    'After creating the roadtrip we show you a recovery code once – it gets you back in if the password is ever forgotten.',
-  'gate.joinFootnote':
-    'Share the password with your crew in person or by chat – it is the only way for others to join this roadtrip and see or change entries.',
-  'gate.throttled': 'Too many failed attempts. Please wait {seconds} seconds.',
-  'gate.passwordMismatch': 'The passwords do not match.',
-  'gate.recoverySuccess': 'Signed in with recovery code',
-  'gate.joinSuccess': 'Joined the roadtrip',
-
-  // --- Sign-in errors (codes from lib/roadtrip.ts) ----------------------
-  'authError.nameTaken':
-    'That roadtrip name is already taken. Pick another name, or join the existing roadtrip.',
-  'authError.wrongCredentials': 'Roadtrip name or password is incorrect.',
+  // --- Sign-in errors (codes from lib/authAccount.ts) --------------------
+  'authError.invalidEmail': 'That email address is invalid.',
+  'authError.emailInUse': 'An account already exists for that email address. Sign in instead?',
+  'authError.weakPassword': 'The password must be at least {min} characters long.',
+  'authError.wrongCredentials': 'Email address or password is incorrect.',
   'authError.tooManyAttempts': 'Too many attempts. Please wait a moment and try again.',
+  'authError.popupClosed': 'The sign-in window was closed before finishing.',
   'authError.unknown': 'Something went wrong. Please try again.',
-  'authError.missingName': 'Please enter a name for the roadtrip.',
-  'authError.passwordTooShort': 'The password must be at least {min} characters long.',
-  'authError.adminPasswordSameAsTrip':
-    'The admin password must differ from the roadtrip password – otherwise the whole crew knows it.',
-  'authError.adminAlreadyExists': 'This roadtrip already has an admin password.',
-  'authError.invalidTripDates': 'The end date cannot be before the start date.',
-  'gate.adminPasswordPlaceholder': 'Admin password',
-  'gate.adminPasswordHint':
-    'A second, separate password for permanent deletion and crew management. Do not share it with everyone.',
-  'gate.startDatePlaceholder': 'Trip start',
-  'gate.endDatePlaceholder': 'Trip end',
-  'gate.tripDatesHint': 'The trip dates are used for the meal plan and the day counter in the cockpit.',
-  'admin.title': 'Admin access',
-  'admin.subtitle': 'Permanent deletion and crew management',
-  'admin.active': 'Admin mode active',
-  'admin.activeHint':
-    'This device may delete permanently and manage the crew. To end it, leave the roadtrip and sign in normally again.',
-  'admin.enterHint': 'Sign in with the admin password to delete permanently or manage the crew.',
-  'admin.passwordPlaceholder': 'Admin password',
-  'admin.start': 'Start admin mode',
-  'admin.entered': 'Admin mode active',
-  'admin.setUpTitle': 'No admin password yet?',
-  'admin.setUpHint':
-    'Roadtrips created before this feature have no admin access yet. Anyone who knows the roadtrip password can set it up once here – best done right away, because afterwards it is taken.',
-  'admin.setUp': 'Set up admin access',
-  'admin.setUpSuccess': 'Admin access set up – this device is now in admin mode.',
-  'admin.requiredForPurge': 'Permanent deletion requires admin mode.',
-  'admin.requiredForCrew': 'Removing members and assigning roles requires admin mode.',
 
-  // --- Recovery code ----------------------------------------------------
-  'recovery.title': 'Recovery code for “{tripName}”',
-  'recovery.description':
-    'If the crew forgets the roadtrip password, this code is the only way back to your data. It is stored nowhere and never shown again – write it down somewhere safe now (a password manager or paper).',
+  // --- Profile / display name (see lib/username.ts) ----------------------
+  'profile.title': 'What should we call you?',
+  'profile.hint': 'Your display name is visible to the whole crew and must be unique.',
+  'profile.namePlaceholder': 'Display name',
+  'profile.submit': 'Continue',
+
+  // --- Display name errors (codes from lib/username.ts) ------------------
+  'profileError.invalidName': 'Please enter a valid display name.',
+  'profileError.nameTaken': 'That display name is already taken. Pick another one.',
+  'profileError.unknown': 'Something went wrong. Please try again.',
+
+  // --- Create/join a roadtrip (see lib/membership.ts) ---------------------
+  'trip.joinHint': "Enter the crew's roadtrip ID to join.",
+  'trip.createHint': 'Create a new roadtrip – you automatically become its owner.',
+  'trip.tabJoin': 'Join',
+  'trip.tabCreate': 'Create roadtrip',
+  'trip.namePlaceholder': 'Roadtrip name, e.g. Summer Tour 2026',
+  'trip.joinIdPlaceholder': 'Roadtrip ID',
+  'trip.submitting': 'One moment …',
+  'trip.createSubmit': 'Create roadtrip',
+  'trip.joinSubmit': 'Join',
+  'trip.startDatePlaceholder': 'Trip start',
+  'trip.endDatePlaceholder': 'Trip end',
+  'trip.tripDatesHint': 'The trip dates are used for the meal plan and the day counter in the cockpit.',
+  'trip.createFootnote':
+    'After creating it we show you the roadtrip ID – share it with your crew so they can join.',
+  'trip.joinFootnote':
+    "Get the roadtrip ID from the owner (see Settings → Crew) – it's the only way to join this roadtrip.",
+  'trip.createdSuccess': '“{tripName}” was created.',
+  'trip.joinSuccess': 'Joined “{tripName}”.',
+
+  // --- Create/join errors (codes from lib/membership.ts) -----------------
+  'tripError.missingName': 'Please enter a name or a roadtrip ID.',
+  'tripError.invalidTripDates': 'The end date cannot be before the start date.',
+  'tripError.tripNotFound': 'No roadtrip found with that ID.',
+  'tripError.alreadyMember': 'You have already joined this roadtrip.',
+  'tripError.unknown': 'Something went wrong. Please try again.',
+
+  'admin.requiredForPurge': 'Permanent deletion is only possible for the owner.',
+
+  // --- Delete roadtrip permanently (owner right, see lib/membership.ts) --
+  'trip.deleteTitle': 'Delete roadtrip permanently',
+  'trip.deleteHint': 'Permanently deletes the roadtrip, including all entries, expenses and the crew list.',
+  'trip.deleteButton': 'Delete roadtrip permanently',
+  'trip.deleteConfirmTitle': 'Permanently delete “{tripName}”?',
+  'trip.deleteConfirmDescription':
+    'All logs, expenses, dishes and the crew list will be deleted permanently. This cannot be undone.',
+  'trip.deleteInProgress': 'Deleting …',
+  'trip.deleteFailed': 'Deletion failed. Please try again.',
+
+  // --- Roadtrip ID to invite the crew (see settings/CrewSettings.tsx) ----
   'recovery.copy': 'Copy',
   'recovery.copied': 'Copied',
-  'recovery.acknowledge': 'I have stored the code somewhere safe.',
 
   // --- Cockpit ----------------------------------------------------------
   'cockpit.title': 'Cockpit',
@@ -241,7 +243,7 @@ export const en: Translations = {
   'settings.title': 'Settings',
   'settings.subtitle': 'Device, display and data of this trip',
   'settings.thisRoadtrip': 'This roadtrip',
-  'settings.roadtripProtected': 'Only reachable with the roadtrip password',
+  'settings.roadtripProtected': 'Only visible to members of this roadtrip',
   'settings.thisDevice': 'This device',
   'settings.signedInProfile': 'Signed-in profile',
   'settings.liveSync': 'Live sync',
@@ -277,7 +279,7 @@ export const en: Translations = {
   'settings.privacyValue': 'GPS, names and costs',
   'settings.app': 'App',
   'settings.version': 'Version',
-  'settings.logout': 'Sign out profile',
+  'settings.logout': 'Sign out account',
   'settings.leaveRoadtrip': 'Leave roadtrip',
   'settings.crewCount_one': '{count} member',
   'settings.crewCount_other': '{count} members',
@@ -288,11 +290,10 @@ export const en: Translations = {
   'crew.title': 'Crew',
   'crew.subtitle': 'Who is aboard and can record entries',
   'crew.section': 'Crew ({count})',
-  'crew.newNamePlaceholder': 'New name',
-  'crew.addMember': 'Add crew member',
+  'crew.inviteTitle': 'Invite crew',
+  'crew.inviteHint': 'Share this roadtrip ID with your crew – anyone who knows it can join.',
   'crew.removeMember': 'Remove {name}',
   'crew.self': '{name} (you)',
-  'crew.alreadyAboard': '{name} is already aboard.',
   'crew.cannotRemoveSelf': 'You cannot remove yourself.',
   'crew.removed': '{name} removed',
   'crew.removeTitle': 'Remove crew member',
@@ -303,7 +304,7 @@ export const en: Translations = {
   'crew.role.readonly': 'Read-only',
   'crew.roleLabel': 'Role of {name}',
   'crew.roleUpdated': '{name} is now {role}.',
-  'crew.onlyOwnerCanManage': 'Only owners can invite or remove crew members, or change roles.',
+  'crew.onlyOwnerCanManage': 'Only owners can remove crew members or change roles.',
   'crew.lastOwnerRequired': 'At least one owner must remain.',
   'crew.readonlyHint': 'Read-only access: viewing works, changes do not.',
 

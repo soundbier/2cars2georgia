@@ -62,20 +62,13 @@ export const DEFAULT_QUICK_LOG_SEEDS: QuickLogSeed[] = [
 // Hand gelöscht werden mussten.
 
 /**
- * Rolle eines Crewmitglieds innerhalb des Roadtrips, siehe lib/permissions.ts:
- * - owner: darf die Crew verwalten (einladen, entfernen, Rollen vergeben).
+ * Rolle eines Crewmitglieds innerhalb des Roadtrips (roadtrips/{tripId}/members/{uid}.role,
+ * siehe lib/membership.ts und lib/permissions.ts):
+ * - owner: darf die Crew verwalten (entfernen, Rollen vergeben) und den Roadtrip löschen.
  * - member: normales Crewmitglied ("Mitfahrer"), erfasst/bearbeitet Einträge.
  * - readonly: sieht alles, kann aber nichts anlegen, ändern oder löschen.
  */
 export type CrewRole = 'owner' | 'member' | 'readonly';
-
-/**
- * Rollenzuordnung im settings/general-Dokument. Ein fehlender Eintrag ist
- * kein Fehler – getEffectiveRole() in lib/permissions.ts liefert dafür einen
- * sinnvollen Standard, damit bestehende Roadtrips ohne dieses Feld weiter
- * funktionieren.
- */
-export type CrewRoles = Partial<Record<string, CrewRole>>;
 
 export interface Coordinates {
   lat: number;
@@ -97,6 +90,8 @@ export interface GpsPoint extends LivePosition {
   id?: string;
   timestamp: number;
   author: string;
+  /** UID der Person, die den Punkt erzeugt hat, siehe firestore.rules. Optional für ältere Punkte. */
+  authorId?: string;
 }
 
 export interface LogEvent extends Coordinates {
