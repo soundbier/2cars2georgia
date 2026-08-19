@@ -39,6 +39,7 @@ import Dishes from './pages/kombuese/Dishes';
 import ShoppingList from './pages/kombuese/ShoppingList';
 import Inventory from './pages/kombuese/Inventory';
 import Privacy from './pages/Privacy';
+import PrivacyOnboarding from './pages/PrivacyOnboarding';
 
 const NAV_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = [
   { to: '/', labelKey: 'nav.cockpit', icon: Gauge },
@@ -184,9 +185,13 @@ export default function App() {
           {/* App-weit gemountet, unabhängig vom Anmeldestatus: Ein Deploy soll auch
               erreichen, wer gerade erst angemeldet ist. */}
           <UpdatePrompt />
-          <RoadtripProvider>
-            <AppGate />
-          </RoadtripProvider>
+          {/* Muss vor jedem Login und vor dem ersten App-Start bestätigt werden,
+              siehe PrivacyOnboarding.tsx – deshalb außerhalb von RoadtripProvider. */}
+          <PrivacyOnboarding>
+            <RoadtripProvider>
+              <AppGate />
+            </RoadtripProvider>
+          </PrivacyOnboarding>
         </ToastProvider>
       </I18nProvider>
     </PreferencesProvider>
