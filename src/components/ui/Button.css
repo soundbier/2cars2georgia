@@ -2,14 +2,19 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   padding: 13px var(--space-4);
+  font-family: var(--font-display);
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  transition: filter var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+  /* Trefferfläche: nie unter 44px. */
   min-height: 46px;
 }
 
@@ -22,13 +27,13 @@
   opacity: 0.45;
 }
 
-/* Primary: die eine Aktion, die zählt */
+/* Primary: die eine Aktion, die zählt. Terracotta. */
 .btn-primary {
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
 .btn-primary:active:not(:disabled) {
-  filter: brightness(0.92);
+  background: var(--color-accent-strong);
 }
 
 /* Secondary: neutrale, ruhige Aktion */

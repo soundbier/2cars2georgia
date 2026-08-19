@@ -12,9 +12,11 @@
   margin-bottom: var(--space-1);
   margin-left: -4px;
   padding: var(--space-1) 0;
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-size: var(--text-sm);
   font-weight: 600;
   text-decoration: none;
   align-self: flex-start;
+  /* Zurück ist ein Navigationsziel und muss sicher zu treffen sein. */
+  min-height: 44px;
 }

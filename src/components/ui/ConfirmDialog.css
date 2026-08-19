@@ -1,7 +1,7 @@
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 5, 6, 0.6);
+  background: rgba(21, 34, 56, 0.55);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -13,16 +13,19 @@
 .dialog {
   width: 100%;
   max-width: 420px;
-  background: var(--color-bg-raised);
+  background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
-  box-shadow: var(--shadow-elevated);
+  /* Der Dialog liegt über allem – einer der wenigen begründeten Schatten. */
+  box-shadow: var(--shadow-overlay);
 }
 
 .dialog-title {
-  font-size: var(--text-xl);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
   font-weight: 700;
+  line-height: 1.15;
   margin-bottom: var(--space-2);
   color: var(--color-text);
 }

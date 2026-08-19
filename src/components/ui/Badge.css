@@ -4,13 +4,16 @@
   gap: var(--space-1);
   padding: 3px var(--space-2);
   border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 700;
   letter-spacing: 0.02em;
   border: 1px solid transparent;
   white-space: nowrap;
 }
 
+/* Der Punkt ist kein Schmuck: Er trägt den Zustand mit, damit die Farbe nicht
+   die einzige Information bleibt. */
 .badge-dot {
   width: 6px;
   height: 6px;
@@ -19,9 +22,9 @@
 }
 
 .badge-neutral {
-  background: var(--color-bg-raised);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
-  border-color: var(--color-border);
+  border-color: var(--color-border-strong);
 }
 
 .badge-success {
@@ -33,4 +36,3 @@
   background: var(--color-danger-muted);
   color: var(--color-danger);
 }
-

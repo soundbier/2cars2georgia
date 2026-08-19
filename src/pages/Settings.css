@@ -16,7 +16,7 @@
 }
 
 .settings-list-self {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* ============================================================
@@ -94,7 +94,7 @@
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   background: var(--color-accent-muted);
-  color: var(--color-accent-strong);
+  color: var(--color-accent-text);
 }
 
 .setting-link-chevron {
@@ -121,12 +121,13 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-1);
-  max-width: 210px;
+  max-width: 232px;
 }
 
+/* 44px Mindesthöhe: auch ein Icon-Raster wird mit dem Daumen bedient. */
 .icon-picker-option {
   width: 100%;
-  height: 40px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,5 +142,5 @@
 .icon-picker-option-active {
   border-color: var(--color-accent);
   background: var(--color-accent-muted);
-  color: var(--color-accent-strong);
+  color: var(--color-accent-text);
 }

@@ -26,8 +26,12 @@ import 'leaflet/dist/leaflet.css';
 import './MapTab.css';
 
 // Leaflet setzt die Linienfarbe als SVG-Attribut – dort werden CSS-Variablen
-// nicht aufgelöst, deshalb hier der Literalwert von --color-accent.
-const TRACK_COLOR = '#0284c7';
+// nicht aufgelöst, deshalb hier der Literalwert von --terracotta
+// (styles/tokens.css). Terracotta ist die Farbe der aktiven Spur; die weiße
+// Konturlinie darunter bleibt, weil die Route sonst auf Satellit und Topo
+// im Untergrund verschwindet.
+const TRACK_COLOR = '#bc4f27';
+const TRACK_CASING_COLOR = '#ffffff';
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -405,7 +409,7 @@ export default function MapTab({ user }: { user: string }) {
             <Polyline
               positions={line}
               pathOptions={{
-                color: '#ffffff',
+                color: TRACK_CASING_COLOR,
                 weight: 7,
                 opacity: 0.6,
                 lineCap: 'round',

@@ -14,7 +14,12 @@
   border: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  padding: var(--space-1);
+  /* Schließen ist der Notausgang des Dialogs – volle Trefferfläche. */
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 0;
   border-radius: var(--radius-sm);
 }

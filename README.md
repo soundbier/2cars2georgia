@@ -11,6 +11,26 @@ npm run typecheck
 npm test
 ```
 
+## Design
+
+Leitbild ist „Instrument auf Papier": Papier trägt die ruhenden Inhalte
+(Logbuch, Kosten, Crew, Einstellungen), das Instrument zeigt Laufendes
+(Geschwindigkeit, GPS, aktive Aufzeichnung). Zwei Materialwelten, keine
+dritte – und keine Skeuomorphie: keine Texturen, keine Alterung, kein Retro.
+
+Alle Farben, Größen und Abstände stehen in `src/styles/tokens.css`. Die Datei
+ist zweistufig aufgebaut – rohe Farbwelt, darüber die semantischen Rollen. In
+Komponenten-CSS gehören ausschließlich Rollen-Tokens; ein roher Farbwert dort
+bricht den späteren Nachtmodus, der genau diese Rollen überschreiben wird.
+
+Signalfarben haben feste Bedeutungen: Terracotta = Primäraktion und Route,
+Türkis = GPS/Sync/Verbindung, Oliv = Erfolg, Rost = Fehler. Farbe ist nie die
+einzige Information – dazu kommen immer Symbol, Text oder Form.
+
+Die Displayschrift (Archivo Narrow, selbst gehostet) lässt sich mit
+`tools/font-preview.html` gegen Alternativen vergleichen: Die Datei zeigt die
+Kandidaten in den Größen aus `tokens.css` mit echten App-Zeichenketten.
+
 ## Zugänge eines Roadtrips
 
 Pro Roadtrip gibt es drei technische Firebase-Auth-User mit demselben lokalen

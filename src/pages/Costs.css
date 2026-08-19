@@ -1,22 +1,23 @@
+/* Die dominierende Information der Seite – und dafür braucht sie keinen
+   Rahmen, sondern Größe. Der persönliche Saldo darunter bleibt sichtbar, er
+   ist funktional notwendig. */
 .costs-total-banner {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
-  padding: var(--space-4);
-  margin-bottom: var(--space-5);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  padding: 0 0 var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .costs-total-value {
-  font-size: clamp(1.9rem, 9vw, 2.5rem);
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 12vw, 3.2rem);
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.05;
   letter-spacing: -0.01em;
-  color: var(--color-accent);
+  color: var(--color-text);
 }
 
 .costs-form {
@@ -26,7 +27,6 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
   padding: var(--space-4);
 }
 
@@ -56,7 +56,7 @@
   height: 34px;
   border-radius: var(--radius-sm);
   background: var(--color-accent-muted);
-  color: var(--color-accent-strong);
+  color: var(--color-accent-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,16 +75,19 @@
 }
 
 .costs-row-amount {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-lg);
   font-weight: 700;
   color: var(--color-text);
   flex-shrink: 0;
 }
 
+/* Abstand zwischen Bearbeiten und Löschen: siehe ui/ListItem.css. */
 .costs-row-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-3);
   flex-shrink: 0;
 }
 
@@ -131,10 +134,12 @@
   font: inherit;
 }
 
+/* Dieselbe Versalien-Rolle wie `.label` – es gibt in der App genau eine. */
 .settlement-header-title {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-tertiary);
 }
@@ -197,7 +202,7 @@
 }
 
 .settlement-balance-meta {
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
 }
 
 .settlement-balance-amount {
@@ -233,22 +238,22 @@
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-bg-raised);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .settlement-transfer-party {
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
   font-weight: 600;
   color: var(--color-text);
 }
 
 .settlement-transfer-amount {
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
   font-weight: 700;
   color: var(--color-text);
 }
 
 .settlement-note {
   margin-top: var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
 }
