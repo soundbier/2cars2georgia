@@ -402,6 +402,11 @@ export const en: Translations = {
     'You have the right to access, rectification, erasure and restriction of processing of your data, as well as to data portability and to object. Please contact the controller named above. You also have the right to lodge a complaint with a data protection supervisory authority.',
   'privacy.translationNote':
     'This is a translation for convenience. The German version of this privacy notice is the authoritative one.',
+  // Einmaliger Hinweis vor dem ersten Login/App-Start, siehe PrivacyOnboarding.tsx.
+  'privacy.onboardingTitle': 'Before you start',
+  'privacy.onboardingHint':
+    'Please take a moment to read what this app stores before signing in or using it.',
+  'privacy.acknowledge': 'Understood, continue',
 
   // --- Export -------------------------------------------------------------
   'export.title': 'Export',

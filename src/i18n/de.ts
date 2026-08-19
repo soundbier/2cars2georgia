@@ -412,6 +412,11 @@ export const de = {
     'Ihr habt das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung eurer Daten sowie auf Datenübertragbarkeit und Widerspruch. Wendet euch dafür an die oben genannte verantwortliche Stelle. Außerdem besteht ein Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde.',
   // Nur in übersetzten Fassungen sichtbar, siehe en.ts.
   'privacy.translationNote': '',
+  // Einmaliger Hinweis vor dem ersten Login/App-Start, siehe PrivacyOnboarding.tsx.
+  'privacy.onboardingTitle': 'Bevor es losgeht',
+  'privacy.onboardingHint':
+    'Bitte lest euch kurz durch, welche Daten diese App speichert, bevor ihr euch anmeldet oder die App nutzt.',
+  'privacy.acknowledge': 'Verstanden, weiter',
 
   // --- Export -------------------------------------------------------------
   'export.title': 'Export',
