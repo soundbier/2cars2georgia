@@ -1,9 +1,35 @@
+/* ============================================================
+   Cockpit
+
+   Referenzimplementierung des Design-Systems: „Instrument auf Papier".
+   Sechs Ebenen von oben nach unten – Expedition, Instrument, Status,
+   primäre Aktionen, Log erfassen, Tageslog –, jede durch Abstand und
+   Typografie getrennt, nicht durch eine eigene Card.
+
+   Die Reihenfolge ist auch eine Reihenfolge der Daumenreichweite: Was
+   unterwegs am häufigsten gedrückt wird (Tour steuern, Log erfassen), liegt
+   unten, nah an der Hand. Was gelesen wird, liegt oben.
+   ============================================================ */
+.cockpit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* --- Ebene 1: Expedition ------------------------------------------------ */
 .cockpit-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+}
+
+/* Der Roadtrip-Name kann lang sein und darf den Crew-Chip nicht wegdrücken. */
+.cockpit-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-chip {
@@ -14,6 +40,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  flex-shrink: 0;
 }
 
 .profile-chip .avatar {
@@ -28,66 +55,103 @@
 }
 
 /* ============================================================
-   Das Instrument
+   Ebenen 2+3: Das Instrument
 
-   Die einzige dunkle Fläche der App und der einzige Ort, an dem laufende
-   Werte stehen. Es braucht keinen Schatten: Der Materialkontrast zum Papier
-   ringsum ist deutlich genug, und liegen tut es über nichts.
+   Die einzige dunkle Fläche der App. Sie zeigt ausschließlich Laufendes –
+   Status, Geschwindigkeit, Strecke, Fahrzeit, Position. Keine Bedienelemente:
+   ein Ablesegerät bedient man nicht, man liest es ab. Deshalb auch kein
+   Schatten; der Materialkontrast zum Papier ist Unterscheidung genug.
    ============================================================ */
 .instrument {
   background: var(--color-instrument);
   border: 1px solid var(--color-instrument-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-5) var(--space-4) var(--space-4);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  padding: var(--space-4);
   color: var(--color-on-instrument);
 }
 
-/* Statuszeile: dieselbe Versalien-Rolle wie `.label`, nur auf dunklem Grund.
-   Vorher 11px – auf einem Handy in der Sonne unlesbar. */
-.instrument-status {
+/* --- Statuszeile -------------------------------------------------------- */
+.instrument-statusbar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-instrument-border);
+}
+
+/* 13px ist die Untergrenze der Skala – Statuszeilen standen vorher in 11px
+   und waren auf einem Handy in der Sonne nicht lesbar. Symbol plus Text
+   tragen den Zustand; die Farbe bestätigt ihn nur. */
+.instrument-status {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
   font-family: var(--font-display);
   font-size: var(--text-label);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-on-instrument-muted);
-  margin-bottom: var(--space-2);
 }
 
-/* Türkis heißt überall in der App: Verbindung steht. */
-.instrument-status-active {
+.instrument-status svg {
+  flex-shrink: 0;
+}
+
+.instrument-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ohne Zustandsklasse (idle: keine Ortung, keine Aufzeichnung) bleibt es bei
+   der gedämpften Grundfarbe oben – kein Zustand, kein Signal. */
+
+/* Türkis heißt in der ganzen App: Verbindung steht. */
+.instrument-status-live {
   color: var(--color-live-on-instrument);
 }
 
-.instrument-status-error {
-  color: var(--color-danger-on-instrument);
+/* Terracotta: es läuft gerade etwas – dieselbe Farbe wie die Route, die
+   dabei entsteht. */
+.instrument-status-active {
+  color: var(--color-accent-on-instrument);
 }
 
-.instrument-status-paused {
+.instrument-status-warning {
   color: var(--color-warning-on-instrument);
 }
 
+.instrument-status-danger {
+  color: var(--color-danger-on-instrument);
+}
+
+/* --- Primärwert --------------------------------------------------------- */
 .instrument-speed {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
+  padding: var(--space-4) 0;
 }
 
-/* Die dominierende Information des Bildschirms. */
+/* Die dominierende Information des Bildschirms. Tabellenziffern, damit die
+   Zahl beim Fahren nicht in der Breite springt. */
 .instrument-speed-value {
   font-family: var(--font-display);
   font-size: var(--text-instrument);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
-  line-height: 1;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
   color: var(--color-on-instrument);
-  letter-spacing: -0.01em;
+}
+
+/* Kein Messwert ist etwas anderes als ein Messwert: Der Strich steht
+   gedämpft da, damit er nicht wie eine Anzeige aussieht. */
+.instrument-speed-value-empty {
+  color: var(--color-on-instrument-muted);
 }
 
 .instrument-speed-unit {
@@ -97,47 +161,74 @@
   color: var(--color-on-instrument-muted);
 }
 
-.instrument-actions {
-  display: flex;
-  gap: var(--space-3);
-  width: 100%;
+/* --- Sekundäre Messwerte ------------------------------------------------ */
+.instrument-readout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-instrument-border);
 }
 
-.instrument-actions .btn {
-  flex: 1;
+.instrument-readout-item {
+  min-width: 0;
 }
 
-/* Die Bedienung sitzt auf dem Instrument, nicht auf Papier – die
-   Papier-Varianten der Buttons wären hier unlesbar. */
-.instrument .btn-secondary {
-  background: transparent;
-  border-color: var(--color-on-instrument-muted);
+/* Die Koordinaten brauchen die ganze Breite – umgebrochen wären sie nicht
+   mehr auf einen Blick zu erfassen. */
+.instrument-readout-item-wide {
+  grid-column: 1 / -1;
+}
+
+.instrument-readout .label {
+  color: var(--color-on-instrument-muted);
+}
+
+.instrument-readout-value {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
   color: var(--color-on-instrument);
-}
-
-.instrument .btn-secondary:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.instrument .btn-destructive {
-  border-color: var(--color-danger-on-instrument);
-  color: var(--color-danger-on-instrument);
-}
-
-.instrument .btn-destructive:active:not(:disabled) {
-  background: rgba(217, 112, 95, 0.16);
-}
-
-.instrument :focus-visible {
-  outline-color: var(--color-on-instrument);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================================
-   Schnell-Logs
-
-   Eine Fläche mit Rasterlinien statt neun einzelner Kärtchen: Das sind
-   Tasten auf einem Blatt, kein Kartenstapel.
+   Ebene 4: primäre Aktionen
    ============================================================ */
+.cockpit-actions {
+  display: flex;
+  /* Abstand zwischen Pausieren und Stoppen: Stoppen beendet die Tour, das
+     darf nicht der Nachbarknopf unter dem Daumen sein. */
+  gap: var(--space-4);
+}
+
+.cockpit-actions .btn {
+  flex: 1;
+}
+
+.cockpit-note {
+  margin-top: calc(var(--space-3) * -1);
+}
+
+/* ============================================================
+   Ebenen 5+6: Papierbereiche
+
+   Kein Card-Stapel: Überschrift, Inhalt, Abstand. Die Fläche entsteht dort,
+   wo sie eine Funktion hat – bei den Schnell-Log-Tasten.
+   ============================================================ */
+.cockpit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* --- Schnell-Logs ------------------------------------------------------- */
+/* Eine Fläche mit Rasterlinien statt einzelner Kärtchen: Das sind Tasten auf
+   einem Blatt, kein Kartenstapel. */
 .quick-log-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -154,17 +245,22 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-1);
-  min-height: 76px;
+  padding: var(--space-3) var(--space-2);
+  /* Deutlich über der 44px-Grenze: Diese Tasten werden in Fahrt getroffen. */
+  min-height: 88px;
   background: var(--color-surface);
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--color-accent-text);
   font-family: var(--font-display);
   font-size: var(--text-label);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   text-align: center;
   cursor: pointer;
+}
+
+.quick-log-btn span {
+  color: var(--color-text);
 }
 
 .quick-log-btn:active:not(:disabled) {
@@ -181,4 +277,75 @@
 .quick-log-btn:focus-visible {
   position: relative;
   z-index: 1;
+}
+
+/* Aufklappen der übrigen Schnell-Logs. */
+.cockpit-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: none;
+  background: none;
+  color: var(--color-accent-text);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* --- Tageslog ----------------------------------------------------------- */
+.cockpit-daylog {
+  list-style: none;
+}
+
+.cockpit-daylog-entry {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cockpit-daylog-entry:last-child {
+  border-bottom: none;
+}
+
+.cockpit-daylog-time {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.cockpit-daylog-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-daylog-author {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* Schmale Geräte: Die Statuszeile bekommt zwei Zeilen, statt die Texte
+   abzuschneiden. */
+@media (max-width: 359px) {
+  .instrument-statusbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
 }

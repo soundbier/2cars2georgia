@@ -57,8 +57,10 @@
   --turquoise-ink: #246e75;
   --turquoise-light: #4fb0b9; /* auf dem dunklen Instrument */
 
-  /* Aufgehellte Signalfarben für die dunkle Instrumentenfläche: Rost und
-     Ocker erreichen dort in ihrer Papierstufe nur 2.44:1 bzw. 3.04:1. */
+  /* Aufgehellte Signalfarben für die dunkle Instrumentenfläche: In ihrer
+     Papierstufe erreichen Terracotta, Rost und Ocker dort nur 3.53:1, 2.44:1
+     bzw. 3.04:1 – zu wenig für die 13px-Statuszeilen. */
+  --terracotta-light: #e07a4e;
   --rust-light: #d9705f;
   --ocher-light: #c39a4a;
 
@@ -101,6 +103,7 @@
   --color-instrument-border: #24354f;
   --color-on-instrument: var(--instrument-ink);
   --color-on-instrument-muted: var(--instrument-ink-muted);
+  --color-accent-on-instrument: var(--terracotta-light);
   --color-danger-on-instrument: var(--rust-light);
   --color-warning-on-instrument: var(--ocher-light);
 
