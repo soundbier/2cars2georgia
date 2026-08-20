@@ -288,6 +288,7 @@ export const de = {
   'settings.app': 'App',
   'settings.version': 'Version',
   'settings.logout': 'Konto abmelden',
+  'settings.logoutFailed': 'Abmelden fehlgeschlagen. Bitte erneut versuchen.',
   'settings.leaveRoadtrip': 'Roadtrip verlassen',
   'settings.crewCount_one': '{count} Mitglied',
   'settings.crewCount_other': '{count} Mitglieder',

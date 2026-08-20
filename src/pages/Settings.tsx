@@ -108,6 +108,7 @@ export default function Settings({ currentUser, users }: Props) {
   const { language, setLanguage } = useI18n();
   const { notify } = useToast();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const t = useT();
 
@@ -118,11 +119,19 @@ export default function Settings({ currentUser, users }: Props) {
     clearTrip();
   };
 
+  // Meldet das Konto ab (signOut). Kein manuelles Weiterleiten nötig: der
+  // onAuthStateChanged in useRoadtrip meldet den fehlenden Auth-User, und
+  // AppGate blendet auf den Login-Screen um – dort kann direkt ein anderes
+  // Konto angemeldet werden. Roadtrip- und Gerätedaten bleiben erhalten.
   const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
     try {
       await signOutAccount();
     } catch (err) {
       console.error('Abmelden fehlgeschlagen:', err);
+      notify(t('settings.logoutFailed'), 'danger');
+      setSigningOut(false);
     }
   };
 
@@ -323,7 +332,7 @@ export default function Settings({ currentUser, users }: Props) {
           <Button variant="secondary" fullWidth onClick={handleLeaveRoadtrip}>
             <DoorOpen size={18} /> {t('settings.leaveRoadtrip')}
           </Button>
-          <Button variant="destructive" fullWidth onClick={handleSignOut}>
+          <Button variant="destructive" fullWidth disabled={signingOut} onClick={handleSignOut}>
             <LogOut size={18} /> {t('settings.logout')}
           </Button>
         </div>

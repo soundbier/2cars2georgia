@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -62,8 +62,24 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<CrewRole | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(true);
 
+  // Merkt sich die zuletzt gesehene UID, um eine Abmeldung bzw. einen
+  // Kontowechsel vom ersten Auth-Status nach dem Start zu unterscheiden.
+  const lastUidRef = useRef<string | null>(null);
+
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
+      const uid = user?.uid ?? null;
+      // Abmeldung oder Kontowechsel: Die auf diesem Gerät gemerkte
+      // Roadtrip-Auswahl gehörte zur vorigen UID und darf nicht in die
+      // nächste Sitzung übernommen werden. Der Roadtrip selbst und alle Daten
+      // darin bleiben bestehen – es fällt nur die Auswahl weg, ein erneutes
+      // Beitreten über die Roadtrip-ID ist nicht nötig.
+      if (lastUidRef.current !== null && lastUidRef.current !== uid) {
+        localStorage.removeItem(STORAGE_KEY_TRIP_ID);
+        setTripId(null);
+        setRole(null);
+      }
+      lastUidRef.current = uid;
       setAuthUser(user);
       setAuthLoading(false);
     });
@@ -114,15 +130,18 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
     );
   }, [authUser, tripId]);
 
+  // An den Auth-User gekoppelt: Nach einer Abmeldung wird der Listener
+  // abgemeldet und der Name des vorigen Roadtrips verworfen, damit beim
+  // nächsten Konto nichts aus der alten Sitzung stehen bleibt.
   useEffect(() => {
-    if (!tripId) {
+    if (!authUser || !tripId) {
       setTripName(null);
       return;
     }
     return onSnapshot(doc(db, 'roadtrips', tripId), (snap) => {
       setTripName((snap.exists() ? (snap.data().name as string | undefined) : undefined) ?? tripId);
     });
-  }, [tripId]);
+  }, [authUser, tripId]);
 
   const selectTrip = (id: string) => {
     localStorage.setItem(STORAGE_KEY_TRIP_ID, id);
