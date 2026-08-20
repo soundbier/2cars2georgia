@@ -2,7 +2,11 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- viewport-fit=cover: Safe-Area-Insets (Notch, Home-Indicator) stehen erst damit
+         als env() zur Verfügung. Kein maximum-scale/user-scalable=no mehr – das Sperren
+         des Zooms ist ein Barrierefreiheitsproblem; Auto-Zoom bei Fokus verhindert
+         stattdessen die 16px-Schriftgröße der Eingabefelder (siehe ui/Field.css). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f5eee2" />
     <title>2cars2georgia</title>
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">

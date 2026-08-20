@@ -3,7 +3,7 @@
   top: 0;
   left: 0;
   right: 0;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  bottom: calc(var(--nav-height) + var(--safe-bottom));
   z-index: 1;
 }
 
@@ -30,7 +30,8 @@
 
 .map-controls {
   position: absolute;
-  right: var(--space-3);
+  /* Im Querformat liegt der Notch seitlich – die Knöpfe rücken davor. */
+  right: calc(var(--space-3) + var(--safe-right));
   /* Oberhalb der Attributionszeile, die Leaflet unten rechts einblendet. */
   bottom: calc(var(--space-3) + 22px);
   display: flex;
@@ -60,6 +61,18 @@
 
 .map-control:active {
   background: var(--color-surface-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .map-control:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .map-control-active:hover {
+    background: var(--color-accent-strong);
+    color: var(--color-on-accent);
+  }
 }
 
 .map-control-active {
@@ -115,4 +128,10 @@
 .leaflet-container {
   background: var(--color-bg);
   font-family: var(--font-ui);
+}
+
+/* Das Popup darf auf dem Handy nicht breiter werden als das Fenster – die
+   Karte selbst scrollt nicht, ein zu breites Popup wäre schlicht ab. */
+.leaflet-popup-content {
+  max-width: calc(100vw - 2 * var(--space-6));
 }

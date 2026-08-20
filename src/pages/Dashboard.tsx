@@ -161,154 +161,163 @@ export default function Dashboard({ user }: { user: string }) {
         </div>
       </header>
 
-      {/* Ebene 2+3: das Instrument. Nur Anzeige – die Bedienung sitzt darunter
-          auf dem Papier, damit die Fläche das bleibt, was sie ist: ein
-          Ablesegerät. */}
-      <section className="instrument" aria-label={t('cockpit.title')}>
-        <div className="instrument-statusbar">
-          <span className={`instrument-status instrument-status-${gpsTone}`}>
-            <Satellite size={15} strokeWidth={2} aria-hidden="true" />
-            <span>{gpsLabel}</span>
-          </span>
-          <span className={`instrument-status instrument-status-${recordingTone}`}>
-            <Circle
-              size={11}
-              strokeWidth={2}
-              /* Gefüllt heißt: läuft. Der Zustand hängt damit nicht an der
-                 Farbe allein. */
-              fill={isTracking && !isPaused ? 'currentColor' : 'none'}
-              aria-hidden="true"
-            />
-            <span>{recordingLabel}</span>
-          </span>
-        </div>
+      {/* Zwei Gruppen statt sechs gleichrangiger Blöcke: links ablesen und
+          steuern (Ebenen 2–4), rechts erfassen und nachlesen (Ebenen 5+6).
+          Im Hochformat stehen sie untereinander und ergeben exakt die
+          bisherige Reihenfolge; ab Tablet-Querformat werden zwei Spalten
+          daraus (siehe Dashboard.css). */}
+      <div className="cockpit-primary">
+        {/* Ebene 2+3: das Instrument. Nur Anzeige – die Bedienung sitzt darunter
+            auf dem Papier, damit die Fläche das bleibt, was sie ist: ein
+            Ablesegerät. */}
+        <section className="instrument" aria-label={t('cockpit.title')}>
+          <div className="instrument-statusbar">
+            <span className={`instrument-status instrument-status-${gpsTone}`}>
+              <Satellite size={15} strokeWidth={2} aria-hidden="true" />
+              <span>{gpsLabel}</span>
+            </span>
+            <span className={`instrument-status instrument-status-${recordingTone}`}>
+              <Circle
+                size={11}
+                strokeWidth={2}
+                /* Gefüllt heißt: läuft. Der Zustand hängt damit nicht an der
+                   Farbe allein. */
+                fill={isTracking && !isPaused ? 'currentColor' : 'none'}
+                aria-hidden="true"
+              />
+              <span>{recordingLabel}</span>
+            </span>
+          </div>
 
-        <div className="instrument-speed">
-          <span
-            className={`instrument-speed-value${position ? '' : ' instrument-speed-value-empty'}`}
-          >
-            {position
-              ? toDisplaySpeed(position.speedKmh, preferences.unitSystem).toFixed(1)
-              : t('cockpit.noValue')}
-          </span>
-          <span className="instrument-speed-unit">{speedUnitLabel(preferences.unitSystem)}</span>
-        </div>
+          <div className="instrument-speed">
+            <span
+              className={`instrument-speed-value${position ? '' : ' instrument-speed-value-empty'}`}
+            >
+              {position
+                ? toDisplaySpeed(position.speedKmh, preferences.unitSystem).toFixed(1)
+                : t('cockpit.noValue')}
+            </span>
+            <span className="instrument-speed-unit">{speedUnitLabel(preferences.unitSystem)}</span>
+          </div>
 
-        <dl className="instrument-readout">
-          {tripDay && (
+          <dl className="instrument-readout">
+            {tripDay && (
+              <div className="instrument-readout-item">
+                <dt className="label">{t('cockpit.tripDayLabel')}</dt>
+                <dd className="instrument-readout-value">
+                  {t('cockpit.dayOfTrip', { day: tripDay.day, total: tripDay.total })}
+                </dd>
+              </div>
+            )}
             <div className="instrument-readout-item">
-              <dt className="label">{t('cockpit.tripDayLabel')}</dt>
+              <dt className="label">{t('logbook.distance')}</dt>
               <dd className="instrument-readout-value">
-                {t('cockpit.dayOfTrip', { day: tripDay.day, total: tripDay.total })}
+                {distance} {distanceUnitLabel(preferences.unitSystem)}
               </dd>
             </div>
-          )}
-          <div className="instrument-readout-item">
-            <dt className="label">{t('logbook.distance')}</dt>
-            <dd className="instrument-readout-value">
-              {distance} {distanceUnitLabel(preferences.unitSystem)}
-            </dd>
-          </div>
-          <div className="instrument-readout-item">
-            <dt className="label">{t('logbook.duration')}</dt>
-            <dd className="instrument-readout-value">{duration}</dd>
-          </div>
-          <div className="instrument-readout-item instrument-readout-item-wide">
-            <dt className="label">{t('cockpit.position')}</dt>
-            <dd className="instrument-readout-value">{coordinates}</dd>
-          </div>
-        </dl>
-      </section>
+            <div className="instrument-readout-item">
+              <dt className="label">{t('logbook.duration')}</dt>
+              <dd className="instrument-readout-value">{duration}</dd>
+            </div>
+            <div className="instrument-readout-item instrument-readout-item-wide">
+              <dt className="label">{t('cockpit.position')}</dt>
+              <dd className="instrument-readout-value">{coordinates}</dd>
+            </div>
+          </dl>
+        </section>
 
-      {/* Ebene 4: primäre Aktionen, in Daumenreichweite direkt unter dem
-          Instrument. */}
-      <div className="cockpit-actions">
-        {isTracking ? (
-          <>
-            <Button variant="secondary" fullWidth onClick={() => setIsPaused(!isPaused)}>
-              {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
-              {isPaused ? t('cockpit.resumeTour') : t('cockpit.pauseTour')}
+        {/* Ebene 4: primäre Aktionen, in Daumenreichweite direkt unter dem
+            Instrument. */}
+        <div className="cockpit-actions">
+          {isTracking ? (
+            <>
+              <Button variant="secondary" fullWidth onClick={() => setIsPaused(!isPaused)}>
+                {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+                {isPaused ? t('cockpit.resumeTour') : t('cockpit.pauseTour')}
+              </Button>
+              <Button variant="destructive" fullWidth onClick={() => setIsTracking(false)}>
+                <Square size={18} fill="currentColor" />
+                {t('cockpit.stopTour')}
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" fullWidth disabled={!canEdit} onClick={() => setIsTracking(true)}>
+              <Play size={18} fill="currentColor" />
+              {t('cockpit.startTour')}
             </Button>
-            <Button variant="destructive" fullWidth onClick={() => setIsTracking(false)}>
-              <Square size={18} fill="currentColor" />
-              {t('cockpit.stopTour')}
-            </Button>
-          </>
-        ) : (
-          <Button variant="primary" fullWidth disabled={!canEdit} onClick={() => setIsTracking(true)}>
-            <Play size={18} fill="currentColor" />
-            {t('cockpit.startTour')}
-          </Button>
-        )}
+          )}
+        </div>
+
+        {!canEdit && <p className="helper-text cockpit-note">{t('crew.readonlyHint')}</p>}
       </div>
 
-      {!canEdit && <p className="helper-text cockpit-note">{t('crew.readonlyHint')}</p>}
+      <div className="cockpit-secondary">
+        {/* Ebene 5: Log erfassen. */}
+        <section className="cockpit-section">
+          <h2 className="section-title">{t('cockpit.addLog')}</h2>
 
-      {/* Ebene 5: Log erfassen. */}
-      <section className="cockpit-section">
-        <h2 className="section-title">{t('cockpit.addLog')}</h2>
+          {quickLogs.length === 0 ? (
+            <EmptyState title={t('cockpit.noQuickLogs')} hint={t('cockpit.noQuickLogsHint')} />
+          ) : (
+            <>
+              <div className="quick-log-grid">
+                {visibleQuickLogs.map(({ id, label, iconName }) => {
+                  const Icon = getQuickLogIcon(iconName);
+                  return (
+                    <button
+                      key={id}
+                      className="quick-log-btn"
+                      disabled={isLogging || !position || !canEdit}
+                      onClick={() => handleQuickLog(id, label)}
+                    >
+                      <Icon size={24} strokeWidth={1.75} aria-hidden="true" />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-        {quickLogs.length === 0 ? (
-          <EmptyState title={t('cockpit.noQuickLogs')} hint={t('cockpit.noQuickLogsHint')} />
-        ) : (
-          <>
-            <div className="quick-log-grid">
-              {visibleQuickLogs.map(({ id, label, iconName }) => {
-                const Icon = getQuickLogIcon(iconName);
-                return (
-                  <button
-                    key={id}
-                    className="quick-log-btn"
-                    disabled={isLogging || !position || !canEdit}
-                    onClick={() => handleQuickLog(id, label)}
-                  >
-                    <Icon size={24} strokeWidth={1.75} aria-hidden="true" />
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              {hiddenQuickLogCount > 0 && (
+                <button
+                  type="button"
+                  className="cockpit-disclosure"
+                  aria-expanded={showAllQuickLogs}
+                  onClick={() => setShowAllQuickLogs((open) => !open)}
+                >
+                  {showAllQuickLogs ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {showAllQuickLogs
+                    ? t('cockpit.fewerLogs')
+                    : t('cockpit.moreLogs', { count: hiddenQuickLogCount })}
+                </button>
+              )}
+            </>
+          )}
+        </section>
 
-            {hiddenQuickLogCount > 0 && (
-              <button
-                type="button"
-                className="cockpit-disclosure"
-                aria-expanded={showAllQuickLogs}
-                onClick={() => setShowAllQuickLogs((open) => !open)}
-              >
-                {showAllQuickLogs ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                {showAllQuickLogs
-                  ? t('cockpit.fewerLogs')
-                  : t('cockpit.moreLogs', { count: hiddenQuickLogCount })}
-              </button>
-            )}
-          </>
-        )}
-      </section>
-
-      {/* Ebene 6: was heute schon passiert ist. Die vollständige Liste steht
-          im Logbuch – hier reicht der Blick auf die letzten Einträge. */}
-      <section className="cockpit-section">
-        <h2 className="section-title">{t('cockpit.today')}</h2>
-        {todaysEvents.length === 0 ? (
-          <p className="helper-text cockpit-note">{t('cockpit.noEntriesToday')}</p>
-        ) : (
-          <ul className="cockpit-daylog">
-            {todaysEvents.slice(0, TODAY_PREVIEW_COUNT).map((event) => (
-              <li key={event.id} className="cockpit-daylog-entry">
-                <span className="cockpit-daylog-time">
-                  {new Date(event.timestamp).toLocaleTimeString(undefined, {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-                <span className="cockpit-daylog-title">{event.title}</span>
-                <span className="cockpit-daylog-author">{event.author}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        {/* Ebene 6: was heute schon passiert ist. Die vollständige Liste steht
+            im Logbuch – hier reicht der Blick auf die letzten Einträge. */}
+        <section className="cockpit-section">
+          <h2 className="section-title">{t('cockpit.today')}</h2>
+          {todaysEvents.length === 0 ? (
+            <p className="helper-text cockpit-note">{t('cockpit.noEntriesToday')}</p>
+          ) : (
+            <ul className="cockpit-daylog">
+              {todaysEvents.slice(0, TODAY_PREVIEW_COUNT).map((event) => (
+                <li key={event.id} className="cockpit-daylog-entry">
+                  <span className="cockpit-daylog-time">
+                    {new Date(event.timestamp).toLocaleTimeString(undefined, {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                  <span className="cockpit-daylog-title">{event.title}</span>
+                  <span className="cockpit-daylog-author">{event.author}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

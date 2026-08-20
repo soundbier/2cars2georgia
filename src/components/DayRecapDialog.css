@@ -40,6 +40,8 @@
 }
 
 .day-recap-preview {
+  display: flex;
+  justify-content: center;
   border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: var(--space-3);
@@ -52,6 +54,24 @@
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 5;
+}
+
+/* Das Tagesbild ist hochkant (4:5). Wo die Höhe knapp ist – Handy im
+   Querformat –, bindet die Vorschau an die Fensterhöhe statt an die Breite,
+   sonst füllt allein das Bild zwei Bildschirme. */
+@media (orientation: landscape) and (max-height: 640px) {
+  .day-recap-canvas {
+    width: auto;
+    height: 45svh;
+  }
+}
+
+/* Ab Tablet darf der Dialog breiter werden: Die Vorschau ist das Ergebnis,
+   das beurteilt werden soll – auf 480px bleibt davon zu wenig übrig. */
+@media (min-width: 900px) {
+  .day-recap-dialog {
+    max-width: 680px;
+  }
 }
 
 .day-recap-hint {

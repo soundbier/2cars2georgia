@@ -1,13 +1,33 @@
+/* Anmeldung, Registrierung und Roadtrip-Auswahl (siehe AuthGate.tsx,
+   RoadtripGate.tsx). Die Seite steht direkt in #root, ohne `.content`
+   darüber – sie ist also selbst der scrollende Bereich.
+
+   Vorher `height: 100svh` mit `justify-content: center`: Im Querformat auf
+   dem Handy passte das Formular nicht mehr in die Höhe, und der Überhang
+   eines zentrierten Flex-Inhalts läuft nach oben aus dem Fenster heraus –
+   unerreichbar, weil <body> nicht scrollt. Jetzt scrollt die Seite in sich
+   und zentriert nur, solange der Platz reicht (`safe center`). */
 .roadtrip-gate {
-  height: 100svh;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: var(--space-6) var(--space-5);
+  justify-content: safe center;
+  padding: var(--space-6) calc(var(--space-5) + var(--safe-right)) calc(var(--space-6) + var(--safe-bottom))
+    calc(var(--space-5) + var(--safe-left));
   gap: var(--space-5);
-  max-width: 360px;
   width: 100%;
-  margin: 0 auto;
+}
+
+/* Die Formularspalte bleibt schmal – zentriert wird sie über den Rahmen,
+   nicht über eine Breite, damit sie beim Scrollen nicht springt. Das
+   Datenschutz-Overlay ist ausgenommen: Es liegt fix über dem Fenster und
+   würde von einer Breitenbegrenzung auf 360px eingeschnürt. */
+.roadtrip-gate > *:not(.roadtrip-gate-privacy-overlay) {
+  width: 100%;
+  max-width: 360px;
+  margin-inline: auto;
 }
 
 .roadtrip-gate-head {
@@ -102,8 +122,9 @@
   z-index: 2100;
   background: var(--color-bg-raised);
   overflow-y: auto;
-  padding: var(--space-5);
-  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+  padding: var(--space-5) calc(var(--space-5) + var(--safe-right)) calc(var(--space-6) + var(--safe-bottom))
+    calc(var(--space-5) + var(--safe-left));
 }
 
 .roadtrip-gate-privacy-panel {
@@ -142,4 +163,12 @@
 
 .roadtrip-gate-date-field .field-control {
   width: 100%;
+}
+
+/* Auf großen Displays darf die Datenschutzerklärung die Fläche nutzen –
+   360px Formularbreite wären für einen Fließtext dieser Länge unnötig eng. */
+@media (min-width: 900px) {
+  .roadtrip-gate-privacy-panel {
+    max-width: 680px;
+  }
 }

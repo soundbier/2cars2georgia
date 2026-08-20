@@ -78,3 +78,40 @@
 .kombuese-meal-group-label {
   color: var(--color-text-tertiary);
 }
+
+/* ============================================================
+   Schmale Geräte
+
+   Name, Menge und Einheit stehen in einer Zeile. Unter ~480px bleibt für den
+   Namen davon zu wenig übrig – dann bekommt er eine eigene Zeile, Menge und
+   Einheit teilen sich die zweite.
+   ============================================================ */
+@media (max-width: 479px) {
+  .kombuese-ingredient-row {
+    flex-wrap: wrap;
+  }
+
+  .kombuese-ingredient-name {
+    flex: 1 0 100%;
+  }
+}
+
+/* ============================================================
+   Größere Flächen
+
+   Ein Reisetag hat bis zu drei Mahlzeiten. Untereinander ergibt das auf dem
+   Handy eine klare Abfolge; sobald die Breite da ist, gehören sie
+   nebeneinander – dann ist ein Tag eine Zeile statt eines Bildschirms.
+   ============================================================ */
+@media (min-width: 700px) {
+  .kombuese-day {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .kombuese-day-title {
+    grid-column: 1 / -1;
+  }
+}

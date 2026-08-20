@@ -166,3 +166,69 @@
 .admin-member-list {
   padding-left: var(--space-3);
 }
+
+/* ============================================================
+   Sehr schmale Geräte
+
+   Label und Auswahlfeld nebeneinander gehen sich unter ~360px gegenseitig
+   auf die Breite. Dann rutscht das Bedienelement in eine eigene Zeile und
+   nimmt sie ganz – lieber eine Zeile mehr als ein zerbrochenes Label.
+   ============================================================ */
+@media (max-width: 359px) {
+  .setting-row {
+    flex-wrap: wrap;
+  }
+
+  .setting-row-control {
+    width: 100%;
+  }
+
+  .setting-select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ============================================================
+   Größere Flächen
+
+   `settings-page-columns` (nur die Hauptseite Einstellungen, siehe
+   Settings.tsx) verteilt die Abschnitte ab Laptopbreite auf zwei Spalten.
+   Mehrspaltiger Satz statt Grid, weil die Abschnitte unterschiedlich hoch
+   sind und in einem Raster halbe Seiten Leerraum hinterlassen würden;
+   `break-inside: avoid` hält jeden Abschnitt zusammen.
+
+   Untergeordnete Seiten (Kombüse, Administration, Crew) bleiben einspaltig:
+   Dort ist der Inhalt eine einzige lange Liste, die nichts davon hat,
+   auseinandergezogen zu werden.
+   ============================================================ */
+@media (min-width: 1024px) {
+  .content > .settings-page-columns {
+    max-width: var(--content-max-wide);
+  }
+
+  .settings-page-columns {
+    column-count: 2;
+    column-gap: var(--space-5);
+  }
+
+  .settings-page-columns > * {
+    break-inside: avoid;
+  }
+
+  /* Der Seitenkopf gehört zur Seite, nicht zur ersten Spalte. */
+  .settings-page-columns > .page-header {
+    column-span: all;
+  }
+
+  /* Im Spaltensatz trennt der Abstand nach unten, nicht der nach oben:
+     Sonst beginnt die zweite Spalte je nach Umbruch mit einer Lücke. Die
+     höhere Spezifität hebt `.section + .section` aus ui/Section.css auf. */
+  .settings-page-columns > .section {
+    margin-bottom: var(--space-4);
+  }
+
+  .settings-page-columns > .section + .section {
+    margin-top: 0;
+  }
+}
