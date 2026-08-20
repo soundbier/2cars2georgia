@@ -199,6 +199,16 @@ export default function Dashboard({ user }: { user: string }) {
           {speedReadout}
           <div className="cockpit-drive-facts">
             {gpsStatus}
+            {/* Die gefahrene Strecke steht am Steuer neben der Geschwindigkeit:
+                Sie beantwortet die Frage, wie weit es heute schon ging, ohne
+                dafür den Fahrmodus verlassen zu müssen. Es ist dieselbe Zahl
+                wie im Instrument und im Logbuch. */}
+            <div className="cockpit-drive-distance">
+              <span className="label">{t('logbook.distance')}</span>
+              <span className="cockpit-drive-distance-value">
+                {distance} {distanceUnitLabel(preferences.unitSystem)}
+              </span>
+            </div>
             <div className="cockpit-drive-coords">{coordinates}</div>
           </div>
         </section>
