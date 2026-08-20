@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { MapContainer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Pencil, LocateFixed, Navigation, DownloadCloud, Route as RouteIcon } from 'lucide-react';
+import { Pencil, LocateFixed, Navigation, DownloadCloud } from 'lucide-react';
 import L from 'leaflet';
 // Seiteneffekt-Import: erweitert Leaflet um die Kartendrehung (map.setBearing).
 import 'leaflet-rotate';
@@ -23,11 +23,7 @@ import {
   OfflineGrid,
   useOfflineDownload
 } from '../components/OfflineMapDownload';
-import {
-  RoutePlannerLayer,
-  RoutePlannerPanel,
-  useRoutePlanner
-} from '../components/RoutePlanner';
+import { PlannedRouteLine, useActivePlannedRoute } from '../components/RoutePlanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { readMapView, saveMapView } from '../lib/mapView';
 import { activeOnly } from '../lib/trash';
@@ -442,28 +438,16 @@ export default function MapTab({ user }: { user: string }) {
     [notify, t]
   );
 
-  const planner = useRoutePlanner();
-
-  // Eine abgesteckte Route hat Vorrang: Wer sie gesetzt hat, will die Karten
-  // für die geplante Strecke – der Track deckt nur die bereits gefahrene ab.
-  // Erst ab zwei Wegpunkten ist es eine Strecke, ein einzelner Punkt wäre
-  // ein versehener Tipp.
-  const hasPlannedRoute = planner.waypoints.length > 1;
-  const offlineRoute = hasPlannedRoute ? planner.waypoints : track;
+  // Abgesteckt wird im Routenplaner (pages/RoutePlanner); hier zählt nur die
+  // dort aktivierte Route. Sie hat Vorrang vor dem Track: Wer sie gewählt hat,
+  // will die Karten für die geplante Strecke, der Track deckt nur die bereits
+  // gefahrene ab. Erst ab zwei Wegpunkten ist es eine Strecke.
+  const plannedRoute = useActivePlannedRoute();
+  const plannedWaypoints = useMemo(() => plannedRoute?.waypoints ?? [], [plannedRoute]);
+  const hasPlannedRoute = plannedWaypoints.length > 1;
+  const offlineRoute = hasPlannedRoute ? plannedWaypoints : track;
 
   const offline = useOfflineDownload(offlineRoute, offlineLayers, handleDownloadFinished);
-
-  // Beide Modi belegen dieselbe Leiste am unteren Rand und dieselben
-  // Kartenklicks – deshalb immer nur einer von beiden.
-  const openPlanner = useCallback(() => {
-    offline.close();
-    planner.open();
-  }, [offline, planner]);
-
-  const openOffline = useCallback(() => {
-    planner.close();
-    offline.open();
-  }, [offline, planner]);
 
   useEffect(() => {
     saveMapView({ follow, northUp, driveMode });
@@ -568,13 +552,9 @@ export default function MapTab({ user }: { user: string }) {
           />
         ))}
 
-        <RoutePlannerLayer
-          active={planner.active}
-          waypoints={planner.waypoints}
-          onAdd={planner.addAt}
-          onMove={planner.moveTo}
-          onRemove={planner.remove}
-        />
+        {/* Die geplante Route bleibt sichtbar, damit erkennbar ist, wofür
+            das Downloadraster gilt. */}
+        <PlannedRouteLine waypoints={plannedWaypoints} />
 
         {offline.active && (
           <OfflineGrid
@@ -665,18 +645,8 @@ export default function MapTab({ user }: { user: string }) {
         </button>
         <button
           type="button"
-          className={`map-control ${planner.active ? 'map-control-active' : ''}`}
-          onClick={planner.active ? planner.close : openPlanner}
-          aria-pressed={planner.active}
-          aria-label={planner.active ? t('map.planClose') : t('map.planOpen')}
-          title={planner.active ? t('map.planClose') : t('map.planOpen')}
-        >
-          <RouteIcon size={20} />
-        </button>
-        <button
-          type="button"
           className={`map-control ${offline.active ? 'map-control-active' : ''}`}
-          onClick={offline.active ? offline.close : openOffline}
+          onClick={offline.active ? offline.close : offline.open}
           aria-pressed={offline.active}
           aria-label={offline.active ? t('map.offlineClose') : t('map.offlineDownload')}
           title={offline.active ? t('map.offlineClose') : t('map.offlineDownload')}
@@ -705,21 +675,17 @@ export default function MapTab({ user }: { user: string }) {
         </div>
       )}
 
-      {planner.active && (
-        <RoutePlannerPanel
-          state={planner}
-          onDownload={() => {
-            planner.close();
-            offline.open();
-          }}
-        />
-      )}
-
       {offline.active && (
         <OfflineDownloadPanel
           state={offline}
           isOnline={isOnline}
-          sourceLabel={t(hasPlannedRoute ? 'map.offlineSourcePlanned' : 'map.offlineSourceTrack')}
+          sourceLabel={
+            hasPlannedRoute
+              ? t('map.offlineSourcePlanned', {
+                  name: plannedRoute?.name || t('plan.unnamed')
+                })
+              : t('map.offlineSourceTrack')
+          }
         />
       )}
 

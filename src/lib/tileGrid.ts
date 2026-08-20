@@ -15,8 +15,14 @@
 import { Coordinates } from '../types';
 import { distanceMeters } from './geo';
 
-/** Zoomstufe, deren Kacheln ein Rasterfeld bilden (~25–40 km Kantenlänge). */
-export const GRID_ZOOM = 10;
+/**
+ * Zoomstufe, deren Kacheln ein Rasterfeld bilden (~13–20 km Kantenlänge).
+ *
+ * Eine Stufe tiefer als die Rasterzoomstufe halbiert die Kantenlänge eines
+ * Feldes: Man wählt genauer aus, was tatsächlich gebraucht wird, und ein
+ * einzelnes Feld ist mit ~90 statt ~345 Kacheln je Ebene schnell geladen.
+ */
+export const GRID_ZOOM = 11;
 
 /** Kleinste heruntergeladene Zoomstufe – grobe Übersicht über die Region. */
 export const MIN_DOWNLOAD_ZOOM = 6;
@@ -41,9 +47,11 @@ const DEFAULT_SAMPLE_METERS = 2_000;
  *
  * Schützt vor einer versehentlich riesigen Route (oder einem Ausreißer im
  * GPS-Track): Lieber ein abgeschnittenes Raster als eine Karte, die beim
- * Öffnen des Downloadmodus minutenlang rechnet.
+ * Öffnen des Downloadmodus minutenlang rechnet. Mit den kleineren Feldern
+ * (GRID_ZOOM 11) deckt dieselbe Strecke rund viermal so viele Felder ab,
+ * deshalb liegt die Grenze entsprechend höher.
  */
-const MAX_CELLS = 1_500;
+const MAX_CELLS = 4_000;
 
 /** Mittlere Kachelgröße in Byte – nur zur Abschätzung der Downloadmenge. */
 export const AVERAGE_TILE_BYTES = 18_000;

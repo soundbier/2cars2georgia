@@ -3,9 +3,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { MapContainer, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { RoutePlannerLayer, useRoutePlanner } from './RoutePlanner';
+import { PlannedRouteLine, RouteEditorLayer, useActivePlannedRoute, useRouteEditor } from './RoutePlanner';
 import { useOfflineDownload } from './OfflineMapDownload';
-import { readPlannedRoute, resetPlannedRouteCache } from '../lib/plannedRoute';
+import {
+  createRoute,
+  findRoute,
+  readPlannedRoutes,
+  resetPlannedRoutesCache,
+  setActiveRoute
+} from '../lib/plannedRoute';
 import { resetOfflineAreasCache } from '../lib/offlineTiles';
 import { GRID_ZOOM, pointToTile, tileKey } from '../lib/tileGrid';
 import { PreferencesProvider } from '../hooks/usePreferences';
@@ -18,7 +24,7 @@ let sizeSpies: Array<() => void> = [];
 
 beforeEach(() => {
   localStorage.clear();
-  resetPlannedRouteCache();
+  resetPlannedRoutesCache();
   resetOfflineAreasCache();
 
   // Wie im Kachel-Test: In jsdom hat der Kartencontainer sonst keine Größe.
@@ -41,7 +47,7 @@ afterEach(() => {
   for (const restore of sizeSpies) restore();
   sizeSpies = [];
   localStorage.clear();
-  resetPlannedRouteCache();
+  resetPlannedRoutesCache();
   resetOfflineAreasCache();
 });
 
@@ -59,18 +65,18 @@ function ExposeMap({ onReady }: { onReady: (map: L.Map) => void }) {
   return null;
 }
 
-function renderPlanner(active: boolean) {
+function renderEditor(routeId: string, active: boolean) {
   let map: L.Map | null = null;
-  const planner = { current: null as ReturnType<typeof useRoutePlanner> | null };
+  const editor = { current: null as ReturnType<typeof useRouteEditor> | null };
 
   function Harness() {
-    const state = useRoutePlanner();
-    planner.current = state;
+    const state = useRouteEditor(routeId);
+    editor.current = state;
     return (
       // Renderer explizit: jsdom meldet weder SVG- noch Canvas-Unterstützung.
       <MapContainer center={[48.4, 13.9]} zoom={9} renderer={new L.SVG()}>
         <ExposeMap onReady={(instance) => (map = instance)} />
-        <RoutePlannerLayer
+        <RouteEditorLayer
           active={active}
           waypoints={state.waypoints}
           onAdd={state.addAt}
@@ -82,16 +88,21 @@ function renderPlanner(active: boolean) {
   }
 
   const utils = render(<Harness />, { wrapper: Wrapper });
-  return { ...utils, planner, clickMap: (point: typeof PASSAU) => {
-    act(() => {
-      map?.fireEvent('click', { latlng: L.latLng(point.lat, point.lng) });
-    });
-  } };
+  return {
+    ...utils,
+    editor,
+    clickMap: (point: typeof PASSAU) => {
+      act(() => {
+        map?.fireEvent('click', { latlng: L.latLng(point.lat, point.lng) });
+      });
+    }
+  };
 }
 
 describe('Routenplanung', () => {
   it('setzt bei einem Kartenklick einen nummerierten Wegpunkt', async () => {
-    const { container, clickMap } = renderPlanner(true);
+    const route = createRoute('Tag 1', '2026-05-04');
+    const { container, clickMap } = renderEditor(route.id, true);
 
     clickMap(PASSAU);
     clickMap(LINZ);
@@ -103,20 +114,22 @@ describe('Routenplanung', () => {
 
     // Die Verbindungslinie liegt zwischen den Punkten.
     expect(container.querySelectorAll('path.leaflet-interactive').length).toBeGreaterThan(0);
-    expect(readPlannedRoute()).toHaveLength(2);
+    expect(findRoute(readPlannedRoutes(), route.id)?.waypoints).toHaveLength(2);
   });
 
   it('nimmt außerhalb des Planungsmodus keine Klicks an', () => {
-    const { container, clickMap } = renderPlanner(false);
+    const route = createRoute('Tag 1', '');
+    const { container, clickMap } = renderEditor(route.id, false);
 
     clickMap(PASSAU);
 
-    expect(readPlannedRoute()).toHaveLength(0);
+    expect(findRoute(readPlannedRoutes(), route.id)?.waypoints).toHaveLength(0);
     expect(container.querySelectorAll('.route-waypoint')).toHaveLength(0);
   });
 
-  it('verschiebt, entfernt und löscht Wegpunkte', () => {
-    const { result } = renderHook(() => useRoutePlanner());
+  it('verschiebt, entfernt und löscht Wegpunkte einer Route', () => {
+    const route = createRoute('Tag 1', '');
+    const { result } = renderHook(() => useRouteEditor(route.id));
 
     act(() => result.current.addAt(PASSAU.lat, PASSAU.lng));
     act(() => result.current.addAt(LINZ.lat, LINZ.lng));
@@ -135,25 +148,71 @@ describe('Routenplanung', () => {
 
     act(() => result.current.clear());
     expect(result.current.waypoints).toHaveLength(0);
-    expect(readPlannedRoute()).toHaveLength(0);
+    expect(findRoute(readPlannedRoutes(), route.id)?.waypoints).toHaveLength(0);
+  });
+
+  it('hält die Routen getrennt und zeigt nur die aktive an', () => {
+    const day1 = createRoute('Tag 1', '2026-05-04');
+    const day2 = createRoute('Tag 2', '2026-05-05');
+
+    const { result } = renderHook(
+      () => ({
+        first: useRouteEditor(day1.id),
+        second: useRouteEditor(day2.id),
+        active: useActivePlannedRoute()
+      }),
+      { wrapper: Wrapper }
+    );
+
+    act(() => result.current.first.addAt(PASSAU.lat, PASSAU.lng));
+    act(() => result.current.second.addAt(LINZ.lat, LINZ.lng));
+
+    expect(result.current.first.waypoints).toHaveLength(1);
+    expect(result.current.second.waypoints).toHaveLength(1);
+    expect(result.current.first.waypoints[0].lat).toBeCloseTo(PASSAU.lat);
+
+    // Zuletzt angelegte Route ist aktiv; umschalten wechselt die Anzeige.
+    expect(result.current.active?.id).toBe(day2.id);
+    act(() => setActiveRoute(day1.id));
+    expect(result.current.active?.id).toBe(day1.id);
+    expect(result.current.active?.waypoints[0].lng).toBeCloseTo(PASSAU.lng);
+  });
+
+  it('zeichnet eine geplante Route auch ohne Bearbeitung', () => {
+    const { container } = render(
+      <MapContainer center={[48.4, 13.9]} zoom={9} renderer={new L.SVG()}>
+        <PlannedRouteLine
+          waypoints={[
+            { id: 'a', ...PASSAU },
+            { id: 'b', ...LINZ }
+          ]}
+        />
+      </MapContainer>,
+      { wrapper: Wrapper }
+    );
+
+    expect(container.querySelectorAll('path').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.route-waypoint')).toHaveLength(0);
   });
 
   it('erzeugt das Downloadraster aus der abgesteckten Route', () => {
     const layers = [{ id: 'osm', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' }];
+    const route = createRoute('Tag 1', '');
     const { result } = renderHook(() => {
-      const planner = useRoutePlanner();
-      const offline = useOfflineDownload(planner.waypoints, layers);
-      return { planner, offline };
+      const editor = useRouteEditor(route.id);
+      const active = useActivePlannedRoute();
+      const offline = useOfflineDownload(active?.waypoints ?? [], layers);
+      return { editor, offline };
     });
 
-    act(() => result.current.planner.addAt(PASSAU.lat, PASSAU.lng));
-    act(() => result.current.planner.addAt(LINZ.lat, LINZ.lng));
+    act(() => result.current.editor.addAt(PASSAU.lat, PASSAU.lng));
+    act(() => result.current.editor.addAt(LINZ.lat, LINZ.lng));
     act(() => result.current.offline.open());
 
     const keys = result.current.offline.cells.map((cell) => cell.key);
     expect(keys).toContain(tileKey(pointToTile(PASSAU, GRID_ZOOM)));
     expect(keys).toContain(tileKey(pointToTile(LINZ, GRID_ZOOM)));
     // Ein Korridor entlang der Strecke, kein Rechteck über halb Europa.
-    expect(keys.length).toBeLessThan(60);
+    expect(keys.length).toBeLessThan(220);
   });
 });

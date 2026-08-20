@@ -15,3 +15,39 @@
   /* Liegt über der Karte – Schatten hält den Punkt auf Luftbildern lesbar. */
   box-shadow: var(--shadow-control);
 }
+
+/* Karte auf der Planerseite: hoch genug zum Abstecken, aber so, dass Liste
+   und Formular darunter noch erreichbar bleiben. */
+.route-planner-map {
+  height: 55vh;
+  min-height: 280px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.route-planner-stats {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.route-planner-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Kennzeichnet die Route, die auf der Karte und im Download gilt. */
+.route-planner-active {
+  padding: 2px 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-label);
+}
+
+.route-planner-actions {
+  display: flex;
+  gap: var(--space-1);
+}
