@@ -109,20 +109,39 @@ describe('joinRoadtrip', () => {
     expect(memberData).toEqual({ displayName: 'Niklas', role: 'member', joinedAt: 'SERVER_TIMESTAMP' });
   });
 
-  it('wirft tripNotFound für eine unbekannte ID', async () => {
-    getDoc.mockResolvedValueOnce({ exists: () => false });
+  it('findet den Roadtrip auch über den sichtbaren Namen statt der ID', async () => {
+    getDoc
+      // 'Sommertour 2026' als Dokument-ID: gibt es nicht …
+      .mockResolvedValueOnce({ exists: () => false })
+      // … der daraus gebildete Slug schon.
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) })
+      .mockResolvedValueOnce({ exists: () => false });
+    setDoc.mockResolvedValue(undefined);
+
+    const result = await joinRoadtrip('uid-2', 'Niklas', '  Sommertour 2026 ');
+
+    expect(result).toEqual({ tripId: 'sommertour-2026', tripName: 'Sommertour 2026' });
+    const [memberRef] = setDoc.mock.calls[0];
+    expect((memberRef as { path: string }).path).toBe('roadtrips/sommertour-2026/members/uid-2');
+  });
+
+  it('wirft tripNotFound, wenn weder Eingabe noch Slug einen Roadtrip treffen', async () => {
+    getDoc.mockResolvedValue({ exists: () => false });
     await expect(joinRoadtrip('uid-2', 'Niklas', 'unbekannt')).rejects.toMatchObject({
       code: 'tripNotFound'
     });
+    expect(setDoc).not.toHaveBeenCalled();
   });
 
-  it('wirft alreadyMember, wenn die Mitgliedschaft schon existiert', async () => {
+  it('schreibt nichts, wenn die Mitgliedschaft schon existiert (Owner bleibt Owner)', async () => {
     getDoc
       .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) })
-      .mockResolvedValueOnce({ exists: () => true });
-    await expect(joinRoadtrip('uid-2', 'Niklas', 'sommertour-2026')).rejects.toMatchObject({
-      code: 'alreadyMember'
-    });
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ role: 'owner' }) });
+
+    const result = await joinRoadtrip('uid-1', 'Leon', 'sommertour-2026');
+
+    expect(result).toEqual({ tripId: 'sommertour-2026', tripName: 'Sommertour 2026' });
+    expect(setDoc).not.toHaveBeenCalled();
   });
 });
 
