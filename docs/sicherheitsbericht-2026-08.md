@@ -150,6 +150,12 @@ Speicherdauer, Betroffenenrechte). Vier Punkte stimmen aber nicht mit dem Code
 **Empfehlung:** Die vier Punkte in `privacy.*` ergänzen bzw. korrigieren und in
 `setSentryContext` den Klarnamen durch die UID (oder gar nichts) ersetzen.
 
+**Status:** Der Datenschutzhinweis wurde angepasst – Konto-/E-Mail-Daten,
+Fehlerprotokoll, Kartendienste samt Esri/USA und reCAPTCHA sind jetzt benannt,
+ebenso die Offline-Kopie auf dem Gerät. Der Sentry-Tag `crewUser` ist damit
+korrekt beschrieben, aber weiterhin gesetzt; ihn zu entfernen bliebe die
+datensparsamere Variante.
+
 ---
 
 ### M4 – Betroffenenrechte sind in der App technisch nicht umsetzbar  *(mittel)*

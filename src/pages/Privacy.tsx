@@ -31,6 +31,9 @@ export function PrivacyContent() {
       <Section title={t('privacy.dataTitle')}>
         <ul className="privacy-list">
           <li>
+            <strong>{t('privacy.dataAccount')}</strong> {t('privacy.dataAccountText')}
+          </li>
+          <li>
             <strong>{t('privacy.dataGps')}</strong> {t('privacy.dataGpsText')}
           </li>
           <li>
@@ -41,6 +44,9 @@ export function PrivacyContent() {
           </li>
           <li>
             <strong>{t('privacy.dataNames')}</strong> {t('privacy.dataNamesText')}
+          </li>
+          <li>
+            <strong>{t('privacy.dataErrors')}</strong> {t('privacy.dataErrorsText')}
           </li>
           <li>
             <strong>{t('privacy.dataLocal')}</strong> {t('privacy.dataLocalText')}
@@ -54,6 +60,10 @@ export function PrivacyContent() {
 
       <Section title={t('privacy.processorsTitle')}>
         <p className="helper-text">{t('privacy.processorsText')}</p>
+      </Section>
+
+      <Section title={t('privacy.mapsTitle')}>
+        <p className="helper-text">{t('privacy.mapsText')}</p>
       </Section>
 
       <Section title={t('privacy.retentionTitle')}>

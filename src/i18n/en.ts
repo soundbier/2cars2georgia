@@ -451,6 +451,9 @@ export const en: Translations = {
   'privacy.controllerPlaceholder':
     'Lukas Gehrke, LukasGehrke@gmx.de; 2cars2georgia, 2cars2georgia@gmx.de',
   'privacy.dataTitle': 'What data is processed',
+  'privacy.dataAccount': 'Account:',
+  'privacy.dataAccountText':
+    'email address, a self-chosen unique display name and an identifier issued by Firebase (UID). The address is needed for signing in, the verification email and password resets; it is held in Firebase Authentication and in the app’s profile record. Other crew members only see the display name, not the address.',
   'privacy.dataGps': 'Location (GPS):',
   'privacy.dataGpsText':
     'only while a tour is actively being recorded (“Start tour” in the cockpit) – coordinates, speed and heading, each with a timestamp and the name of the device/crew member.',
@@ -461,16 +464,22 @@ export const en: Translations = {
   'privacy.dataCostsText': 'amounts, description, category and who paid or recorded them.',
   'privacy.dataNames': 'Crew names:',
   'privacy.dataNamesText':
-    'self-chosen names of those aboard, no email addresses or other contact details.',
+    'the self-chosen display names of those aboard. They appear on every entry someone creates and are visible to the whole crew of the roadtrip.',
+  'privacy.dataErrors': 'Error log:',
+  'privacy.dataErrorsText':
+    'if something crashes, the error is recorded – error message, technical stack trace, app version, browser and device identifier (user agent), the place in the app that was open, and the display name. The log belongs to the roadtrip and can be read by its crew.',
   'privacy.dataLocal': 'Technical, local to the device:',
   'privacy.dataLocalText':
-    'the selected crew name (`localStorage`), the language setting and the roadtrip’s Firebase session – no advertising or tracking cookies.',
+    'language setting, display preferences, the last map view, the selected roadtrip and the acknowledgement of this notice (`localStorage`), the Firebase session, plus a full offline copy of the roadtrip data and of any downloaded map tiles (IndexedDB and Cache Storage) – no advertising or tracking cookies. That copy stays on the device after signing out: if you pass a device on or lose it, clear the site data in the browser.',
   'privacy.purposeTitle': 'Purpose and legal basis',
   'privacy.purposeText':
     'Processing serves solely the crew’s own organisation and documentation of this trip (Art. 6(1)(b) and (f) GDPR – performance of the jointly agreed use, and legitimate interest in planning the trip). For purely private use among close friends and family, the household exemption (Art. 2(2)(c) GDPR) may also apply. This assessment is not legal advice – for use beyond a close private circle, a lawyer should review it.',
   'privacy.processorsTitle': 'Who else sees the data',
   'privacy.processorsText':
-    'The data is held by Google Firebase (Firestore database, authentication) as a technical processor; depending on the chosen Firestore region, servers may also be located outside the EU (e.g. in the USA). If Sentry is configured for error monitoring (see README), Sentry also receives technical error reports – deliberately without location, name or cost data, only the anonymous roadtrip ID as context.',
+    'The data is held by Google Firebase (Firestore database, authentication) as a technical processor; depending on the chosen Firestore region, servers may also be located outside the EU (e.g. in the USA). If Sentry is configured for error monitoring (see README), Sentry receives technical error reports: error message, stack trace, app version, the roadtrip ID and the crew member’s display name – no location or cost data, but whatever an individual error message happens to carry. If Firebase App Check is enabled as well (protection against automated access), the app embeds Google reCAPTCHA, which transmits device and usage characteristics to Google.',
+  'privacy.mapsTitle': 'Map services',
+  'privacy.mapsText':
+    'The map loads its tiles directly from third-party servers. Those services thereby learn the device’s IP address and which section it requests – roughly, where you are looking. Used are OpenStreetMap, OpenTopoMap, CARTO, OpenSeaMap and Waymarked Trails, plus Esri/ArcGIS for the satellite view, whose servers are located in the USA. To avoid this, download the area you need in advance (map → download cloud): whatever is on the device is not requested again.',
   'privacy.retentionTitle': 'Retention period',
   'privacy.retentionText':
     'Data remains stored for as long as the roadtrip exists in Firebase – there is currently no automatic deletion. On request, the controller (see above) deletes individual entries or the entire roadtrip manually.',
@@ -481,7 +490,7 @@ export const en: Translations = {
     'Under More → Export, the logbook, expenses and route can be taken out of the app as PDF, CSV or GPX. These files contain the crew’s names, positions and amounts and leave the app’s protected area once shared – sharing them with others should be agreed with everyone concerned.',
   'privacy.rightsTitle': 'Your rights',
   'privacy.rightsText':
-    'You have the right to access, rectification, erasure and restriction of processing of your data, as well as to data portability and to object. Please contact the controller named above. You also have the right to lodge a complaint with a data protection supervisory authority.',
+    'You have the right to access, rectification, erasure and restriction of processing of your data, as well as to data portability and to object. Please contact the controller named above. Rectifying or erasing an account and display name cannot currently be triggered in the app itself and is done manually there – a short message is enough. A copy of your own trip data is available right away under More → Export. You also have the right to lodge a complaint with a data protection supervisory authority.',
   'privacy.translationNote':
     'This is a translation for convenience. The German version of this privacy notice is the authoritative one.',
   // Einmaliger Hinweis vor dem ersten Login/App-Start, siehe PrivacyOnboarding.tsx.
