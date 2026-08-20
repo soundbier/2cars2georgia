@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Pencil, LocateFixed } from 'lucide-react';
+import { Pencil, LocateFixed, Navigation } from 'lucide-react';
 import L from 'leaflet';
 // Seiteneffekt-Import: erweitert Leaflet um die Kartendrehung (map.setBearing).
 import 'leaflet-rotate';
@@ -34,6 +34,19 @@ const TRACK_COLOR = '#bc4f27';
 const TRACK_CASING_COLOR = '#ffffff';
 
 const DEG_TO_RAD = Math.PI / 180;
+
+/**
+ * Kleinste Kursänderung, die im Fahrmodus die Karte dreht.
+ *
+ * GPS-Kurse zappeln auch bei gerader Fahrt um ein paar Grad – ohne diese
+ * Schwelle wackelte die Karte dauernd unter dem Finger.
+ */
+const MIN_HEADING_CHANGE_DEG = 3;
+
+/** Kürzester Winkelabstand zwischen zwei Kursen, in Grad (-180 … 180). */
+function angleDelta(a: number, b: number): number {
+  return ((((a - b) % 360) + 540) % 360) - 180;
+}
 
 // Leaflet-Icons sind pro Farbe identisch – einmal erzeugen statt bei jedem Render.
 const iconCache = new Map<string, L.DivIcon>();
@@ -164,6 +177,69 @@ function FollowController({ position, active }: { position: LivePosition | null;
     if (!active || lat === undefined || lng === undefined) return;
     map.setView([lat, lng], map.getZoom(), { animate: true });
   }, [map, active, lat, lng]);
+
+  return null;
+}
+
+/**
+ * Bedient die Ausrichtung der Karte: Nordfixierung, Fahrmodus und die Frage,
+ * ob überhaupt von Hand gedreht werden darf.
+ *
+ * Beide Modi sperren die Drehgesten. Das ist nicht nur Zierde: Die
+ * Zwei-Finger-Geste von leaflet-rotate hängt an derselben Auswertung wie der
+ * Pinch-Zoom und dreht die Karte schon bei minimaler Schräglage der Finger
+ * kräftig mit. Wer zoomen will, soll nur zoomen.
+ */
+function BearingController({
+  northUp,
+  driveMode,
+  headingDeg
+}: {
+  northUp: boolean;
+  driveMode: boolean;
+  headingDeg: number | null;
+}) {
+  const map = useMap();
+  const locked = northUp || driveMode;
+  // Zuletzt gefahrener Kurs – verhindert, dass jede Rundungsstelle des GPS
+  // eine neue Drehung auslöst.
+  const appliedHeadingRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (locked) {
+      map.touchRotate.disable();
+      map.shiftKeyRotate.disable();
+      // Das Plugin schaltet beim Shift-Drehen den Radzoom ab und erst beim
+      // nächsten Rad-Ereignis ohne Shift wieder an – ohne den Handler käme
+      // dieses Ereignis nie an.
+      map.scrollWheelZoom.enable();
+    } else {
+      map.touchRotate.enable();
+      map.shiftKeyRotate.enable();
+    }
+  }, [map, locked]);
+
+  useEffect(() => {
+    if (northUp) map.setBearing(0);
+  }, [map, northUp]);
+
+  useEffect(() => {
+    if (!driveMode) {
+      appliedHeadingRef.current = null;
+      return;
+    }
+    // Ohne gültigen Kurs (im Hafen, Gerät ohne Kompass) bleibt die Karte
+    // stehen, statt sich auf einen zufälligen Wert zu drehen.
+    if (headingDeg === null || !Number.isFinite(headingDeg)) return;
+
+    const applied = appliedHeadingRef.current;
+    if (applied !== null && Math.abs(angleDelta(headingDeg, applied)) < MIN_HEADING_CHANGE_DEG) return;
+
+    appliedHeadingRef.current = headingDeg;
+    // Positives Bearing dreht den Karteninhalt im Uhrzeigersinn: Damit der
+    // Kurs oben liegt, muss gegen den Kurs gedreht werden.
+    map.setBearing(-headingDeg);
+  }, [map, driveMode, headingDeg]);
 
   return null;
 }
@@ -323,19 +399,25 @@ export default function MapTab({ user }: { user: string }) {
   // Beim Einhängen einmal gelesen: MapContainer wertet center/zoom nur initial
   // aus, alles Weitere läuft über die Map-Instanz.
   const [initialView] = useState(readMapView);
-  const [map, setMap] = useState<L.Map | null>(null);
   const [bearing, setBearing] = useState(initialView.bearing);
   const [follow, setFollow] = useState(initialView.follow);
+  const [northUp, setNorthUp] = useState(initialView.northUp);
+  const [driveMode, setDriveMode] = useState(initialView.driveMode);
 
   const baseLayer = getBaseLayer(preferences.baseLayer);
   const line: [number, number][] = track.map((p) => [p.lat, p.lng]);
 
   useEffect(() => {
-    saveMapView({ follow });
-  }, [follow]);
+    saveMapView({ follow, northUp, driveMode });
+  }, [follow, northUp, driveMode]);
 
-  // Wer die Karte selbst verschiebt, will dort bleiben.
-  const stopFollowing = useCallback(() => setFollow(false), []);
+  // Wer die Karte selbst verschiebt, will dort bleiben. Im Fahrmodus gilt das
+  // nicht: Dort soll das Schiff in der Mitte bleiben, ein Schubs zum Vorausblick
+  // wird mit dem nächsten GPS-Fix wieder eingefangen. Beenden lässt sich das
+  // Folgen dort über den Zentrierknopf.
+  const stopFollowing = useCallback(() => {
+    if (!driveMode) setFollow(false);
+  }, [driveMode]);
 
   const centerOnUser = () => {
     if (follow) {
@@ -351,7 +433,30 @@ export default function MapTab({ user }: { user: string }) {
     setFollow(true);
   };
 
-  const resetNorth = () => map?.setBearing(0);
+  // Nordfixierung und Fahrmodus schließen sich aus – beide bestimmen die
+  // Ausrichtung, also darf immer nur einer davon das Sagen haben.
+  const toggleNorthUp = () => {
+    if (northUp) {
+      setNorthUp(false);
+      return;
+    }
+    setDriveMode(false);
+    setNorthUp(true);
+  };
+
+  const toggleDriveMode = () => {
+    if (driveMode) {
+      setDriveMode(false);
+      return;
+    }
+    setNorthUp(false);
+    setDriveMode(true);
+    // Im Fahrmodus gehört das Schiff in die Bildmitte; die Zoomstufe bleibt.
+    setFollow(true);
+    // Ohne Kurs bleibt die Karte stehen, bis das GPS einen liefert – ein
+    // stiller Knopf sähe nach einem Fehler aus.
+    if (position?.headingDeg == null) notify(t('map.driveModeNoHeading'), 'info');
+  };
 
   const handleSaveEdit = async (id: string, changes: EventChanges) => {
     if (!tripId) return false;
@@ -369,7 +474,6 @@ export default function MapTab({ user }: { user: string }) {
   return (
     <div className="map-view">
       <MapContainer
-        ref={setMap}
         center={[initialView.lat, initialView.lng]}
         zoom={initialView.zoom}
         className="map-canvas"
@@ -381,6 +485,11 @@ export default function MapTab({ user }: { user: string }) {
       >
         <MapStateSync onUserDrag={stopFollowing} onBearingChange={setBearing} />
         <FollowController position={position} active={follow} />
+        <BearingController
+          northUp={northUp}
+          driveMode={driveMode}
+          headingDeg={position?.headingDeg ?? null}
+        />
 
         <TileLayer
           // Attribution und Zoomgrenzen gelten pro Quelle: neu einhängen statt
@@ -458,18 +567,26 @@ export default function MapTab({ user }: { user: string }) {
       </MapContainer>
 
       <div className="map-controls">
-        {/* Nur sichtbar, wenn es etwas zurückzusetzen gibt. */}
-        {Math.round(bearing) % 360 !== 0 && (
-          <button
-            type="button"
-            className="map-control map-control-compass"
-            onClick={resetNorth}
-            aria-label={t('map.orientNorth')}
-            title={t('map.orientNorth')}
-          >
-            <CompassNeedle bearing={bearing} />
-          </button>
-        )}
+        <button
+          type="button"
+          className={`map-control map-control-compass ${northUp ? 'map-control-active' : ''}`}
+          onClick={toggleNorthUp}
+          aria-pressed={northUp}
+          aria-label={northUp ? t('map.unlockNorth') : t('map.lockNorth')}
+          title={northUp ? t('map.unlockNorth') : t('map.lockNorth')}
+        >
+          <CompassNeedle bearing={bearing} />
+        </button>
+        <button
+          type="button"
+          className={`map-control ${driveMode ? 'map-control-active' : ''}`}
+          onClick={toggleDriveMode}
+          aria-pressed={driveMode}
+          aria-label={driveMode ? t('map.driveModeOff') : t('map.driveModeOn')}
+          title={driveMode ? t('map.driveModeOff') : t('map.driveModeOn')}
+        >
+          <Navigation size={20} />
+        </button>
         <button
           type="button"
           className={`map-control ${follow ? 'map-control-active' : ''}`}

@@ -19,6 +19,10 @@ export interface MapView {
   bearing: number;
   /** true, solange die Karte der eigenen Position folgt. */
   follow: boolean;
+  /** true, solange die Karte fest auf Norden steht und nicht gedreht werden darf. */
+  northUp: boolean;
+  /** true, solange sich die Karte automatisch nach dem Kurs des Schiffs dreht. */
+  driveMode: boolean;
 }
 
 /** Hamburg als Startansicht, solange weder GPS noch Track vorliegen. */
@@ -29,7 +33,9 @@ export const DEFAULT_MAP_VIEW: MapView = {
   bearing: 0,
   // Beim allerersten Öffnen zentriert die Karte auf die eigene Position,
   // sobald GPS verfügbar ist. Danach entscheidet der Nutzer.
-  follow: true
+  follow: true,
+  northUp: false,
+  driveMode: false
 };
 
 // Der Ausschnitt ändert sich bei jeder Kartenbewegung. Über den Cache lesen
