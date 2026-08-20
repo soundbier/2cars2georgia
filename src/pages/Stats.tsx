@@ -196,11 +196,12 @@ export default function Stats({ user }: { user: string }) {
         </div>
       </div>
 
-      {days.length > 0 && (
-        <Button variant="secondary" fullWidth onClick={() => setRecapOpen(true)} className="logbook-recap-button">
-          <Image size={18} /> {t('dayRecap.openButton')}
-        </Button>
-      )}
+      {/* Immer sichtbar, auch ohne Track/Ereignisse – der Dialog selbst zeigt
+          dann einen Leer-Hinweis statt einer Vorschau. So verschwindet der
+          Einstieg für die Instagram-Tagesübersicht nie aus dem Logbuch. */}
+      <Button variant="secondary" fullWidth onClick={() => setRecapOpen(true)} className="logbook-recap-button">
+        <Image size={18} /> {t('dayRecap.openButton')}
+      </Button>
 
       <h2 className="section-title section-title-spaced">
         {t('logbook.events', { count: events.length })}
