@@ -446,6 +446,31 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // --- Routenplaner: geplante Tagesrouten --------------------------------
+      // Von Hand abgesteckte Routen (siehe src/hooks/usePlannedRoutes.ts).
+      // Bewusst ohne Papierkorb: Eine geplante Route ist Vorbereitung, kein
+      // Protokoll – und bewusst ohne Owner-Schranke beim Löschen, damit die
+      // Crew ihre Tagesplanung selbst aufräumen kann. Welche Route aktiv ist,
+      // steht gar nicht hier, sondern gerätelokal (src/lib/plannedRoute.ts).
+      match /plannedRoutes/{routeId} {
+        function isPlannedRoute() {
+          return fieldsAre(['waypoints', 'updatedAt'], ['name', 'date', 'author', 'authorId'])
+            && data().waypoints is list
+            && data().waypoints.size() <= 500
+            && isEpochMillis('updatedAt')
+            && isOptionalText('name', 120)
+            // Anders als beim Speiseplan darf der Tag fehlen oder leer sein:
+            // Routen ohne festes Datum sind ausdrücklich vorgesehen.
+            && (!('date' in data()) || data().date == '' || isDateString('date'))
+            && isOptionalText('author', 60)
+            && isOptionalAuthorId();
+        }
+
+        allow read: if isMember();
+        allow create, update: if canWrite() && isPlannedRoute();
+        allow delete: if canWrite();
+      }
+
       // --- Roadtrip-weite Einstellungen ------------------------------------
       // Genau zwei Dokumente: "general" (Reisezeitraum) und "quicklogs"
       // (Schnell-Log-Kategorien), siehe src/hooks/useSettings.ts. Die Crew

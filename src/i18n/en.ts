@@ -222,6 +222,8 @@ export const en: Translations = {
   // --- Route planner ----------------------------------------------------
   'plan.title': 'Route planner',
   'plan.subtitle': 'Plan daily routes ahead, activate the right one on the day',
+  'plan.sharedHint':
+    'Routes belong to the roadtrip: what you plan on a computer is there on every crew device. Which route is active is a per-device choice.',
   'plan.routes': 'Saved routes',
   'plan.addTitle': 'New route',
   'plan.add': 'Create route',
@@ -239,7 +241,7 @@ export const en: Translations = {
   'plan.copyName': '{name} (copy)',
   'plan.delete': 'Delete route',
   'plan.deleteTitle': 'Delete route?',
-  'plan.deleteDescription': 'The waypoints of this route are removed from this device. Maps already downloaded are kept.',
+  'plan.deleteDescription': 'The route is deleted for the whole crew. Maps already downloaded are kept.',
   'plan.intro': 'Tap the map to place a waypoint. Drag points to move them, tap one to remove it.',
   'plan.removePoint': 'Remove waypoint',
   'plan.undo': 'Undo last',

@@ -23,7 +23,8 @@ import {
   OfflineGrid,
   useOfflineDownload
 } from '../components/OfflineMapDownload';
-import { PlannedRouteLine, useActivePlannedRoute } from '../components/RoutePlanner';
+import { PlannedRouteLine } from '../components/RoutePlanner';
+import { useActivePlannedRoute } from '../hooks/usePlannedRoutes';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { readMapView, saveMapView } from '../lib/mapView';
 import { activeOnly } from '../lib/trash';

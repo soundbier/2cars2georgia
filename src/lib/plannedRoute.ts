@@ -7,19 +7,29 @@
  * vorbereitet, unterwegs nur noch die Route des Tages aktivieren. Aus der
  * aktiven Route entsteht dann dasselbe Raster wie sonst aus dem Track.
  *
- * Bewusst in localStorage statt in Firestore: Die geplanten Routen hängen am
- * Gerät, das offline gehen soll, müssen ohne Netz sofort lesbar sein und
- * dürfen für die Offline-Funktion keinen Server voraussetzen (siehe
- * lib/offlineTiles.ts).
+ * Gespeichert wird im Roadtrip (roadtrips/{tripId}/plannedRoutes, siehe
+ * hooks/usePlannedRoutes.ts): Wer die Route am großen Bildschirm absteckt,
+ * ist selten die Person, die unterwegs die Karten lädt. Firestore hält die
+ * Routen dank persistentLocalCache auch offline bereit, sobald sie einmal
+ * geladen waren.
+ *
+ * Gerätelokal bleibt nur die Auswahl der aktiven Route: Welche Route dieses
+ * Gerät gerade auf der Karte zeigt und herunterlädt, geht die übrige Crew
+ * nichts an – auf zwei Booten sind das schlicht zwei verschiedene.
+ *
+ * Diese Datei enthält nur Daten und Rechnerei ohne Firestore-Bezug, damit
+ * beides einzeln testbar bleibt.
  */
 
 import { distanceMeters } from './geo';
 import { Coordinates } from '../types';
 
-const STORAGE_KEY = 'boat_planned_routes';
+/** Aktive Route dieses Geräts (nur die Kennung, die Route selbst liegt online). */
+const ACTIVE_KEY = 'boat_active_route';
 
-/** Speicher der ersten Fassung: eine einzige Route ohne Namen. */
-const LEGACY_STORAGE_KEY = 'boat_planned_route';
+/** Speicher der Fassungen vor der Online-Ablage – wird einmalig übernommen. */
+const LOCAL_ROUTES_KEY = 'boat_planned_routes';
+const LEGACY_SINGLE_KEY = 'boat_planned_route';
 
 export interface PlannedWaypoint extends Coordinates {
   /** Stabile Kennung, damit Marker beim Verschieben nicht neu aufgebaut werden. */
@@ -32,19 +42,19 @@ export interface PlannedRoute {
   /** Tag der Route als ISO-Datum (YYYY-MM-DD); leer, wenn ohne festen Tag. */
   date: string;
   waypoints: PlannedWaypoint[];
+  /** Anzeigename der Person, die zuletzt gespeichert hat. */
+  author: string;
   updatedAt: number;
 }
 
-export interface PlannedRouteStore {
-  routes: PlannedRoute[];
-  /** Route, die auf der Karte gezeigt und für den Download verwendet wird. */
-  activeId: string | null;
-}
-
-const EMPTY_STORE: PlannedRouteStore = { routes: [], activeId: null };
-
-let cached: PlannedRouteStore | null = null;
-const listeners = new Set<() => void>();
+/**
+ * Obergrenze je Route – dieselbe Zahl steht in firestore.rules.
+ *
+ * Ein Dokument muss unter 1 MB bleiben; mit ~50 Byte je Wegpunkt ist das
+ * weit weg, aber eine versehentliche Klickorgie soll die Route nicht
+ * unbrauchbar machen.
+ */
+export const MAX_WAYPOINTS = 500;
 
 function isWaypoint(value: unknown): value is PlannedWaypoint {
   const point = value as Partial<PlannedWaypoint> | null;
@@ -56,98 +66,38 @@ function isWaypoint(value: unknown): value is PlannedWaypoint {
   );
 }
 
-function toRoute(value: unknown): PlannedRoute | null {
-  const route = value as Partial<PlannedRoute> | null;
-  if (!route || typeof route.id !== 'string') return null;
-  return {
-    id: route.id,
-    name: typeof route.name === 'string' ? route.name : '',
-    date: typeof route.date === 'string' ? route.date : '',
-    waypoints: Array.isArray(route.waypoints) ? route.waypoints.filter(isWaypoint) : [],
-    updatedAt: Number.isFinite(route.updatedAt) ? (route.updatedAt as number) : 0
-  };
-}
-
 /**
- * Route der ersten Fassung übernehmen.
+ * Firestore-Dokument in eine Route übersetzen.
  *
- * Wer schon eine Strecke abgesteckt hatte, soll sie nach dem Update
- * wiederfinden – als benannte Route ohne Tag.
+ * Bewusst nachsichtig: Fehlende oder kaputte Felder machen die Route leer,
+ * aber nicht die ganze Liste unlesbar.
  */
-function migrateLegacyRoute(): PlannedRouteStore {
-  const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
-  if (!raw) return EMPTY_STORE;
-
-  const parsed = JSON.parse(raw) as unknown;
-  const waypoints = Array.isArray(parsed) ? parsed.filter(isWaypoint) : [];
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
-  if (waypoints.length === 0) return EMPTY_STORE;
-
-  const route: PlannedRoute = {
-    id: createId('route'),
-    name: '',
-    date: '',
-    waypoints,
-    updatedAt: Date.now()
+export function routeFromDoc(id: string, data: Record<string, unknown> | undefined): PlannedRoute {
+  const waypoints = Array.isArray(data?.waypoints) ? data.waypoints.filter(isWaypoint) : [];
+  return {
+    id,
+    name: typeof data?.name === 'string' ? data.name : '',
+    date: typeof data?.date === 'string' ? data.date : '',
+    waypoints: waypoints.slice(0, MAX_WAYPOINTS),
+    author: typeof data?.author === 'string' ? data.author : '',
+    updatedAt: Number.isFinite(data?.updatedAt) ? (data?.updatedAt as number) : 0
   };
-  const store: PlannedRouteStore = { routes: [route], activeId: route.id };
-  persist(store);
-  return store;
 }
 
-/** Alle gespeicherten Routen samt der aktiven Auswahl. */
-export function readPlannedRoutes(): PlannedRouteStore {
-  if (cached) return cached;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      cached = migrateLegacyRoute();
-      return cached;
-    }
-    const parsed = JSON.parse(raw) as Partial<PlannedRouteStore> | null;
-    const routes = Array.isArray(parsed?.routes)
-      ? parsed.routes.map(toRoute).filter((route): route is PlannedRoute => route !== null)
-      : [];
-    const activeId = typeof parsed?.activeId === 'string' ? parsed.activeId : null;
-    cached = {
-      routes,
-      activeId: routes.some((route) => route.id === activeId) ? activeId : null
-    };
-  } catch (err) {
-    console.error('Geplante Routen konnten nicht gelesen werden:', err);
-    cached = EMPTY_STORE;
-  }
-  return cached;
-}
-
-function persist(store: PlannedRouteStore): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch (err) {
-    console.error('Geplante Routen konnten nicht gespeichert werden:', err);
-  }
-}
-
-export function writePlannedRoutes(store: PlannedRouteStore): void {
-  cached = store;
-  persist(store);
-  for (const listener of listeners) listener();
-}
-
-/** Benachrichtigt bei jeder Änderung an den geplanten Routen. */
-export function subscribePlannedRoutes(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-/** Nur für Tests: gelesenen Stand vergessen. */
-export function resetPlannedRoutesCache(): void {
-  cached = null;
+/** Route als Firestore-Dokument (ohne id, die steckt im Dokumentpfad). */
+export function routeToDoc(route: PlannedRoute): Record<string, unknown> {
+  return {
+    name: route.name,
+    date: route.date,
+    waypoints: route.waypoints.map((point) => ({ id: point.id, lat: point.lat, lng: point.lng })),
+    author: route.author,
+    updatedAt: route.updatedAt
+  };
 }
 
 let counter = 0;
 
-function createId(prefix: string): string {
+export function createId(prefix: string): string {
   counter += 1;
   return `${prefix}-${Date.now().toString(36)}-${counter}`;
 }
@@ -156,73 +106,98 @@ export function createWaypoint(lat: number, lng: number): PlannedWaypoint {
   return { id: createId('wp'), lat, lng };
 }
 
-/** Legt eine leere Route an und macht sie zur aktiven. */
-export function createRoute(name: string, date: string): PlannedRoute {
-  const route: PlannedRoute = {
-    id: createId('route'),
-    name: name.trim(),
-    date,
-    waypoints: [],
-    updatedAt: Date.now()
+// --- Aktive Route dieses Geräts ----------------------------------------
+
+let cachedActiveId: string | null | undefined;
+const activeListeners = new Set<() => void>();
+
+export function readActiveRouteId(): string | null {
+  if (cachedActiveId === undefined) {
+    cachedActiveId = localStorage.getItem(ACTIVE_KEY);
+  }
+  return cachedActiveId;
+}
+
+export function writeActiveRouteId(id: string | null): void {
+  cachedActiveId = id;
+  try {
+    if (id) localStorage.setItem(ACTIVE_KEY, id);
+    else localStorage.removeItem(ACTIVE_KEY);
+  } catch (err) {
+    console.error('Aktive Route konnte nicht gespeichert werden:', err);
+  }
+  for (const listener of activeListeners) listener();
+}
+
+export function subscribeActiveRouteId(listener: () => void): () => void {
+  activeListeners.add(listener);
+  return () => {
+    activeListeners.delete(listener);
   };
-  const store = readPlannedRoutes();
-  writePlannedRoutes({ routes: [...store.routes, route], activeId: route.id });
-  return route;
 }
 
-function updateRoute(id: string, change: (route: PlannedRoute) => PlannedRoute): void {
-  const store = readPlannedRoutes();
-  writePlannedRoutes({
-    ...store,
-    routes: store.routes.map((route) =>
-      route.id === id ? { ...change(route), updatedAt: Date.now() } : route
-    )
-  });
+/** Nur für Tests: gelesenen Stand vergessen. */
+export function resetActiveRouteCache(): void {
+  cachedActiveId = undefined;
 }
 
-export function renameRoute(id: string, name: string, date: string): void {
-  updateRoute(id, (route) => ({ ...route, name: name.trim(), date }));
+// --- Übernahme der früher gerätelokal gespeicherten Routen --------------
+
+/**
+ * Liest die vor der Online-Ablage lokal gespeicherten Routen aus und
+ * entfernt sie vom Gerät.
+ *
+ * Wird einmalig beim ersten Start mit angemeldetem Roadtrip aufgerufen: Wer
+ * schon Routen abgesteckt hatte, findet sie danach im Roadtrip wieder,
+ * statt vor einer leeren Liste zu stehen. Das Entfernen passiert erst nach
+ * dem Auslesen durch den Aufrufer (siehe hooks/usePlannedRoutes.ts) – ein
+ * zweiter Aufruf liefert nichts mehr und legt damit auch keine Duplikate an.
+ */
+export function takeLocalRoutes(): PlannedRoute[] {
+  const routes: PlannedRoute[] = [];
+  try {
+    const raw = localStorage.getItem(LOCAL_ROUTES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { routes?: unknown } | null;
+      if (Array.isArray(parsed?.routes)) {
+        for (const entry of parsed.routes) {
+          const route = entry as Partial<PlannedRoute> | null;
+          if (!route || typeof route.id !== 'string') continue;
+          routes.push(routeFromDoc(route.id, route as Record<string, unknown>));
+        }
+      }
+    }
+
+    // Allererste Fassung: eine einzige Route, gespeichert als reine Liste.
+    const legacyRaw = localStorage.getItem(LEGACY_SINGLE_KEY);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw) as unknown;
+      const waypoints = Array.isArray(parsed) ? parsed.filter(isWaypoint) : [];
+      if (waypoints.length > 0) {
+        routes.push({
+          id: createId('route'),
+          name: '',
+          date: '',
+          waypoints,
+          author: '',
+          updatedAt: Date.now()
+        });
+      }
+    }
+
+    localStorage.removeItem(LOCAL_ROUTES_KEY);
+    localStorage.removeItem(LEGACY_SINGLE_KEY);
+  } catch (err) {
+    console.error('Lokale Routen konnten nicht übernommen werden:', err);
+  }
+  return routes.filter((route) => route.waypoints.length > 0 || route.name);
 }
 
-export function setRouteWaypoints(id: string, waypoints: PlannedWaypoint[]): void {
-  updateRoute(id, (route) => ({ ...route, waypoints }));
-}
+// --- Rechnen und Sortieren ---------------------------------------------
 
-export function deleteRoute(id: string): void {
-  const store = readPlannedRoutes();
-  writePlannedRoutes({
-    routes: store.routes.filter((route) => route.id !== id),
-    activeId: store.activeId === id ? null : store.activeId
-  });
-}
-
-/** Kopiert eine Route samt Wegpunkten – Grundlage für den nächsten Tag. */
-export function duplicateRoute(id: string, name: string): PlannedRoute | null {
-  const store = readPlannedRoutes();
-  const source = store.routes.find((route) => route.id === id);
-  if (!source) return null;
-
-  const copy: PlannedRoute = {
-    id: createId('route'),
-    name: name.trim(),
-    date: '',
-    // Neue Kennungen: sonst zeigten Marker beider Routen auf denselben Punkt.
-    waypoints: source.waypoints.map((point) => createWaypoint(point.lat, point.lng)),
-    updatedAt: Date.now()
-  };
-  writePlannedRoutes({ routes: [...store.routes, copy], activeId: copy.id });
-  return copy;
-}
-
-/** Wählt die Route, die auf der Karte gilt. `null` = wieder der Track. */
-export function setActiveRoute(id: string | null): void {
-  const store = readPlannedRoutes();
-  writePlannedRoutes({ ...store, activeId: id && store.routes.some((r) => r.id === id) ? id : null });
-}
-
-export function findRoute(store: PlannedRouteStore, id: string | null): PlannedRoute | null {
+export function findRoute(routes: PlannedRoute[], id: string | null): PlannedRoute | null {
   if (!id) return null;
-  return store.routes.find((route) => route.id === id) ?? null;
+  return routes.find((route) => route.id === id) ?? null;
 }
 
 /** Länge einer Route in Metern (Luftlinie zwischen den Wegpunkten). */

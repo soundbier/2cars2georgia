@@ -1,166 +1,129 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  createRoute,
   createWaypoint,
-  deleteRoute,
-  duplicateRoute,
   findRoute,
+  PlannedRoute,
   plannedRouteLengthMeters,
-  readPlannedRoutes,
-  renameRoute,
-  resetPlannedRoutesCache,
-  setActiveRoute,
-  setRouteWaypoints,
+  readActiveRouteId,
+  resetActiveRouteCache,
+  routeFromDoc,
+  routeToDoc,
   sortRoutes,
-  subscribePlannedRoutes
+  subscribeActiveRouteId,
+  takeLocalRoutes,
+  writeActiveRouteId
 } from './plannedRoute';
 
 const PASSAU = { lat: 48.5667, lng: 13.4319 };
 const WIEN = { lat: 48.2082, lng: 16.3738 };
 
+function route(partial: Partial<PlannedRoute>): PlannedRoute {
+  return { id: 'r', name: '', date: '', waypoints: [], author: '', updatedAt: 0, ...partial };
+}
+
 beforeEach(() => {
   localStorage.clear();
-  resetPlannedRoutesCache();
+  resetActiveRouteCache();
 });
 
 afterEach(() => {
   localStorage.clear();
-  resetPlannedRoutesCache();
+  resetActiveRouteCache();
 });
 
 describe('plannedRoute', () => {
-  it('startet ohne Routen', () => {
-    expect(readPlannedRoutes()).toEqual({ routes: [], activeId: null });
-  });
-
-  it('legt eine Route an, steckt sie ab und behält sie über einen Neustart', () => {
-    const route = createRoute('Tag 1: Passau – Wien', '2026-05-04');
-    setRouteWaypoints(route.id, [createWaypoint(PASSAU.lat, PASSAU.lng), createWaypoint(WIEN.lat, WIEN.lng)]);
-
-    resetPlannedRoutesCache();
-    const store = readPlannedRoutes();
-    const stored = findRoute(store, route.id);
-
-    expect(store.routes).toHaveLength(1);
-    expect(store.activeId).toBe(route.id);
-    expect(stored?.name).toBe('Tag 1: Passau – Wien');
-    expect(stored?.date).toBe('2026-05-04');
-    expect(stored?.waypoints).toHaveLength(2);
-    expect(stored?.waypoints[1].lng).toBeCloseTo(WIEN.lng);
-  });
-
-  it('benennt um, aktiviert und löscht einzelne Routen', () => {
-    const first = createRoute('Tag 1', '2026-05-04');
-    const second = createRoute('Tag 2', '2026-05-05');
-
-    renameRoute(first.id, 'Tag 1: Anreise', '2026-05-03');
-    expect(findRoute(readPlannedRoutes(), first.id)).toMatchObject({
-      name: 'Tag 1: Anreise',
-      date: '2026-05-03'
+  it('übersetzt zwischen Route und Firestore-Dokument', () => {
+    const original = route({
+      id: 'tag-1',
+      name: 'Tag 1: Passau – Wien',
+      date: '2026-05-04',
+      waypoints: [createWaypoint(PASSAU.lat, PASSAU.lng), createWaypoint(WIEN.lat, WIEN.lng)],
+      author: 'Skipper',
+      updatedAt: 1_770_000_000_000
     });
 
-    // Zuletzt angelegte Route ist aktiv, umschalten geht auf jede andere.
-    expect(readPlannedRoutes().activeId).toBe(second.id);
-    setActiveRoute(first.id);
-    expect(readPlannedRoutes().activeId).toBe(first.id);
+    const back = routeFromDoc('tag-1', routeToDoc(original));
 
-    // Wird die aktive Route gelöscht, gilt wieder der gefahrene Track.
-    deleteRoute(first.id);
-    const store = readPlannedRoutes();
-    expect(store.routes.map((route) => route.id)).toEqual([second.id]);
-    expect(store.activeId).toBeNull();
+    expect(back).toEqual(original);
+    // Die Kennung steckt im Dokumentpfad, nicht in den Feldern.
+    expect(routeToDoc(original)).not.toHaveProperty('id');
   });
 
-  it('kopiert eine Route mit eigenen Wegpunkten', () => {
-    const source = createRoute('Tag 1', '2026-05-04');
-    setRouteWaypoints(source.id, [createWaypoint(PASSAU.lat, PASSAU.lng)]);
-
-    const copy = duplicateRoute(source.id, 'Tag 1 (Kopie)');
-    const store = readPlannedRoutes();
-
-    expect(copy).not.toBeNull();
-    expect(store.activeId).toBe(copy?.id);
-    expect(copy?.date).toBe('');
-    expect(copy?.waypoints[0]).toMatchObject({ lat: PASSAU.lat, lng: PASSAU.lng });
-    // Eigene Kennungen: sonst würde das Verschieben beide Routen ändern.
-    expect(copy?.waypoints[0].id).not.toBe(findRoute(store, source.id)?.waypoints[0].id);
-  });
-
-  it('meldet Änderungen an die Oberfläche', () => {
-    let calls = 0;
-    const unsubscribe = subscribePlannedRoutes(() => {
-      calls += 1;
+  it('kommt mit unvollständigen Dokumenten zurecht', () => {
+    const parsed = routeFromDoc('kaputt', {
+      waypoints: [{ id: 'a', lat: 48, lng: 13 }, { id: 'b', lat: 'nein' }, null],
+      updatedAt: 'gestern'
     });
 
-    const route = createRoute('Tag 1', '');
-    expect(calls).toBe(1);
+    expect(parsed).toEqual(
+      route({ id: 'kaputt', waypoints: [{ id: 'a', lat: 48, lng: 13 }], updatedAt: 0 })
+    );
+  });
+
+  it('merkt sich die aktive Route auf diesem Gerät und meldet Änderungen', () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeActiveRouteId(listener);
+
+    writeActiveRouteId('tag-2');
+    expect(readActiveRouteId()).toBe('tag-2');
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // Neu geladene Seite liest denselben Stand aus dem Speicher.
+    resetActiveRouteCache();
+    expect(readActiveRouteId()).toBe('tag-2');
+
+    writeActiveRouteId(null);
+    expect(readActiveRouteId()).toBeNull();
 
     unsubscribe();
-    deleteRoute(route.id);
-    expect(calls).toBe(1);
+    writeActiveRouteId('tag-3');
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it('übernimmt die Route der ersten Fassung', () => {
-    localStorage.setItem(
-      'boat_planned_route',
-      JSON.stringify([
-        { id: 'a', lat: PASSAU.lat, lng: PASSAU.lng },
-        { id: 'b', lat: WIEN.lat, lng: WIEN.lng }
-      ])
-    );
-
-    const store = readPlannedRoutes();
-
-    expect(store.routes).toHaveLength(1);
-    expect(store.routes[0].waypoints).toHaveLength(2);
-    expect(store.activeId).toBe(store.routes[0].id);
-    // Der alte Schlüssel wird dabei aufgeräumt, sonst käme die Route bei
-    // jedem Leeren der Liste zurück.
-    expect(localStorage.getItem('boat_planned_route')).toBeNull();
-  });
-
-  it('überspringt unbrauchbare Einträge im Speicher', () => {
+  it('übernimmt gerätelokal gespeicherte Routen genau einmal', () => {
     localStorage.setItem(
       'boat_planned_routes',
       JSON.stringify({
         routes: [
-          {
-            id: 'r1',
-            name: 'Tag 1',
-            date: '',
-            waypoints: [{ id: 'a', lat: 48, lng: 13 }, { id: 'b', lat: 'nein' }, null],
-            updatedAt: 1
-          },
-          null
+          { id: 'alt-1', name: 'Tag 1', date: '2026-05-04', waypoints: [{ id: 'a', ...PASSAU }] },
+          { id: 'alt-2', name: '', date: '', waypoints: [] }
         ],
-        activeId: 'gibt-es-nicht'
+        activeId: 'alt-1'
       })
     );
+    localStorage.setItem('boat_planned_route', JSON.stringify([{ id: 'x', ...WIEN }]));
 
-    const store = readPlannedRoutes();
+    const taken = takeLocalRoutes();
 
-    expect(store.routes).toHaveLength(1);
-    expect(store.routes[0].waypoints).toEqual([{ id: 'a', lat: 48, lng: 13 }]);
-    expect(store.activeId).toBeNull();
+    expect(taken.map((r) => r.name)).toEqual(['Tag 1', '']);
+    expect(taken[0].waypoints).toHaveLength(1);
+    // Die ganz alte Einzelroute kommt als namenlose Route mit.
+    expect(taken[1].waypoints[0]).toMatchObject(WIEN);
+    expect(localStorage.getItem('boat_planned_routes')).toBeNull();
+    expect(localStorage.getItem('boat_planned_route')).toBeNull();
+    expect(takeLocalRoutes()).toEqual([]);
+  });
+
+  it('findet Routen und rechnet ihre Länge', () => {
+    const routes = [route({ id: 'a' }), route({ id: 'b' })];
+    expect(findRoute(routes, 'b')?.id).toBe('b');
+    expect(findRoute(routes, 'weg')).toBeNull();
+    expect(findRoute(routes, null)).toBeNull();
+
+    const km = plannedRouteLengthMeters([PASSAU, WIEN]) / 1000;
+    expect(km).toBeGreaterThan(200);
+    expect(km).toBeLessThan(260);
+    expect(plannedRouteLengthMeters([PASSAU])).toBe(0);
   });
 
   it('sortiert Routen nach Tag, danach nach letzter Änderung', () => {
-    const routes = [
-      { id: 'c', name: 'ohne Tag, alt', date: '', waypoints: [], updatedAt: 10 },
-      { id: 'b', name: 'Tag 2', date: '2026-05-05', waypoints: [], updatedAt: 5 },
-      { id: 'd', name: 'ohne Tag, neu', date: '', waypoints: [], updatedAt: 20 },
-      { id: 'a', name: 'Tag 1', date: '2026-05-04', waypoints: [], updatedAt: 1 }
-    ];
+    const sorted = sortRoutes([
+      route({ id: 'c', updatedAt: 10 }),
+      route({ id: 'a', date: '2026-05-04' }),
+      route({ id: 'd', updatedAt: 20 }),
+      route({ id: 'b', date: '2026-05-05' })
+    ]);
 
-    expect(sortRoutes(routes).map((route) => route.id)).toEqual(['a', 'b', 'd', 'c']);
-  });
-
-  it('rechnet die Länge der geplanten Route', () => {
-    // Passau → Wien, gut 250 km Luftlinie.
-    const meters = plannedRouteLengthMeters([PASSAU, WIEN]);
-
-    expect(meters / 1000).toBeGreaterThan(200);
-    expect(meters / 1000).toBeLessThan(260);
-    expect(plannedRouteLengthMeters([PASSAU])).toBe(0);
+    expect(sorted.map((r) => r.id)).toEqual(['a', 'b', 'd', 'c']);
   });
 });

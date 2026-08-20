@@ -5,24 +5,15 @@
  * zeichnet eine geplante Route (auch auf dem Kartentab, damit man sieht,
  * wofür das Downloadraster gilt), `RouteEditorLayer` nimmt zusätzlich Klicks
  * entgegen und zeigt die verschiebbaren Wegpunkte. Die Seite mit der
- * Routenverwaltung liegt unter pages/RoutePlanner.tsx, die Daten in
- * lib/plannedRoute.ts.
+ * Routenverwaltung liegt unter pages/RoutePlanner.tsx, die Daten kommen aus
+ * hooks/usePlannedRoutes.ts.
  */
 
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Marker, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useT } from '../i18n';
-import {
-  createWaypoint,
-  findRoute,
-  PlannedRoute,
-  plannedRouteLengthMeters,
-  PlannedWaypoint,
-  readPlannedRoutes,
-  setRouteWaypoints,
-  subscribePlannedRoutes
-} from '../lib/plannedRoute';
+import { createWaypoint, plannedRouteLengthMeters, PlannedWaypoint } from '../lib/plannedRoute';
 import './RoutePlanner.css';
 
 // Wie beim Track (siehe MapTab): Leaflet schreibt die Farbe als SVG-Attribut,
@@ -47,12 +38,6 @@ function waypointIcon(index: number): L.DivIcon {
   return icon;
 }
 
-/** Aktive Route – die, deren Strecke auf der Karte und im Download gilt. */
-export function useActivePlannedRoute(): PlannedRoute | null {
-  const store = useSyncExternalStore(subscribePlannedRoutes, readPlannedRoutes);
-  return useMemo(() => findRoute(store, store.activeId), [store]);
-}
-
 export interface RouteEditorState {
   waypoints: PlannedWaypoint[];
   addAt: (lat: number, lng: number) => void;
@@ -66,43 +51,33 @@ export interface RouteEditorState {
 /**
  * Bearbeitet die Wegpunkte einer Route.
  *
- * Jede Änderung geht direkt in den Speicher: Auf dem Wasser gibt es kein
- * „Speichern nicht vergessen“, und der Stand muss auch nach einem Neuladen
- * ohne Netz noch da sein.
+ * Hält bewusst keinen eigenen Zustand: Jede Änderung geht sofort über
+ * `onChange` in den Speicher (Firestore, siehe hooks/usePlannedRoutes.ts).
+ * Auf dem Wasser gibt es kein „Speichern nicht vergessen“, und der Stand
+ * muss auch nach einem Neuladen ohne Netz noch da sein – dafür sorgt der
+ * lokale Firestore-Cache.
  */
-export function useRouteEditor(routeId: string | null): RouteEditorState {
-  const store = useSyncExternalStore(subscribePlannedRoutes, readPlannedRoutes);
-  const waypoints = useMemo(() => findRoute(store, routeId)?.waypoints ?? [], [store, routeId]);
-
-  const current = useCallback(
-    () => (routeId ? (findRoute(readPlannedRoutes(), routeId)?.waypoints ?? []) : []),
-    [routeId]
-  );
-
-  const write = useCallback(
-    (next: PlannedWaypoint[]) => {
-      if (routeId) setRouteWaypoints(routeId, next);
-    },
-    [routeId]
-  );
-
+export function useRouteEditor(
+  waypoints: PlannedWaypoint[],
+  onChange: (next: PlannedWaypoint[]) => void
+): RouteEditorState {
   return {
     waypoints,
     addAt: useCallback(
-      (lat: number, lng: number) => write([...current(), createWaypoint(lat, lng)]),
-      [current, write]
+      (lat: number, lng: number) => onChange([...waypoints, createWaypoint(lat, lng)]),
+      [onChange, waypoints]
     ),
     moveTo: useCallback(
       (id: string, lat: number, lng: number) =>
-        write(current().map((point) => (point.id === id ? { ...point, lat, lng } : point))),
-      [current, write]
+        onChange(waypoints.map((point) => (point.id === id ? { ...point, lat, lng } : point))),
+      [onChange, waypoints]
     ),
     remove: useCallback(
-      (id: string) => write(current().filter((point) => point.id !== id)),
-      [current, write]
+      (id: string) => onChange(waypoints.filter((point) => point.id !== id)),
+      [onChange, waypoints]
     ),
-    undo: useCallback(() => write(current().slice(0, -1)), [current, write]),
-    clear: useCallback(() => write([]), [write]),
+    undo: useCallback(() => onChange(waypoints.slice(0, -1)), [onChange, waypoints]),
+    clear: useCallback(() => onChange([]), [onChange]),
     lengthMeters: useMemo(() => plannedRouteLengthMeters(waypoints), [waypoints])
   };
 }
