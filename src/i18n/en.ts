@@ -281,6 +281,7 @@ export const en: Translations = {
   'settings.app': 'App',
   'settings.version': 'Version',
   'settings.logout': 'Sign out account',
+  'settings.logoutFailed': 'Sign-out failed. Please try again.',
   'settings.leaveRoadtrip': 'Leave roadtrip',
   'settings.crewCount_one': '{count} member',
   'settings.crewCount_other': '{count} members',

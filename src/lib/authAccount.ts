@@ -95,6 +95,17 @@ export async function sendPasswordReset(email: string): Promise<void> {
   }
 }
 
-export function signOutAccount(): Promise<void> {
-  return signOut(auth);
+/**
+ * Meldet das Konto auf diesem Gerät ab. `signOut` leert die Auth-Sitzung
+ * (browserLocalPersistence, siehe firebase.ts) und stößt onAuthStateChanged
+ * an – RoadtripProvider/AppGate blenden daraufhin von selbst zurück auf den
+ * Login-Screen, ein manuelles Weiterleiten ist nicht nötig. Roadtrip- und
+ * Gerätedaten bleiben unangetastet.
+ */
+export async function signOutAccount(): Promise<void> {
+  try {
+    await signOut(auth);
+  } catch (err) {
+    throw new AuthAccountError(authErrorCode(err));
+  }
 }
