@@ -257,3 +257,53 @@
   margin-top: var(--space-2);
   font-size: var(--text-label);
 }
+
+/* ============================================================
+   Größere Flächen
+
+   Auf dem Handy stapeln sich die Felder zu zweit; ab großen Handys und
+   Tablets stehen Beschreibung und Betrag in der ersten, Kategorie, Zahler
+   und Knopf in der zweiten Zeile. Bewusst nicht alles in eine einzige
+   Zeile: Die Auswahlfelder tragen lange Werte („Gemeinsame Kasse"), die
+   dann abgeschnitten wären.
+   ============================================================ */
+@media (min-width: 600px) {
+  .costs-form,
+  .costs-row-edit {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* Die Beschreibung ist das lange Feld – sie bekommt zwei Drittel. */
+  .costs-form-title,
+  .costs-row-edit-title {
+    grid-column: span 2;
+  }
+
+  .costs-row-edit-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+/* Der Ausgleich beantwortet zwei Fragen: Wer steht wie da, und wer zahlt
+   wem. Nebeneinander sind beide auf einen Blick zu erfassen. */
+@media (min-width: 900px) {
+  .settlement-details {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--space-6);
+    align-items: start;
+  }
+
+  .settlement-transfers {
+    margin-top: 0;
+  }
+
+  /* Hinweiszeilen laufen unter beiden Spalten durch – sie gehören zu keiner
+     von beiden. */
+  .settlement-note {
+    grid-column: 1 / -1;
+  }
+}

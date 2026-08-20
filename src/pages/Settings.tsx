@@ -153,7 +153,10 @@ export default function Settings({ currentUser, users }: Props) {
   };
 
   return (
-    <div className="settings-page">
+    /* `settings-page-columns`: Die Übersichtsseite besteht aus vielen kurzen
+       Abschnitten und darf ab Laptopbreite zweispaltig laufen (siehe
+       Settings.css). Die Unterseiten behalten die einspaltige Liste. */
+    <div className="settings-page settings-page-columns">
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
       <Section title={t('settings.thisRoadtrip')}>

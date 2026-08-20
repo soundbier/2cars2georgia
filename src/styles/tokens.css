@@ -172,10 +172,17 @@
   --font-display: 'Archivo Narrow', var(--font-ui);
   --font-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
 
-  /* Skala mit deutlicher Spreizung; nichts unter 13px. */
-  --text-instrument: clamp(3.4rem, 19vw, 4rem); /* ~64px Instrumentenwert */
-  --text-2xl: 1.875rem; /* 30px Seitentitel */
-  --text-xl: 1.1875rem; /* 19px Abschnitt */
+  /* Skala mit deutlicher Spreizung; nichts unter 13px.
+
+     Die oberen Stufen wachsen mit der Fläche: `clamp()` bindet sie an die
+     Viewport-Breite, damit der Instrumentenwert auf einem 320px-Gerät nicht
+     überläuft und auf einem großen Monitor nicht verloren wirkt. Die
+     Lesegrößen (`--text-base` abwärts) bleiben fest – Fließtext skaliert
+     nicht mit dem Fenster, sondern mit der Systemeinstellung. */
+  --text-instrument: clamp(3rem, 15vw, 4.5rem); /* Instrumentenwert */
+  --text-2xl: clamp(1.625rem, 1.15rem + 2.4vw, 2.125rem); /* Seitentitel */
+  --text-xl: clamp(1.1875rem, 1.1rem + 0.4vw, 1.375rem); /* Abschnitt */
+  --text-lg: 1.0625rem; /* 17px – hervorgehobener Wert in einer Zeile */
   --text-base: 1rem; /* 16px Fließtext */
   --text-sm: 0.875rem; /* 14px Sekundärtext */
   --text-label: 0.8125rem; /* 13px Label – die kleinste erlaubte Größe */
@@ -187,9 +194,82 @@
   /* Höhe des Sync-Banners; die Toasts rücken darüber, wenn es sichtbar ist. */
   --sync-banner-height: 36px;
 
+  /* ============================================================
+     Layout — Breite und Seitenrand
+
+     Mobile-first: Auf dem Handy füllt der Inhalt die Breite, der Seitenrand
+     ist knapp. Ab Tablet wächst der Rand, und die Spalte bekommt eine
+     Obergrenze – ein über 1000px langer Fließtext ist nicht lesbarer,
+     sondern nur breiter. Seiten mit mehrspaltigem Inhalt (Cockpit,
+     Einstellungen) nutzen `--content-max-wide`.
+
+     Die Werte werden weiter unten je Breakpoint überschrieben; die
+     Komponenten kennen nur die Tokens.
+     ============================================================ */
+  --content-max: 100%;
+  --content-max-wide: 100%;
+  --content-pad-x: var(--space-4);
+  --content-pad-y: var(--space-5);
+
+  /* Seitenrand inklusive Safe Area – im Querformat liegt der Notch seitlich. */
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
   /* Schatten nur für Elemente, die tatsächlich über anderem Inhalt liegen. */
   --shadow-overlay: 0 8px 24px rgba(21, 34, 56, 0.18), 0 2px 8px rgba(21, 34, 56, 0.1);
   --shadow-control: 0 1px 3px rgba(21, 34, 56, 0.18);
 
   --duration-fast: 0.12s;
+}
+
+/* ============================================================
+   BREAKPOINTS
+
+   Nur vier Stufen, und jede hat einen Grund:
+
+   600px   große Handys und Tablets im Hochformat – ab hier ist Platz für
+           mehr als drei Schnell-Log-Tasten nebeneinander.
+   900px   Tablet-Querformat und kleine Laptops – ab hier lohnt sich die
+           zweite Spalte im Cockpit.
+   1280px  Desktop – ab hier begrenzt nur noch die Lesbarkeit die Breite.
+
+   Dazu genau ein Sonderfall, der sich nicht über die Breite beschreiben
+   lässt: das flache Querformat (Handy quer, max. 520px hoch). Dort ist nicht
+   die Breite knapp, sondern die Höhe – die Navigationsleiste und die
+   vertikalen Abstände müssen schrumpfen, sonst bleibt vom Inhalt nichts
+   übrig.
+   ============================================================ */
+
+@media (min-width: 600px) {
+  :root {
+    --content-max: 640px;
+    --content-max-wide: 720px;
+    --content-pad-x: var(--space-6);
+    --content-pad-y: var(--space-6);
+  }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --content-max: 720px;
+    --content-max-wide: 1040px;
+    --content-pad-x: var(--space-8);
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --content-max: 780px;
+    --content-max-wide: 1180px;
+  }
+}
+
+/* Flaches Querformat: Höhe ist die knappe Größe. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --nav-height: 56px;
+    --content-pad-y: var(--space-3);
+    --text-instrument: clamp(2.25rem, 7vh + 1rem, 3rem);
+  }
 }

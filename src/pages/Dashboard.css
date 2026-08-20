@@ -16,6 +16,17 @@
   gap: var(--space-5);
 }
 
+/* Die beiden Gruppen (siehe Dashboard.tsx) verhalten sich im Hochformat wie
+   der bisherige Fluss: gleicher Abstand, gleiche Reihenfolge. Sie existieren
+   nur, damit die Spalten weiter unten ohne Umsortieren entstehen können. */
+.cockpit-primary,
+.cockpit-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
 /* --- Ebene 1: Expedition ------------------------------------------------ */
 .cockpit-header {
   display: flex;
@@ -228,18 +239,26 @@
 
 /* --- Schnell-Logs ------------------------------------------------------- */
 /* Eine Fläche mit Rasterlinien statt einzelner Kärtchen: Das sind Tasten auf
-   einem Blatt, kein Kartenstapel. */
+   einem Blatt, kein Kartenstapel.
+
+   Die Rasterlinien liegen als 1px-Kontur an den Tasten selbst, nicht als
+   durchscheinende Hintergrundfläche des Rasters: Sobald die Spaltenzahl mit
+   der Displaybreite wechselt (siehe unten), geht die letzte Reihe nicht
+   mehr auf – ein eingefärbter Rasterhintergrund stünde dann als
+   sinnfreier Farbblock neben der letzten Taste. So bleibt die freie Stelle
+   schlicht Papier. */
 .quick-log-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  background: var(--color-border);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
 .quick-log-btn {
+  box-shadow: 0 0 0 1px var(--color-border);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -347,5 +366,83 @@
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-2);
+  }
+}
+
+/* ============================================================
+   Größere Flächen
+
+   Das Cockpit ist die einzige Seite, die dauernd im Blick ist – hier zahlt
+   sich Platz unmittelbar aus: mehr Schnell-Log-Tasten ohne Aufklappen, und
+   Instrument und Tageslog gleichzeitig sichtbar.
+   ============================================================ */
+
+/* Ab großen Handys/Tablets im Hochformat passen vier Tasten nebeneinander,
+   auf breiten Displays sechs. Die Tasten bleiben dabei gleich hoch – sie
+   werden in Fahrt getroffen, nicht betrachtet. */
+@media (min-width: 600px) {
+  .quick-log-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .instrument {
+    padding: var(--space-5);
+  }
+}
+
+@media (min-width: 1280px) {
+  .quick-log-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  /* Erst hier ist die Instrumentenspalte breit genug für drei Messwerte
+     nebeneinander, ohne dass „Tag 4 von 21" abgeschnitten wird. Die
+     Koordinaten behalten ihre eigene Zeile. */
+  .instrument-readout {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Zwei Spalten: sobald genug Breite da ist – am Laptop/Desktop ebenso wie
+   im flachen Querformat, wo die Höhe fehlt und die Breite übrig ist. Die
+   Seite nutzt dafür die weite Spaltenbreite (siehe tokens.css). */
+@media (min-width: 900px), (orientation: landscape) and (max-height: 520px) and (min-width: 720px) {
+  .content > .cockpit {
+    max-width: var(--content-max-wide);
+  }
+
+  .cockpit {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+    column-gap: var(--space-6);
+  }
+
+  .cockpit-header {
+    grid-column: 1 / -1;
+  }
+
+}
+
+/* Im flachen Querformat ist die Höhe das Nadelöhr: Der Instrumentenwert
+   bekommt weniger Luft, damit Statuszeile, Messwerte und die Tour-Tasten
+   ohne Scrollen auf den Schirm passen. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .cockpit,
+  .cockpit-primary,
+  .cockpit-secondary {
+    gap: var(--space-3);
+  }
+
+  .instrument {
+    padding: var(--space-3);
+  }
+
+  .instrument-speed {
+    padding: var(--space-2) 0;
+  }
+
+  .quick-log-btn {
+    min-height: 64px;
   }
 }
