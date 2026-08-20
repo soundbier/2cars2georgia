@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Pencil, LocateFixed, Navigation } from 'lucide-react';
+import { Pencil, LocateFixed, Navigation, DownloadCloud } from 'lucide-react';
 import L from 'leaflet';
 // Seiteneffekt-Import: erweitert Leaflet um die Kartendrehung (map.setBearing).
 import 'leaflet-rotate';
@@ -17,6 +17,13 @@ import { usePreferences } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
 import { formatSpeed } from '../lib/units';
 import { getBaseLayer, OVERLAYS, OVERLAY_IDS } from '../lib/mapLayers';
+import { OfflineTileLayer } from '../components/OfflineTileLayer';
+import {
+  OfflineDownloadPanel,
+  OfflineGrid,
+  useOfflineDownload
+} from '../components/OfflineMapDownload';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { readMapView, saveMapView } from '../lib/mapView';
 import { activeOnly } from '../lib/trash';
 import { useI18n, useT } from '../i18n';
@@ -406,6 +413,31 @@ export default function MapTab({ user }: { user: string }) {
 
   const baseLayer = getBaseLayer(preferences.baseLayer);
   const line: [number, number][] = track.map((p) => [p.lat, p.lng]);
+  const isOnline = useOnlineStatus();
+
+  // Offline gespeichert wird genau das, was auch angezeigt wird: die gewählte
+  // Grundkarte samt eingeschalteter Overlays.
+  const offlineLayers = useMemo(
+    () => [
+      { id: preferences.baseLayer, url: baseLayer.url },
+      ...OVERLAY_IDS.filter((id) => preferences.overlays[id]).map((id) => ({
+        id,
+        url: OVERLAYS[id].url
+      }))
+    ],
+    [preferences.baseLayer, preferences.overlays, baseLayer.url]
+  );
+
+  const handleDownloadFinished = useCallback(
+    ({ failed, aborted }: { failed: number; aborted: boolean }) => {
+      if (aborted) notify(t('map.offlineAborted'), 'info');
+      else if (failed > 0) notify(t('map.offlineFailed', { count: failed }), 'danger');
+      else notify(t('map.offlineDone'), 'success');
+    },
+    [notify, t]
+  );
+
+  const offline = useOfflineDownload(track, offlineLayers, handleDownloadFinished);
 
   useEffect(() => {
     saveMapView({ follow, northUp, driveMode });
@@ -491,7 +523,7 @@ export default function MapTab({ user }: { user: string }) {
           headingDeg={position?.headingDeg ?? null}
         />
 
-        <TileLayer
+        <OfflineTileLayer
           // Attribution und Zoomgrenzen gelten pro Quelle: neu einhängen statt
           // nur die URL auszutauschen.
           key={preferences.baseLayer}
@@ -501,7 +533,7 @@ export default function MapTab({ user }: { user: string }) {
           maxNativeZoom={baseLayer.maxNativeZoom}
         />
         {OVERLAY_IDS.filter((id) => preferences.overlays[id]).map((id) => (
-          <TileLayer
+          <OfflineTileLayer
             key={id}
             url={OVERLAYS[id].url}
             attribution={OVERLAYS[id].attribution}
@@ -509,6 +541,16 @@ export default function MapTab({ user }: { user: string }) {
             maxNativeZoom={OVERLAYS[id].maxNativeZoom}
           />
         ))}
+
+        {offline.active && (
+          <OfflineGrid
+            cells={offline.cells}
+            selected={offline.selected}
+            downloaded={offline.downloaded}
+            onToggle={offline.toggleCell}
+            disabled={offline.busy}
+          />
+        )}
 
         {line.length > 1 && (
           <>
@@ -589,6 +631,16 @@ export default function MapTab({ user }: { user: string }) {
         </button>
         <button
           type="button"
+          className={`map-control ${offline.active ? 'map-control-active' : ''}`}
+          onClick={offline.active ? offline.close : offline.open}
+          aria-pressed={offline.active}
+          aria-label={offline.active ? t('map.offlineClose') : t('map.offlineDownload')}
+          title={offline.active ? t('map.offlineClose') : t('map.offlineDownload')}
+        >
+          <DownloadCloud size={20} />
+        </button>
+        <button
+          type="button"
           className={`map-control ${follow ? 'map-control-active' : ''}`}
           onClick={centerOnUser}
           aria-pressed={follow}
@@ -598,6 +650,18 @@ export default function MapTab({ user }: { user: string }) {
           <LocateFixed size={20} />
         </button>
       </div>
+
+      {/* Offline-Status: nur dann sichtbar, wenn er etwas erklärt – ohne Netz
+          oder solange der Downloadmodus offen ist. */}
+      {!isOnline && !offline.active && (
+        <div className="map-offline-badge">
+          {offline.storedAreas > 0
+            ? t('map.offlineStored', { count: offline.storedAreas })
+            : t('map.offlineNone')}
+        </div>
+      )}
+
+      {offline.active && <OfflineDownloadPanel state={offline} isOnline={isOnline} />}
 
       <ConfirmDialog
         open={deleteTargetId !== null}

@@ -95,3 +95,30 @@ die Erfolgsmeldung erscheint), der Server lehnt ihn ein bis zwei Sekunden
 später mit `permission-denied` ab – und der Eintrag ist wieder da. Betroffen
 war zuletzt das Feld `deletedAt` (Papierkorb): Solange die alten Regeln online
 sind, erlauben sie es nicht, und jedes Löschen schlägt genau so fehl.
+
+## Offline-Karten
+
+Die Karte lädt Kacheln weiterhin von den Diensten aus `src/lib/mapLayers.ts`.
+Zusätzlich lassen sich Bereiche entlang der aufgezeichneten Route für die
+Fahrt ohne Netz mitnehmen:
+
+* Der Knopf mit der Download-Wolke auf der Karte öffnet den Downloadmodus.
+* Aus dem Track entsteht ein Korridor (±12 km), zerlegt in Rasterfelder –
+  jedes Feld ist genau eine Kachel der Zoomstufe 10 (`src/lib/tileGrid.ts`).
+  Gewählte Felder sind terracotta, bereits geladene türkis markiert.
+* Der Download holt für jedes gewählte Feld die Zoomstufen 6–14 der aktiven
+  Grundkarte und aller eingeschalteten Overlays (~345 Kacheln je Feld und
+  Ebene) und legt sie in der Cache Storage ab (`src/lib/offlineTiles.ts`).
+  Welche Felder vorliegen, steht in localStorage – der Bestand ist eine
+  Eigenschaft des Geräts, nicht des Roadtrips.
+* `src/components/OfflineTileLayer.tsx` ersetzt `TileLayer` und sieht vor
+  jedem Netzzugriff im Speicher nach. Ohne Verbindung wird gar nicht erst
+  angefragt; nicht geladene Bereiche erscheinen schraffiert statt leer.
+  Route, Marker und Popups kommen aus Firestore und bleiben davon unberührt.
+
+Grenzen der Dienste: Die Nutzungsbedingungen von OpenStreetMap erlauben nur
+maßvolles Vorabladen kleiner Gebiete – deshalb der Korridor statt eines
+Flächendownloads und Zoom 14 als Untergrenze. OpenTopoMap und die
+Waymarked-Trails-Overlays liefern nur bis Zoom 17/18 eigene Kacheln, was für
+den Offline-Bereich ohne Bedeutung ist. Antworten ohne CORS-Header werden
+opak gespeichert: als Bild nutzbar, aber nicht auslesbar.
