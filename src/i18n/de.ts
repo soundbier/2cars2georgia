@@ -200,6 +200,7 @@ export const de = {
   'dayRecap.title': 'Tagesübersicht',
   'dayRecap.exportButton': 'Teilen',
   'dayRecap.noTrackHint': 'Für diesen Tag liegt noch keine Route vor – das Bild zeigt nur die Kennzahlen.',
+  'dayRecap.emptyHint': 'Noch keine Route oder Ereignisse für diesen Roadtrip – sobald ihr loslegt, könnt ihr hier ein Tagesbild erstellen.',
   'dayRecap.background': 'Hintergrund',
   'dayRecap.background.reduced': 'Reduziert',
   'dayRecap.background.standard': 'Standard',

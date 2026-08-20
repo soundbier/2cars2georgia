@@ -195,6 +195,7 @@ export const en: Translations = {
   'dayRecap.title': 'Day recap',
   'dayRecap.exportButton': 'Share',
   'dayRecap.noTrackHint': 'No route recorded for this day yet – the image will only show the stats.',
+  'dayRecap.emptyHint': 'No route or events for this road trip yet – once you get going, you can create a day image here.',
   'dayRecap.background': 'Background',
   'dayRecap.background.reduced': 'Reduced',
   'dayRecap.background.standard': 'Standard',

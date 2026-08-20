@@ -137,6 +137,7 @@ export function DayRecapDialog({ open, onClose, tripName, days, initialDayKey }:
           <canvas ref={canvasRef} className="day-recap-canvas" />
         </div>
 
+        {!day && <p className="helper-text day-recap-hint">{t('dayRecap.emptyHint')}</p>}
         {day && day.track.length <= 1 && (
           <p className="helper-text day-recap-hint">{t('dayRecap.noTrackHint')}</p>
         )}
