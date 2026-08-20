@@ -462,6 +462,9 @@ export const de = {
   'privacy.controllerPlaceholder':
     'Lukas Gehrke, LukasGehrke@gmx.de; 2cars2georgia, 2cars2georgia@gmx.de ',
   'privacy.dataTitle': 'Welche Daten werden verarbeitet',
+  'privacy.dataAccount': 'Konto:',
+  'privacy.dataAccountText':
+    'E-Mail-Adresse, ein selbst gewählter eindeutiger Anzeigename und eine von Firebase vergebene Kennung (UID). Die Adresse wird für die Anmeldung, die Bestätigungs-Mail und das Zurücksetzen des Passworts gebraucht; sie liegt in Firebase Authentication und im Profil-Datensatz der App. Andere Crewmitglieder sehen nur den Anzeigenamen, nicht die Adresse.',
   'privacy.dataGps': 'Standort (GPS):',
   'privacy.dataGpsText':
     'nur während eine Tour aktiv aufgezeichnet wird („Tour starten“ im Cockpit) – Koordinaten, Geschwindigkeit und Kurs, jeweils mit Zeitstempel und dem Namen des Geräts/Crewmitglieds.',
@@ -473,16 +476,22 @@ export const de = {
     'Beträge, Beschreibung, Kategorie und wer bezahlt bzw. eingetragen hat.',
   'privacy.dataNames': 'Crew-Namen:',
   'privacy.dataNamesText':
-    'selbst gewählte Namen der Mitfahrenden, keine E-Mail-Adressen oder sonstigen Kontaktdaten.',
+    'die selbst gewählten Anzeigenamen der Mitfahrenden. Sie stehen an jedem Eintrag, den jemand anlegt, und sind für die ganze Crew des Roadtrips sichtbar.',
+  'privacy.dataErrors': 'Fehlerprotokoll:',
+  'privacy.dataErrorsText':
+    'stürzt etwas ab, wird der Fehler festgehalten – Fehlermeldung, technische Fehlerspur, App-Version, Browser- und Gerätekennung (User-Agent), die aufgerufene Stelle in der App und der Anzeigename. Das Protokoll gehört zum Roadtrip und ist für dessen Crew einsehbar.',
   'privacy.dataLocal': 'Technisch, lokal auf dem Gerät:',
   'privacy.dataLocalText':
-    'der gewählte Crew-Name (`localStorage`), die Spracheinstellung und die Firebase-Anmeldesitzung des Roadtrips – keine Werbe-/Tracking-Cookies.',
+    'Spracheinstellung, Anzeige-Vorlieben, zuletzt gezeigter Kartenausschnitt, der ausgewählte Roadtrip und die Bestätigung dieses Hinweises (`localStorage`), die Firebase-Anmeldesitzung sowie eine vollständige Offline-Kopie der Roadtrip-Daten und der heruntergeladenen Kartenkacheln (IndexedDB bzw. Cache Storage) – keine Werbe-/Tracking-Cookies. Diese Kopie bleibt auch nach dem Abmelden auf dem Gerät liegen: Wer ein Gerät weitergibt oder verliert, sollte die Websitedaten im Browser löschen.',
   'privacy.purposeTitle': 'Zweck und Rechtsgrundlage',
   'privacy.purposeText':
     'Die Verarbeitung dient ausschließlich der gemeinsamen Organisation und Dokumentation dieser Reise durch die Crew selbst (Art. 6 Abs. 1 lit. b bzw. lit. f DSGVO – Erfüllung der gemeinsam vereinbarten Nutzung bzw. berechtigtes Interesse an der Reiseplanung). Bei rein privater, familiärer Nutzung im engen Freundeskreis kann zusätzlich die Haushaltsausnahme (Art. 2 Abs. 2 lit. c DSGVO) einschlägig sein. Diese Einschätzung ersetzt keine Rechtsberatung – bei Nutzung außerhalb eines engen, privaten Kreises empfiehlt sich eine anwaltliche Prüfung.',
   'privacy.processorsTitle': 'Wer die Daten sonst noch sieht',
   'privacy.processorsText':
-    'Die Daten liegen bei Google Firebase (Firestore-Datenbank, Authentifizierung) als technischem Auftragsverarbeiter; je nach gewählter Firestore-Region können Server auch außerhalb der EU (z.B. USA) stehen. Ist Sentry für Fehler-Monitoring konfiguriert (siehe README), erhält auch Sentry technische Fehlerberichte – dabei bewusst ohne Standort-, Namens- oder Kostendaten, nur die anonyme Roadtrip-ID als Kontext.',
+    'Die Daten liegen bei Google Firebase (Firestore-Datenbank, Authentifizierung) als technischem Auftragsverarbeiter; je nach gewählter Firestore-Region können Server auch außerhalb der EU (z.B. USA) stehen. Ist Sentry für Fehler-Monitoring konfiguriert (siehe README), erhält Sentry technische Fehlerberichte: Fehlermeldung, Fehlerspur, App-Version, die Roadtrip-ID und den Anzeigenamen des Crewmitglieds – keine Standort- oder Kostendaten, wohl aber das, was eine Fehlermeldung im Einzelfall mitbringt. Ist zusätzlich Firebase App Check eingeschaltet (Schutz vor automatisierten Zugriffen), bindet die App Google reCAPTCHA ein; dabei werden Geräte- und Nutzungsmerkmale an Google übertragen.',
+  'privacy.mapsTitle': 'Kartendienste',
+  'privacy.mapsText':
+    'Die Karte lädt ihre Kacheln direkt von fremden Servern. Diese Dienste erfahren dabei die IP-Adresse des Geräts und welchen Ausschnitt es anfordert – also ungefähr, wo gerade hingeschaut wird. Verwendet werden OpenStreetMap, OpenTopoMap, CARTO, OpenSeaMap und Waymarked Trails sowie für die Satellitenansicht Esri/ArcGIS, dessen Server in den USA stehen. Wer das vermeiden will, lädt den gebrauchten Bereich vorab herunter (Karte → Download-Wolke): Was im Gerät liegt, wird nicht erneut angefragt.',
   'privacy.retentionTitle': 'Speicherdauer',
   'privacy.retentionText':
     'Daten bleiben gespeichert, solange der Roadtrip in Firebase besteht – es gibt aktuell keine automatische Löschung. Auf Wunsch löscht die verantwortliche Stelle (siehe oben) einzelne Einträge oder den gesamten Roadtrip manuell.',
@@ -493,7 +502,7 @@ export const de = {
     'Über Mehr → Export lassen sich Logbuch, Kosten und Route als PDF, CSV oder GPX aus der App holen. Diese Dateien enthalten Namen, Positionen und Beträge der Crew und verlassen mit dem Teilen den Schutzbereich der App – die Weitergabe an Dritte sollte deshalb mit allen Betroffenen abgestimmt sein.',
   'privacy.rightsTitle': 'Eure Rechte',
   'privacy.rightsText':
-    'Ihr habt das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung eurer Daten sowie auf Datenübertragbarkeit und Widerspruch. Wendet euch dafür an die oben genannte verantwortliche Stelle. Außerdem besteht ein Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde.',
+    'Ihr habt das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung eurer Daten sowie auf Datenübertragbarkeit und Widerspruch. Wendet euch dafür an die oben genannte verantwortliche Stelle. Berichtigung und Löschung von Konto und Anzeigename lassen sich derzeit nicht in der App selbst auslösen, sondern werden dort von Hand erledigt – eine kurze Nachricht genügt. Eine Kopie der eigenen Reisedaten gibt es sofort über Mehr → Export. Außerdem besteht ein Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde.',
   // Nur in übersetzten Fassungen sichtbar, siehe en.ts.
   'privacy.translationNote': '',
   // Einmaliger Hinweis vor dem ersten Login/App-Start, siehe PrivacyOnboarding.tsx.
