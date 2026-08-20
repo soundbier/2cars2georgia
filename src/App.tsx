@@ -91,6 +91,15 @@ function AppShell() {
     setErrorLogContext(tripId, user || null, authUser?.uid ?? null);
   }, [tripId, user, authUser]);
 
+  // Nur hier gibt es die Bottom-Navigation. Die Toasts richten sich daran aus
+  // (siehe ui/Toast.css); auf den Gate-Seiten davor – Login, Profil,
+  // Roadtrip-Wahl, Datenschutz-Onboarding – gibt es keine, und der
+  // reservierte Platz ließ die Meldung mitten im Text stehen.
+  useEffect(() => {
+    document.body.classList.add('has-bottom-nav');
+    return () => document.body.classList.remove('has-bottom-nav');
+  }, []);
+
   return (
     <TrackingProvider key={user} user={user}>
       <BrowserRouter>

@@ -67,6 +67,9 @@
   /* Oliv: Erfolg, positiv, bestätigt. */
   --olive: #6b7a3f;
   --olive-ink: #5f6d38;
+  /* Auf der Instrumentenfläche erreicht Oliv nur 2.6:1 – wie Terracotta,
+     Rost und Ocker braucht es dort eine aufgehellte Stufe. */
+  --olive-light: #a3b466;
 
   /* Rost: Fehler, kritisch, destruktiv. */
   --rust: #a32e20;
@@ -106,6 +109,7 @@
   --color-accent-on-instrument: var(--terracotta-light);
   --color-danger-on-instrument: var(--rust-light);
   --color-warning-on-instrument: var(--ocher-light);
+  --color-success-on-instrument: var(--olive-light);
 
   /* --- Text auf Papier --- */
   --color-text: var(--ink);
