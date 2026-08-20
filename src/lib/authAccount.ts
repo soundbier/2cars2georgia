@@ -4,17 +4,10 @@ import {
   signInWithPopup,
   sendPasswordResetEmail,
   signOut,
+  sendEmailVerification,
   User
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
-
-/**
- * Persönliche Firebase-Auth-Konten: E-Mail/Passwort oder Google, jeweils mit
- * einer echten, eindeutigen UID pro Person (request.auth.uid in
- * firestore.rules). Ersetzt den bisherigen technischen Roadtrip-User pro
- * Roadtrip (früher in lib/roadtrip.ts) – ein Konto gehört jetzt einer
- * Person, nicht einem Roadtrip.
- */
 
 export const MIN_PASSWORD_LENGTH = 6;
 
@@ -25,12 +18,11 @@ export type AuthErrorCode =
   | 'wrongCredentials'
   | 'tooManyAttempts'
   | 'popupClosed'
+  | 'emailNotVerified'
   | 'unknown';
 
 export class AuthAccountError extends Error {
   constructor(readonly code: AuthErrorCode) {
-    // Die Message ist nur für Logs gedacht, nie für die Anzeige – die
-    // Oberfläche übersetzt `code` über die Schlüssel `authError.{code}`.
     super(`auth failed: ${code}`);
     this.name = 'AuthAccountError';
   }
@@ -59,28 +51,33 @@ function authErrorCode(err: unknown): AuthErrorCode {
   }
 }
 
-/** Legt ein neues Konto per E-Mail/Passwort an und meldet es zugleich an. */
 export async function registerWithEmail(email: string, password: string): Promise<User> {
   if (password.length < MIN_PASSWORD_LENGTH) throw new AuthAccountError('weakPassword');
   try {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    await sendEmailVerification(cred.user);
     return cred.user;
   } catch (err) {
     throw new AuthAccountError(authErrorCode(err));
   }
 }
 
-/** Meldet ein bestehendes Konto per E-Mail/Passwort an. */
 export async function signInWithEmail(email: string, password: string): Promise<User> {
   try {
     const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+    
+    if (!cred.user.emailVerified) {
+      await signOut(auth);
+      throw new AuthAccountError('emailNotVerified');
+    }
+    
     return cred.user;
   } catch (err) {
+    if (err instanceof AuthAccountError) throw err;
     throw new AuthAccountError(authErrorCode(err));
   }
 }
 
-/** Meldet ein Konto per Google-Popup an (legt es bei Bedarf automatisch an). */
 export async function signInWithGoogle(): Promise<User> {
   try {
     const cred = await signInWithPopup(auth, googleProvider);
@@ -90,7 +87,6 @@ export async function signInWithGoogle(): Promise<User> {
   }
 }
 
-/** Schickt eine Passwort-Reset-Mail – ersetzt den früheren Wiederherstellungscode. */
 export async function sendPasswordReset(email: string): Promise<void> {
   try {
     await sendPasswordResetEmail(auth, email.trim());
@@ -99,7 +95,6 @@ export async function sendPasswordReset(email: string): Promise<void> {
   }
 }
 
-/** Meldet das Gerät komplett ab (nicht nur vom aktuellen Roadtrip). */
 export function signOutAccount(): Promise<void> {
   return signOut(auth);
 }
