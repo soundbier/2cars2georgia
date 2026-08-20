@@ -39,7 +39,6 @@ export type MembershipErrorCode =
   | 'missingName'
   | 'invalidTripDates'
   | 'tripNotFound'
-  | 'alreadyMember'
   | 'unknown';
 
 export class MembershipError extends Error {
@@ -128,21 +127,59 @@ export async function createRoadtrip(
   return { tripId, tripName: trimmedName };
 }
 
-/** Tritt einem bestehenden Roadtrip als normales Mitglied bei. */
+/**
+ * Kandidaten-IDs für eine Beitritts-Eingabe, in Reihenfolge der Prüfung.
+ *
+ * Eingegeben wird in aller Regel der sichtbare Roadtrip-Name ("Sommertour
+ * 2026"); die Dokument-ID ist aber dessen Slug ("sommertour-2026", siehe
+ * createRoadtrip). Beides muss zum Ziel führen: der Name, weil ihn die Crew
+ * kennt, und die ID, weil der Owner sie als Beitritts-Code weitergibt
+ * (siehe Einstellungen → Crew). Eine Suche über die ganze Collection wäre
+ * der Alternativweg, scheidet aber aus: `list` auf roadtrips/ ist in
+ * firestore.rules bewusst auf Mitglieder beschränkt, damit niemand fremde
+ * Roadtrips auflisten kann.
+ */
+function joinCandidateIds(input: string): string[] {
+  const candidates: string[] = [];
+  // Firestore-Dokument-IDs dürfen keinen Schrägstrich enthalten – eine
+  // solche Eingabe würde doc() werfen statt einfach nicht zu treffen.
+  if (input && !input.includes('/')) candidates.push(input);
+  const slug = slugifyTripName(input);
+  if (slug && !candidates.includes(slug)) candidates.push(slug);
+  return candidates;
+}
+
+/**
+ * Tritt einem bestehenden Roadtrip als normales Mitglied bei. Akzeptiert
+ * sowohl den sichtbaren Roadtrip-Namen als auch die Roadtrip-ID.
+ *
+ * Ist die aufrufende Person bereits Mitglied, wird nichts geschrieben und
+ * der Roadtrip einfach zurückgegeben: Ein zweiter Beitritt darf weder einen
+ * doppelten Datensatz erzeugen noch eine bestehende Owner-Rolle auf
+ * `member` zurückstufen.
+ */
 export async function joinRoadtrip(
   uid: string,
   displayName: string,
-  tripId: string
+  nameOrTripId: string
 ): Promise<CreateRoadtripResult> {
-  const trimmedId = tripId.trim();
-  if (!trimmedId) throw new MembershipError('missingName');
+  const trimmed = nameOrTripId.trim();
+  if (!trimmed) throw new MembershipError('missingName');
 
-  const tripSnap = await getDoc(doc(db, 'roadtrips', trimmedId));
-  if (!tripSnap.exists()) throw new MembershipError('tripNotFound');
+  let tripId: string | null = null;
+  let tripName = trimmed;
+  for (const candidate of joinCandidateIds(trimmed)) {
+    const snap = await getDoc(doc(db, 'roadtrips', candidate));
+    if (!snap.exists()) continue;
+    tripId = candidate;
+    tripName = (snap.data().name as string | undefined) ?? candidate;
+    break;
+  }
+  if (!tripId) throw new MembershipError('tripNotFound');
 
-  const memberRef = doc(db, 'roadtrips', trimmedId, 'members', uid);
+  const memberRef = doc(db, 'roadtrips', tripId, 'members', uid);
   const existing = await getDoc(memberRef);
-  if (existing.exists()) throw new MembershipError('alreadyMember');
+  if (existing.exists()) return { tripId, tripName };
 
   try {
     await setDoc(memberRef, {
@@ -154,8 +191,7 @@ export async function joinRoadtrip(
     throw new MembershipError('unknown');
   }
 
-  const tripName = (tripSnap.data().name as string | undefined) ?? trimmedId;
-  return { tripId: trimmedId, tripName };
+  return { tripId, tripName };
 }
 
 /** Ändert die Rolle eines Mitglieds – nur der Owner darf das (siehe firestore.rules). */

@@ -81,12 +81,12 @@ export const en: Translations = {
   'profileError.unknown': 'Something went wrong. Please try again.',
 
   // --- Create/join a roadtrip (see lib/membership.ts) ---------------------
-  'trip.joinHint': "Enter the crew's roadtrip ID to join.",
+  'trip.joinHint': "Enter the crew's roadtrip name or ID to join.",
   'trip.createHint': 'Create a new roadtrip – you automatically become its owner.',
   'trip.tabJoin': 'Join',
   'trip.tabCreate': 'Create roadtrip',
   'trip.namePlaceholder': 'Roadtrip name, e.g. Summer Tour 2026',
-  'trip.joinIdPlaceholder': 'Roadtrip ID',
+  'trip.joinIdPlaceholder': 'Roadtrip name or ID',
   'trip.submitting': 'One moment …',
   'trip.createSubmit': 'Create roadtrip',
   'trip.joinSubmit': 'Join',
@@ -96,15 +96,14 @@ export const en: Translations = {
   'trip.createFootnote':
     'After creating it we show you the roadtrip ID – share it with your crew so they can join.',
   'trip.joinFootnote':
-    "Get the roadtrip ID from the owner (see Settings → Crew) – it's the only way to join this roadtrip.",
+    'The roadtrip name your crew knows is enough. Alternatively use the roadtrip ID from the owner (see Settings → Crew).',
   'trip.createdSuccess': '“{tripName}” was created.',
   'trip.joinSuccess': 'Joined “{tripName}”.',
 
   // --- Create/join errors (codes from lib/membership.ts) -----------------
-  'tripError.missingName': 'Please enter a name or a roadtrip ID.',
+  'tripError.missingName': 'Please enter a roadtrip name or ID.',
   'tripError.invalidTripDates': 'The end date cannot be before the start date.',
-  'tripError.tripNotFound': 'No roadtrip found with that ID.',
-  'tripError.alreadyMember': 'You have already joined this roadtrip.',
+  'tripError.tripNotFound': 'No roadtrip found with that name or ID.',
   'tripError.unknown': 'Something went wrong. Please try again.',
 
   'admin.requiredForPurge': 'Permanent deletion is only possible for the owner.',

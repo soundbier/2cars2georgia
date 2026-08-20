@@ -86,12 +86,12 @@ export const de = {
   'profileError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
 
   // --- Roadtrip erstellen/beitreten (siehe lib/membership.ts) ------------
-  'trip.joinHint': 'Roadtrip-ID der Crew eingeben, um beizutreten.',
+  'trip.joinHint': 'Roadtrip-Namen oder -ID der Crew eingeben, um beizutreten.',
   'trip.createHint': 'Neuen Roadtrip anlegen – du wirst automatisch Owner.',
   'trip.tabJoin': 'Beitreten',
   'trip.tabCreate': 'Roadtrip erstellen',
   'trip.namePlaceholder': 'Roadtrip-Name, z.B. Sommertour 2026',
-  'trip.joinIdPlaceholder': 'Roadtrip-ID',
+  'trip.joinIdPlaceholder': 'Roadtrip-Name oder -ID',
   'trip.submitting': 'Einen Moment …',
   'trip.createSubmit': 'Roadtrip anlegen',
   'trip.joinSubmit': 'Beitreten',
@@ -101,15 +101,14 @@ export const de = {
   'trip.createFootnote':
     'Nach dem Anlegen zeigen wir dir die Roadtrip-ID – die teilst du der Crew mit, damit sie beitreten kann.',
   'trip.joinFootnote':
-    'Die Roadtrip-ID bekommst du vom Owner (siehe Einstellungen → Crew) – nur damit könnt ihr diesem Roadtrip beitreten.',
+    'Es genügt der Roadtrip-Name, den die Crew kennt. Alternativ die Roadtrip-ID vom Owner (siehe Einstellungen → Crew).',
   'trip.createdSuccess': '„{tripName}“ wurde angelegt.',
   'trip.joinSuccess': '„{tripName}“ beigetreten.',
 
   // --- Fehler bei Roadtrip erstellen/beitreten (Codes aus lib/membership.ts) --
-  'tripError.missingName': 'Bitte einen Namen bzw. eine Roadtrip-ID eingeben.',
+  'tripError.missingName': 'Bitte einen Roadtrip-Namen bzw. eine Roadtrip-ID eingeben.',
   'tripError.invalidTripDates': 'Das Enddatum darf nicht vor dem Startdatum liegen.',
-  'tripError.tripNotFound': 'Kein Roadtrip mit dieser ID gefunden.',
-  'tripError.alreadyMember': 'Du bist diesem Roadtrip bereits beigetreten.',
+  'tripError.tripNotFound': 'Kein Roadtrip mit diesem Namen bzw. dieser ID gefunden.',
   'tripError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
 
   'admin.requiredForPurge': 'Endgültiges Löschen ist nur dem Owner möglich.',
