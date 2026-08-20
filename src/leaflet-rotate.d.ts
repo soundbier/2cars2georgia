@@ -24,6 +24,10 @@ declare module 'leaflet' {
   interface Map {
     setBearing(degrees: number): void;
     getBearing(): number;
+    /** Handler der Zwei-Finger-Drehgeste – lässt sich zur Laufzeit abschalten. */
+    touchRotate: Handler;
+    /** Handler für Shift + Mausrad am Desktop. */
+    shiftKeyRotate: Handler;
   }
 
   interface MarkerOptions {
