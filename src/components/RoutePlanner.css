@@ -1,0 +1,17 @@
+/* Nummerierter Wegpunkt der geplanten Route. */
+.route-waypoint {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--color-bg-raised);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 600;
+  /* Liegt über der Karte – Schatten hält den Punkt auf Luftbildern lesbar. */
+  box-shadow: var(--shadow-control);
+}
