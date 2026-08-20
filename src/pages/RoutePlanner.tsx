@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MapContainer } from 'react-leaflet';
 import { Check, Copy, MapPin, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { OfflineTileLayer } from '../components/OfflineTileLayer';
@@ -37,6 +37,64 @@ function todayIso(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/** Wartezeit nach dem letzten Tastendruck, bevor der Name gespeichert wird. */
+const NAME_SAVE_DELAY_MS = 600;
+
+/**
+ * Der Name der bearbeiteten Route, während getippt wird.
+ *
+ * Jeden Tastendruck sofort zu speichern ging nicht: Der Speicher kürzt
+ * Leerraum am Rand weg, sodass sich am Wortende gar kein Leerzeichen tippen
+ * ließ – und jeder Buchstabe wäre ein eigener Schreibvorgang im Roadtrip.
+ * Getippt wird deshalb lokal; gespeichert wird kurz nach dem letzten
+ * Tastendruck und sobald das Feld verlassen wird.
+ */
+function useNameDraft(route: PlannedRoute | null, save: (route: PlannedRoute, name: string) => void) {
+  const [draft, setDraft] = useState(route?.name ?? '');
+  const routeRef = useRef(route);
+  routeRef.current = route;
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+
+  const store = useCallback(
+    (value: string) => {
+      const current = routeRef.current;
+      if (current && current.name !== value.trim()) save(current, value);
+    },
+    [save]
+  );
+
+  // Andere Route geöffnet: Entwurf frisch aus dem Speicher. Absichtlich nur
+  // an der Kennung hängend – bei jeder Namensänderung würde er sich sonst
+  // mitten im Tippen selbst überschreiben.
+  const routeId = route?.id ?? null;
+  useEffect(() => {
+    cancel();
+    setDraft(routeRef.current?.name ?? '');
+  }, [routeId]);
+
+  // Beim Verlassen der Seite den letzten Stand nicht verlieren.
+  useEffect(() => cancel, []);
+
+  return {
+    value: draft,
+    onChange: (value: string) => {
+      setDraft(value);
+      cancel();
+      timer.current = setTimeout(() => store(value), NAME_SAVE_DELAY_MS);
+    },
+    /** Speichert sofort – beim Verlassen des Feldes und wenn der Editor zugeht. */
+    flush: () => {
+      cancel();
+      store(draft);
+    }
+  };
+}
+
 /**
  * Routenplaner: Tagesrouten anlegen, abstecken und für unterwegs auswählen.
  *
@@ -67,6 +125,17 @@ export default function RoutePlanner() {
     [editing, planner]
   );
   const editor = useRouteEditor(editing?.waypoints ?? [], writeWaypoints);
+
+  const saveName = useCallback(
+    (route: PlannedRoute, value: string) => planner.rename(route, value, route.date),
+    [planner]
+  );
+  const nameDraft = useNameDraft(editing, saveName);
+
+  const closeEditor = () => {
+    nameDraft.flush();
+    setEditingId(null);
+  };
 
   const baseLayer = getBaseLayer(preferences.baseLayer);
   // Beim Einhängen einmal gelesen (MapContainer wertet center/zoom nur initial
@@ -119,19 +188,21 @@ export default function RoutePlanner() {
     <div className="settings-page">
       <PageHeader title={t('plan.title')} subtitle={t('plan.subtitle')} />
 
+      {/* Die Überschrift folgt dem Getippten, nicht erst dem Gespeicherten. */}
       {editing && planner.canEdit && (
-        <Section title={t('plan.editTitle', { name: routeLabel(editing) })}>
+        <Section title={t('plan.editTitle', { name: nameDraft.value.trim() || t('plan.unnamed') })}>
           <div className="stack">
             <div className="row">
               <Input
-                value={editing.name}
+                value={nameDraft.value}
                 placeholder={t('plan.namePlaceholder')}
-                onChange={(e) => planner.rename(editing, e.target.value, editing.date)}
+                onChange={(e) => nameDraft.onChange(e.target.value)}
+                onBlur={nameDraft.flush}
               />
               <Input
                 type="date"
                 value={editing.date}
-                onChange={(e) => planner.rename(editing, editing.name, e.target.value)}
+                onChange={(e) => planner.rename(editing, nameDraft.value, e.target.value)}
               />
             </div>
 
@@ -187,7 +258,7 @@ export default function RoutePlanner() {
               </Button>
             </div>
 
-            <Button fullWidth onClick={() => setEditingId(null)}>
+            <Button fullWidth onClick={closeEditor}>
               <Check size={16} /> {t('plan.done')}
             </Button>
           </div>
@@ -233,7 +304,10 @@ export default function RoutePlanner() {
                         <>
                           <IconButton
                             label={t('plan.edit')}
-                            onClick={() => setEditingId(editingId === route.id ? null : route.id)}
+                            onClick={() => {
+                              nameDraft.flush();
+                              setEditingId(editingId === route.id ? null : route.id);
+                            }}
                           >
                             <Pencil size={18} />
                           </IconButton>
