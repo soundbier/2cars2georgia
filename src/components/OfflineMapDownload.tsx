@@ -231,10 +231,13 @@ function formatSize(bytes: number, locale: string): string {
 /** Bedienleiste des Downloadmodus. */
 export function OfflineDownloadPanel({
   state,
-  isOnline
+  isOnline,
+  sourceLabel
 }: {
   state: OfflineDownloadState;
   isOnline: boolean;
+  /** Woher die Route stammt (geplant oder gefahren) – nur zur Anzeige. */
+  sourceLabel?: string;
 }) {
   const t = useT();
   const { locale } = useI18n();
@@ -267,6 +270,7 @@ export function OfflineDownloadPanel({
           <p className="helper-text">
             {t('map.offlineIntro')}{' '}
             {t('map.offlineZoomRange', { min: MIN_DOWNLOAD_ZOOM, max: MAX_DOWNLOAD_ZOOM })}
+            {sourceLabel && <> {t('map.offlineSource', { source: sourceLabel })}</>}
           </p>
 
           <div className="offline-legend">

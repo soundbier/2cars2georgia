@@ -99,11 +99,18 @@ sind, erlauben sie es nicht, und jedes Löschen schlägt genau so fehl.
 ## Offline-Karten
 
 Die Karte lädt Kacheln weiterhin von den Diensten aus `src/lib/mapLayers.ts`.
-Zusätzlich lassen sich Bereiche entlang der aufgezeichneten Route für die
-Fahrt ohne Netz mitnehmen:
+Zusätzlich lassen sich Bereiche entlang der Route für die Fahrt ohne Netz
+mitnehmen:
 
+* Der Knopf mit dem Routensymbol öffnet die Routenplanung: Ein Tipp auf die
+  Karte setzt einen Wegpunkt, Punkte lassen sich ziehen, ein Tipp darauf
+  entfernt sie wieder (`src/components/RoutePlanner.tsx`). Die geplante Route
+  liegt in localStorage (`src/lib/plannedRoute.ts`) – sie gehört zum Gerät,
+  das offline gehen soll.
 * Der Knopf mit der Download-Wolke auf der Karte öffnet den Downloadmodus.
-* Aus dem Track entsteht ein Korridor (±12 km), zerlegt in Rasterfelder –
+  Grundlage ist die abgesteckte Route, sobald sie mindestens zwei Wegpunkte
+  hat; sonst der aufgezeichnete Track.
+* Aus der Route entsteht ein Korridor (±12 km), zerlegt in Rasterfelder –
   jedes Feld ist genau eine Kachel der Zoomstufe 10 (`src/lib/tileGrid.ts`).
   Gewählte Felder sind terracotta, bereits geladene türkis markiert.
 * Der Download holt für jedes gewählte Feld die Zoomstufen 6–14 der aktiven
