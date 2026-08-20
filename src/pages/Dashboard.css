@@ -509,6 +509,28 @@
   min-width: 0;
 }
 
+/* Gefahrene Strecke: Beschriftung klein davor, damit die Zahl nicht mit den
+   Koordinaten darunter verwechselt wird. */
+.cockpit-drive-distance {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cockpit-drive-distance .label {
+  color: var(--color-on-instrument-muted);
+}
+
+.cockpit-drive-distance-value {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-on-instrument);
+  white-space: nowrap;
+}
+
 .cockpit-drive-coords {
   font-family: var(--font-display);
   font-size: var(--text-base);
