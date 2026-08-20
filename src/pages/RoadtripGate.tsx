@@ -1,7 +1,12 @@
 import { useState, FormEvent } from 'react';
-import { Compass, Plus, LogIn, ShieldCheck, X } from 'lucide-react';
+import { Compass, Plus, LogIn, ShieldCheck, MailCheck, X } from 'lucide-react';
 import { useRoadtrip } from '../hooks/useRoadtrip';
 import { createRoadtrip, joinRoadtrip, MembershipError } from '../lib/membership';
+import {
+  AuthAccountError,
+  ensureEmailVerified,
+  resendVerificationForCurrentUser
+} from '../lib/authAccount';
 import { useT } from '../i18n';
 import { PrivacyContent } from './Privacy';
 import { Button, Input, useToast } from '../components/ui';
@@ -24,6 +29,10 @@ export default function RoadtripGate() {
   const [tripEndDate, setTripEndDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  // Wird gesetzt, sobald ein Versuch an der fehlenden E-Mail-Bestätigung
+  // gescheitert ist – erst dann bekommt der Screen den Hinweis samt
+  // erneutem Versand, statt ihn allen vorab hinzuwerfen.
+  const [needsVerification, setNeedsVerification] = useState(false);
   const { notify } = useToast();
   const t = useT();
 
@@ -41,6 +50,15 @@ export default function RoadtripGate() {
 
     setSubmitting(true);
     try {
+      // Serverseitig verweigern die Firestore-Regeln das Anlegen einer
+      // Mitgliedschaft ohne bestätigte E-Mail-Adresse (siehe
+      // firestore.rules, emailVerified()). Hier wird derselbe Stand frisch
+      // geholt – das liefert die verständliche Meldung statt eines nackten
+      // "permission denied" und erneuert zugleich den Token, wenn die
+      // Bestätigung inzwischen erfolgt ist.
+      await ensureEmailVerified();
+      setNeedsVerification(false);
+
       if (mode === 'create') {
         const result = await createRoadtrip(authUser.uid, displayName, name, tripStartDate, tripEndDate);
         selectTrip(result.tripId);
@@ -51,8 +69,30 @@ export default function RoadtripGate() {
         notify(t('trip.joinSuccess', { tripName: result.tripName }), 'success');
       }
     } catch (err) {
-      const code = err instanceof MembershipError ? err.code : 'unknown';
-      notify(t(`tripError.${code}` as Parameters<typeof t>[0]), 'danger');
+      if (err instanceof AuthAccountError) {
+        setNeedsVerification(true);
+        notify(t(`authError.${err.code}` as Parameters<typeof t>[0]), 'danger');
+      } else {
+        const code = err instanceof MembershipError ? err.code : 'unknown';
+        notify(t(`tripError.${code}` as Parameters<typeof t>[0]), 'danger');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await resendVerificationForCurrentUser();
+      notify(t('auth.verificationSent'), 'success');
+    } catch (err) {
+      const code = err instanceof AuthAccountError ? err.code : 'unknown';
+      notify(
+        t(`authError.${code}` as Parameters<typeof t>[0]),
+        code === 'alreadyVerified' ? 'info' : 'danger'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -141,6 +181,21 @@ export default function RoadtripGate() {
           {submitting ? t('trip.submitting') : mode === 'create' ? t('trip.createSubmit') : t('trip.joinSubmit')}
         </Button>
       </form>
+
+      {needsVerification && (
+        <>
+          <p className="helper-text roadtrip-gate-hint">{t('trip.verifyRequiredHint')}</p>
+          <button
+            type="button"
+            className="roadtrip-gate-recovery-link"
+            disabled={submitting}
+            onClick={handleResendVerification}
+          >
+            <MailCheck size={13} />
+            {t('auth.resendVerification')}
+          </button>
+        </>
+      )}
 
       <p className="helper-text roadtrip-gate-hint">
         {mode === 'create' ? t('trip.createFootnote') : t('trip.joinFootnote')}

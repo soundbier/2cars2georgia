@@ -100,6 +100,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Bestätigte E-Mail-Adresse (Firebase setzt email_verified im Token,
+    // sobald der Link aus sendEmailVerification() angeklickt wurde; bei
+    // Google-Anmeldung ist er von Haus aus true).
+    //
+    // Bewusst nur dort verlangt, wo eine NEUE Mitgliedschaft entsteht
+    // (roadtrips create + members create): Bestehende Mitglieder – auch das
+    // Administrationskonto aus der Zeit vor dieser Prüfung – arbeiten
+    // unverändert weiter, nichts wird nachträglich gesperrt oder muss neu
+    // angelegt werden. `get(..., false)` statt direktem Feldzugriff, weil
+    // das Feld in fremd erzeugten Tokens fehlen kann.
+    function emailVerified() {
+      return signedIn() && request.auth.token.get('email_verified', false) == true;
+    }
+
     // Plattform-Administration: eine einzelne Person, die in ihrem eigenen
     // Profil users/{uid} das Feld `role: "admin"` trägt. Die Rolle wird
     // bewusst nirgends vom Client geschrieben (users/ erlaubt kein update
@@ -168,6 +182,7 @@ service cloud.firestore {
       // src/lib/membership.ts – die Owner-Mitgliedschaft entsteht in einem
       // zweiten, separaten Schreibvorgang direkt danach).
       allow create: if signedIn()
+        && emailVerified()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && fieldsAre(['name', 'createdAt', 'ownerUid'], [])
         && isText('name', 80)
@@ -206,7 +221,11 @@ service cloud.firestore {
         // Roadtrip anlegt, wird stattdessen Owner – nur zulässig, wenn die
         // aufrufende Person laut roadtrips/{tripId}.ownerUid tatsächlich die
         // Person ist, die ihn gerade angelegt hat.
+        // Beitreten setzt eine bestätigte E-Mail-Adresse voraus – ein frisch
+        // registriertes, unbestätigtes Konto kommt hier nicht durch (siehe
+        // emailVerified() oben und src/lib/authAccount.ts).
         allow create: if signedIn()
+          && emailVerified()
           && request.auth.uid == memberUid
           && fieldsAre(['displayName', 'role', 'joinedAt'], [])
           && isText('displayName', 60)

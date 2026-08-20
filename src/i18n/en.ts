@@ -60,6 +60,11 @@ export const en: Translations = {
   'auth.resetNeedsEmail': 'Please enter your email address first.',
   'auth.resetSent': 'Password reset email has been sent.',
   'auth.passwordMismatch': 'The passwords do not match.',
+  'auth.verifyEmailSent':
+    'Account created. We sent you a verification email – please confirm the address and sign in afterwards.',
+  'auth.resendVerification': 'Resend verification email',
+  'auth.resendNeedsCredentials': 'Please enter your email address and password so we can resend the email.',
+  'auth.verificationSent': 'Verification email sent again. Please also check your spam folder.',
 
   // --- Sign-in errors (codes from lib/authAccount.ts) --------------------
   'authError.invalidEmail': 'That email address is invalid.',
@@ -68,6 +73,10 @@ export const en: Translations = {
   'authError.wrongCredentials': 'Email address or password is incorrect.',
   'authError.tooManyAttempts': 'Too many attempts. Please wait a moment and try again.',
   'authError.popupClosed': 'The sign-in window was closed before finishing.',
+  'authError.emailNotVerified':
+    'Your email address is not verified yet. Please click the link in the verification email.',
+  'authError.alreadyVerified': 'This email address is already verified – you can simply sign in.',
+  'authError.verificationFailed': 'The verification email could not be sent. Please try again later.',
   'authError.unknown': 'Something went wrong. Please try again.',
 
   // --- Profile / display name (see lib/username.ts) ----------------------
@@ -100,6 +109,8 @@ export const en: Translations = {
     'The roadtrip name your crew knows is enough. Alternatively use the roadtrip ID from the owner (see Settings → Crew).',
   'trip.createdSuccess': '“{tripName}” was created.',
   'trip.joinSuccess': 'Joined “{tripName}”.',
+  'trip.verifyRequiredHint':
+    'As long as your email address is unverified you can neither join nor create a roadtrip.',
 
   // --- Create/join errors (codes from lib/membership.ts) -----------------
   'tripError.missingName': 'Please enter a roadtrip name or ID.',

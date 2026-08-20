@@ -58,6 +58,27 @@ In der Firebase Console müssen unter Authentication die Anbieter
 „E-Mail/Passwort" und „Google" aktiviert sein, sonst schlagen die
 entsprechenden Anmeldewege fehl.
 
+### E-Mail-Bestätigung
+
+Ein neues Konto mit E-Mail/Passwort muss die Adresse bestätigen, bevor es
+einem Roadtrip beitreten oder einen anlegen kann: Die Registrierung
+verschickt `sendEmailVerification()` und meldet das Konto sofort wieder ab,
+der Anmeldeweg lässt nur bestätigte Konten durch, und `firestore.rules`
+verlangt `email_verified` beim Anlegen von `roadtrips/{tripId}` und
+`roadtrips/{tripId}/members/{uid}`. Bestehende Mitgliedschaften bleiben davon
+unberührt – Konten aus der Zeit davor (etwa die Administration) werden nicht
+nachträglich gesperrt und müssen nicht neu angelegt werden.
+
+Wer die Mail nicht bekommen hat, kann sie im Anmeldebereich über
+„Verifizierungs-Mail erneut senden" (E-Mail + Passwort eingeben) erneut
+anfordern. Nach dem Klick auf den Link genügt eine normale Anmeldung bzw.
+ein Neuladen – die App holt den Status frisch vom Server.
+
+Die Vorlage der Bestätigungs-Mail (Absender, Text, Weiterleitungs-URL) liegt
+in der Firebase Console unter Authentication → Templates → „E-Mail-Adresse
+bestätigen"; die App-Domain muss dort unter Authentication → Settings →
+Authorized domains eingetragen sein.
+
 ## Firestore-Regeln veröffentlichen
 
 `firestore.rules` liegt im Repo, wird aber von keinem Workflow ausgerollt.

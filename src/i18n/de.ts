@@ -65,6 +65,12 @@ export const de = {
   'auth.resetNeedsEmail': 'Bitte zuerst die E-Mail-Adresse eingeben.',
   'auth.resetSent': 'E-Mail zum Zurücksetzen des Passworts wurde verschickt.',
   'auth.passwordMismatch': 'Die Passwörter stimmen nicht überein.',
+  'auth.verifyEmailSent':
+    'Konto angelegt. Wir haben dir eine Bestätigungs-Mail geschickt – bitte bestätige die Adresse und melde dich danach an.',
+  'auth.resendVerification': 'Verifizierungs-Mail erneut senden',
+  'auth.resendNeedsCredentials':
+    'Bitte E-Mail-Adresse und Passwort eingeben, damit wir die Mail erneut verschicken können.',
+  'auth.verificationSent': 'Bestätigungs-Mail wurde erneut verschickt. Bitte auch den Spam-Ordner prüfen.',
 
   // --- Fehler der Anmeldung (Codes aus lib/authAccount.ts) ---------------
   'authError.invalidEmail': 'Diese E-Mail-Adresse ist ungültig.',
@@ -73,6 +79,11 @@ export const de = {
   'authError.wrongCredentials': 'E-Mail-Adresse oder Passwort ist falsch.',
   'authError.tooManyAttempts': 'Zu viele Versuche. Bitte kurz warten und erneut probieren.',
   'authError.popupClosed': 'Anmeldefenster wurde geschlossen, bevor die Anmeldung abgeschlossen war.',
+  'authError.emailNotVerified':
+    'Deine E-Mail-Adresse ist noch nicht bestätigt. Bitte klicke den Link in der Bestätigungs-Mail.',
+  'authError.alreadyVerified': 'Diese E-Mail-Adresse ist bereits bestätigt – du kannst dich direkt anmelden.',
+  'authError.verificationFailed':
+    'Die Bestätigungs-Mail konnte nicht verschickt werden. Bitte später erneut versuchen.',
   'authError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
 
   // --- Profil / Anzeigename (siehe lib/username.ts) -----------------------
@@ -105,6 +116,8 @@ export const de = {
     'Es genügt der Roadtrip-Name, den die Crew kennt. Alternativ die Roadtrip-ID vom Owner (siehe Einstellungen → Crew).',
   'trip.createdSuccess': '„{tripName}“ wurde angelegt.',
   'trip.joinSuccess': '„{tripName}“ beigetreten.',
+  'trip.verifyRequiredHint':
+    'Solange deine E-Mail-Adresse nicht bestätigt ist, kannst du keinem Roadtrip beitreten und keinen anlegen.',
 
   // --- Fehler bei Roadtrip erstellen/beitreten (Codes aus lib/membership.ts) --
   'tripError.missingName': 'Bitte einen Roadtrip-Namen bzw. eine Roadtrip-ID eingeben.',
