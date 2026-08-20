@@ -14,6 +14,8 @@ interface ToastEntry {
   message: string;
   tone: ToastTone;
   action?: ToastAction;
+  /** Läuft gerade die Ausblende-Animation (siehe .toast-leaving). */
+  leaving?: boolean;
 }
 
 interface ToastContextValue {
@@ -29,18 +31,31 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 const TOAST_TIMEOUT_MS = 3200;
 const TOAST_WITH_ACTION_TIMEOUT_MS = 7000;
 
+/** Muss zur Dauer von .toast-leaving in Toast.css passen. */
+const TOAST_EXIT_MS = 180;
+
+/**
+ * Mehr als drei Meldungen übereinander liest ohnehin niemand, sie würden auf
+ * dem Handy aber den halben Bildschirm verdecken – die älteste weicht.
+ */
+const MAX_VISIBLE_TOASTS = 3;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const idRef = useRef(0);
 
+  /** Blendet aus und räumt den Eintrag erst nach der Animation weg. */
   const dismiss = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, TOAST_EXIT_MS);
   }, []);
 
   const notify = useCallback(
     (message: string, tone: ToastTone = 'info', action?: ToastAction) => {
       const id = ++idRef.current;
-      setToasts((prev) => [...prev, { id, message, tone, action }]);
+      setToasts((prev) => [...prev, { id, message, tone, action }].slice(-MAX_VISIBLE_TOASTS));
       setTimeout(
         () => dismiss(id),
         action ? TOAST_WITH_ACTION_TIMEOUT_MS : TOAST_TIMEOUT_MS
@@ -54,10 +69,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toast-stack" role="status" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.tone}`}>
-            {t.tone === 'danger' && <AlertTriangle size={16} />}
-            {t.tone === 'success' && <CheckCircle2 size={16} />}
-            {t.tone === 'info' && <Info size={16} />}
+          <div
+            key={t.id}
+            className={`toast toast-${t.tone}${t.leaving ? ' toast-leaving' : ''}`}
+          >
+            {t.tone === 'danger' && <AlertTriangle size={16} className="toast-icon" />}
+            {t.tone === 'success' && <CheckCircle2 size={16} className="toast-icon" />}
+            {t.tone === 'info' && <Info size={16} className="toast-icon" />}
             <span className="toast-message">{t.message}</span>
             {t.action && (
               <button
