@@ -45,9 +45,24 @@ const ADMIN_UID = 'uid-platform-admin';
 
 let testEnv: RulesTestEnvironment;
 
-/** Firestore-Handle einer angemeldeten Person mit der gegebenen UID. */
+/**
+ * Firestore-Handle einer angemeldeten Person mit der gegebenen UID.
+ *
+ * `email_verified` gehört zum echten Firebase-Token und ist hier
+ * standardmäßig true – so sieht der Normalfall aus. Für die Prüfung des
+ * unbestätigten Kontos siehe unverifiedDb().
+ */
 function userDb(uid: string) {
-  return testEnv.authenticatedContext(uid, { email: `${uid}@example.com` }).firestore();
+  return testEnv
+    .authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: true })
+    .firestore();
+}
+
+/** Frisch registriertes Konto, dessen E-Mail-Adresse noch nicht bestätigt ist. */
+function unverifiedDb(uid: string) {
+  return testEnv
+    .authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: false })
+    .firestore();
 }
 
 const ownerDb = () => userDb(OWNER_UID);
@@ -323,6 +338,17 @@ describe('Roadtrip-Dokument', () => {
     expect(missing.exists()).toBe(false);
   });
 
+  it('verweigert das Anlegen ohne bestätigte E-Mail-Adresse', async () => {
+    await seed(`users/${OWNER_UID}`, { displayName: 'Owner', email: 'x@example.com', createdAt: NOW });
+    await assertFails(
+      setDoc(doc(unverifiedDb(OWNER_UID), `roadtrips/${TRIP}`), {
+        name: 'Sommertour 2026',
+        ownerUid: OWNER_UID,
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
   it('verweigert das Anlegen ohne vorhandenes Profil', async () => {
     const db = ownerDb();
     await assertFails(
@@ -418,6 +444,40 @@ describe('Mitgliedschaften', () => {
         joinedAt: serverTimestamp()
       })
     );
+  });
+
+  it('verweigert den Beitritt, solange die E-Mail-Adresse nicht bestätigt ist', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertFails(
+      setDoc(doc(unverifiedDb(MEMBER_UID), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
+        displayName: 'Member',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('lässt dieselbe Person nach bestätigter E-Mail-Adresse beitreten', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertSucceeds(
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
+        displayName: 'Member',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('lässt ein bestehendes Mitglied ohne bestätigte Adresse unangetastet weiterarbeiten', async () => {
+    // Konten aus der Zeit vor dieser Prüfung (etwa das Administrationskonto)
+    // dürfen durch die neue Regel nicht ausgesperrt werden: Verlangt wird sie
+    // nur beim Anlegen einer Mitgliedschaft, nicht beim Nutzen einer
+    // bestehenden.
+    await seedTripWithCrew(TRIP);
+    const db = unverifiedDb(MEMBER_UID);
+    await assertSucceeds(getDoc(doc(db, `roadtrips/${TRIP}/members/${OWNER_UID}`)));
+    await assertSucceeds(setDoc(doc(db, `roadtrips/${TRIP}/track/p-alt`), validTrackPoint));
+    await assertSucceeds(deleteDoc(doc(db, `roadtrips/${TRIP}/members/${MEMBER_UID}`)));
   });
 
   it('verweigert das Selbst-Eintragen als owner ohne ownerUid-Übereinstimmung', async () => {

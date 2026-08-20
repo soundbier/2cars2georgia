@@ -1,10 +1,11 @@
 import { useState, FormEvent } from 'react';
-import { Compass, LogIn, UserPlus, ShieldCheck, X } from 'lucide-react';
+import { Compass, LogIn, UserPlus, ShieldCheck, MailCheck, X } from 'lucide-react';
 import {
   registerWithEmail,
   signInWithEmail,
   signInWithGoogle,
   sendPasswordReset,
+  resendVerificationEmail,
   AuthAccountError,
   MIN_PASSWORD_LENGTH
 } from '../lib/authAccount';
@@ -49,7 +50,7 @@ export default function AuthGate() {
     try {
       if (mode === 'signUp') {
         await registerWithEmail(email, password);
-        notify(t('auth.verifyEmailSent' as Parameters<typeof t>[0]), 'success');
+        notify(t('auth.verifyEmailSent'), 'success');
         switchMode('signIn');
       } else {
         await signInWithEmail(email, password);
@@ -68,6 +69,31 @@ export default function AuthGate() {
       await signInWithGoogle();
     } catch (err) {
       reportError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * Erneuter Versand der Bestätigungs-Mail. Firebase verschickt sie nur für
+   * ein angemeldetes Konto, deshalb wird hier auch das Passwort gebraucht –
+   * lib/authAccount.ts meldet dafür kurz an und sofort wieder ab.
+   */
+  const handleResendVerification = async () => {
+    if (submitting) return;
+    if (!email.trim() || !password) {
+      notify(t('auth.resendNeedsCredentials'), 'danger');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await resendVerificationEmail(email, password);
+      notify(t('auth.verificationSent'), 'success');
+    } catch (err) {
+      const code = err instanceof AuthAccountError ? err.code : 'unknown';
+      // „Bereits bestätigt“ ist kein Fehler, sondern eine gute Nachricht.
+      notify(t(`authError.${code}` as Parameters<typeof t>[0], { min: MIN_PASSWORD_LENGTH }),
+        code === 'alreadyVerified' ? 'info' : 'danger');
     } finally {
       setSubmitting(false);
     }
@@ -152,9 +178,20 @@ export default function AuthGate() {
         </Button>
 
         {mode === 'signIn' && (
-          <button type="button" className="roadtrip-gate-recovery-link" onClick={handleForgotPassword}>
-            {t('auth.forgotPassword')}
-          </button>
+          <>
+            <button type="button" className="roadtrip-gate-recovery-link" onClick={handleForgotPassword}>
+              {t('auth.forgotPassword')}
+            </button>
+            <button
+              type="button"
+              className="roadtrip-gate-recovery-link"
+              disabled={submitting}
+              onClick={handleResendVerification}
+            >
+              <MailCheck size={13} />
+              {t('auth.resendVerification')}
+            </button>
+          </>
         )}
       </form>
 
