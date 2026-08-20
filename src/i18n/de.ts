@@ -346,6 +346,12 @@ export const de = {
   'settings.unitsDescription': 'Geschwindigkeit und Strecke in der ganzen App',
   'settings.language': 'Sprache',
   'settings.languageDescription': 'Sprache der Oberfläche auf diesem Gerät',
+  'settings.quickLogRows': 'Schnell-Logs im Cockpit',
+  'settings.quickLogRowsDescription':
+    'Wie viele Reihen unter „Log hinzufügen" ohne Aufklappen sichtbar sind',
+  'settings.quickLogRowsValue_one': '{count} Reihe',
+  'settings.quickLogRowsValue_other': '{count} Reihen',
+  'settings.quickLogRowsAll': 'Alle anzeigen',
   'settings.map': 'Karte',
   'settings.baseLayer': 'Grundkarte',
   'settings.layerNote':

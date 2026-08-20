@@ -14,7 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { usePreferences } from '../hooks/usePreferences';
+import { usePreferences, QUICK_LOG_ROW_OPTIONS } from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
 import { usePermissions } from '../hooks/usePermissions';
 import { signOutAccount } from '../lib/authAccount';
@@ -216,6 +216,26 @@ export default function Settings({ currentUser, users }: Props) {
             {LANGUAGES.map((id) => (
               <option key={id} value={id}>
                 {t(`language.${id}` as TranslationKey)}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+
+        <SettingRow
+          label={t('settings.quickLogRows')}
+          description={t('settings.quickLogRowsDescription')}
+        >
+          <Select
+            className="setting-select"
+            aria-label={t('settings.quickLogRows')}
+            value={preferences.quickLogRows}
+            onChange={(e) => setPreference('quickLogRows', Number(e.target.value))}
+          >
+            {QUICK_LOG_ROW_OPTIONS.map((rows) => (
+              <option key={rows} value={rows}>
+                {rows === 0
+                  ? t('settings.quickLogRowsAll')
+                  : t('settings.quickLogRowsValue', { count: rows })}
               </option>
             ))}
           </Select>

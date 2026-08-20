@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { Play, Pause, Square, Satellite, Circle, ChevronDown, ChevronUp } from 'lucide-react';
 import { db } from '../firebase';
@@ -25,13 +25,47 @@ import { DriveMap } from '../components/DriveMap';
 import './Dashboard.css';
 
 /**
- * Wie viele Schnell-Logs ohne Aufklappen sichtbar sind.
- *
- * Drei große Kacheln statt einer Matrix aus neun gleich gewichteten Knöpfen:
- * Was oben in den Einstellungen steht, ist das, was unterwegs am häufigsten
- * gebraucht wird – der Rest bleibt einen Tipp entfernt.
+ * Wie viele Schnell-Log-Tasten nebeneinander stehen – dieselben Schwellen wie
+ * `.quick-log-grid` in Dashboard.css. Beides muss zusammen geändert werden:
+ * Nur so weiß das Cockpit, wie viele Tasten eine Reihe fasst.
  */
-const VISIBLE_QUICK_LOGS = 3;
+const QUICK_LOG_COLUMNS = [
+  { query: '(min-width: 1280px)', columns: 6 },
+  { query: '(min-width: 600px)', columns: 4 }
+] as const;
+
+const QUICK_LOG_COLUMNS_BASE = 3;
+
+function currentQuickLogColumns(): number {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return QUICK_LOG_COLUMNS_BASE;
+  }
+  for (const { query, columns } of QUICK_LOG_COLUMNS) {
+    if (window.matchMedia(query).matches) return columns;
+  }
+  return QUICK_LOG_COLUMNS_BASE;
+}
+
+/**
+ * Wie viele Schnell-Logs eine Reihe im Cockpit gerade fasst.
+ *
+ * Die Einstellung wird in Reihen gewählt, das Aufklappen rechnet aber in
+ * Tasten – beim Drehen des Geräts muss die Grenze also mitwandern.
+ */
+function useQuickLogColumns(): number {
+  const [columns, setColumns] = useState(currentQuickLogColumns);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const lists = QUICK_LOG_COLUMNS.map(({ query }) => window.matchMedia(query));
+    const update = () => setColumns(currentQuickLogColumns());
+    update();
+    lists.forEach((list) => list.addEventListener('change', update));
+    return () => lists.forEach((list) => list.removeEventListener('change', update));
+  }, []);
+
+  return columns;
+}
 
 /** Wie viele Einträge des Tages im Cockpit stehen, bevor das Logbuch dran ist. */
 const TODAY_PREVIEW_COUNT = 4;
@@ -72,6 +106,7 @@ export default function Dashboard({ user }: { user: string }) {
   const quickLogs = useQuickLogs();
   const { startDate, endDate } = useTripDates();
   const { preferences } = usePreferences();
+  const quickLogColumns = useQuickLogColumns();
   const [isLogging, setIsLogging] = useState(false);
   const [showAllQuickLogs, setShowAllQuickLogs] = useState(false);
   // Reine Ansichtssache: Der Fahrmodus räumt den Bildschirm für die Fahrt frei
@@ -148,8 +183,15 @@ export default function Dashboard({ user }: { user: string }) {
       `  ${Math.abs(position.lng).toFixed(4)}° ${t(position.lng >= 0 ? 'cockpit.east' : 'cockpit.west')}`
     : t('cockpit.noValue');
 
-  const visibleQuickLogs = showAllQuickLogs ? quickLogs : quickLogs.slice(0, VISIBLE_QUICK_LOGS);
-  const hiddenQuickLogCount = Math.max(0, quickLogs.length - VISIBLE_QUICK_LOGS);
+  // `quickLogRows === 0` heißt „alle anzeigen" – dann gibt es nichts zum
+  // Aufklappen, sonst füllt jede gewählte Reihe so viele Tasten, wie in der
+  // aktuellen Breite nebeneinander passen.
+  const visibleQuickLogCount =
+    preferences.quickLogRows === 0 ? quickLogs.length : preferences.quickLogRows * quickLogColumns;
+  const visibleQuickLogs = showAllQuickLogs
+    ? quickLogs
+    : quickLogs.slice(0, visibleQuickLogCount);
+  const hiddenQuickLogCount = Math.max(0, quickLogs.length - visibleQuickLogCount);
   const tripDay = dayOfTrip(startDate, endDate);
 
   // GPS-Status und Geschwindigkeit stehen in beiden Modi – einmal beschrieben,

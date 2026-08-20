@@ -337,6 +337,12 @@ export const en: Translations = {
   'settings.unitsDescription': 'Speed and distance throughout the app',
   'settings.language': 'Language',
   'settings.languageDescription': 'Interface language on this device',
+  'settings.quickLogRows': 'Quick logs in the cockpit',
+  'settings.quickLogRowsDescription':
+    'How many rows under “Add log entry” are visible without expanding',
+  'settings.quickLogRowsValue_one': '{count} row',
+  'settings.quickLogRowsValue_other': '{count} rows',
+  'settings.quickLogRowsAll': 'Show all',
   'settings.map': 'Map',
   'settings.baseLayer': 'Base map',
   'settings.layerNote':
