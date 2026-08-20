@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import {
   fakeFirestoreModule,
   readFakeCollection,
+  readFakeDoc,
   resetFakeFirestore,
   seedFakeDoc
 } from '../test/fakeFirestore';
@@ -98,6 +99,30 @@ describe('Routenplaner-Seite', () => {
     // Neu angelegte Routen sind sofort aktiv und offen zum Abstecken.
     expect(readActiveRouteId()).toBe(stored[0].id);
     expect(screen.getByText('Abstecken: Tag 3: Passau – Linz')).toBeTruthy();
+  });
+
+  it('lässt den Namen in Ruhe tippen und speichert ihn danach', () => {
+    seedRoute('tag-1', 'Tag 1', '2026-05-04', []);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Route abstecken' }));
+    // Dasselbe Feld gibt es zweimal: oben im Editor, unten im Formular für
+    // eine neue Route.
+    const input = screen.getAllByPlaceholderText('Name, z. B. Tag 3: Passau – Linz')[0];
+
+    // Beim Tippen bleibt stehen, was getippt wurde – auch das Leerzeichen am
+    // Wortende, das der Speicher wegkürzen würde.
+    fireEvent.change(input, { target: { value: 'Tag 1 ' } });
+    expect((input as HTMLInputElement).value).toBe('Tag 1 ');
+    expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.name).toBe('Tag 1');
+
+    fireEvent.change(input, { target: { value: 'Tag 1 Passau' } });
+    expect((input as HTMLInputElement).value).toBe('Tag 1 Passau');
+
+    // Gespeichert wird beim Verlassen des Feldes (und kurz nach dem letzten
+    // Tastendruck).
+    fireEvent.blur(input);
+    expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.name).toBe('Tag 1 Passau');
   });
 
   it('listet gespeicherte Routen mit Tag, Wegpunkten und Länge', () => {
