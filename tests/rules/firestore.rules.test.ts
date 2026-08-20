@@ -5,7 +5,17 @@ import {
   assertSucceeds,
   initializeTestEnvironment
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc, updateDoc, deleteField, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  updateDoc,
+  deleteField,
+  serverTimestamp
+} from 'firebase/firestore';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -31,6 +41,7 @@ const OWNER_UID = 'uid-owner';
 const MEMBER_UID = 'uid-member';
 const READONLY_UID = 'uid-readonly';
 const OUTSIDER_UID = 'uid-outsider';
+const ADMIN_UID = 'uid-platform-admin';
 
 let testEnv: RulesTestEnvironment;
 
@@ -43,6 +54,7 @@ const ownerDb = () => userDb(OWNER_UID);
 const memberDb = () => userDb(MEMBER_UID);
 const readonlyDb = () => userDb(READONLY_UID);
 const outsiderDb = () => userDb(OUTSIDER_UID);
+const adminDb = () => userDb(ADMIN_UID);
 
 function anonymousDb() {
   return testEnv.unauthenticatedContext().firestore();
@@ -960,6 +972,90 @@ describe('Fehlerprotokoll', () => {
     await seed(`roadtrips/${OTHER_TRIP}/errors/f1`, validError);
     // memberDb() gehört zur Crew von TRIP, aber nicht zu OTHER_TRIP.
     await assertFails(getDoc(doc(memberDb(), `roadtrips/${OTHER_TRIP}/errors/f1`)));
+  });
+});
+
+describe('Plattform-Administration', () => {
+  /** Profil mit `role: "admin"` – wird ausschließlich direkt in Firebase gesetzt. */
+  async function seedPlatformAdmin() {
+    await seed(`users/${ADMIN_UID}`, {
+      displayName: 'Admin',
+      email: 'admin@example.com',
+      createdAt: NOW,
+      role: 'admin'
+    });
+  }
+
+  it('lässt die Administration alle Roadtrips auflisten und lesen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seedTripWithCrew(OTHER_TRIP);
+    await seedPlatformAdmin();
+
+    const snap = await assertSucceeds(getDocs(collection(adminDb(), 'roadtrips')));
+    expect(snap.size).toBe(2);
+    await assertSucceeds(getDoc(doc(adminDb(), `roadtrips/${TRIP}`)));
+  });
+
+  it('lässt die Administration die Mitglieder eines fremden Roadtrips lesen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seedPlatformAdmin();
+
+    const snap = await assertSucceeds(getDocs(collection(adminDb(), `roadtrips/${TRIP}/members`)));
+    expect(snap.size).toBe(3);
+    await assertSucceeds(getDoc(doc(adminDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`)));
+  });
+
+  it('gibt der Administration keinerlei Schreibrecht und keinen Blick in die Trip-Daten', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(`roadtrips/${TRIP}/events/e1`, validEvent);
+    await seedPlatformAdmin();
+    const db = adminDb();
+
+    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
+    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/events/e2`), validEvent));
+    await assertFails(deleteDoc(doc(db, `roadtrips/${TRIP}`)));
+    await assertFails(
+      updateDoc(doc(db, `roadtrips/${TRIP}/members/${MEMBER_UID}`), { role: 'owner' })
+    );
+    await assertFails(
+      setDoc(doc(db, `roadtrips/${TRIP}/members/${ADMIN_UID}`), {
+        displayName: 'Admin',
+        role: 'owner',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('lässt eine gewöhnliche Person weder Roadtrips noch fremde Mitglieder auflisten', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(`users/${OUTSIDER_UID}`, {
+      displayName: 'Outsider',
+      email: 'outsider@example.com',
+      createdAt: NOW
+    });
+
+    await assertFails(getDocs(collection(outsiderDb(), 'roadtrips')));
+    await assertFails(getDocs(collection(outsiderDb(), `roadtrips/${TRIP}/members`)));
+  });
+
+  it('lässt niemanden sich selbst zum Administrator machen', async () => {
+    const db = outsiderDb();
+    // Beim Anlegen des eigenen Profils ist role kein erlaubtes Feld …
+    await assertFails(
+      setDoc(doc(db, `users/${OUTSIDER_UID}`), {
+        displayName: 'Outsider',
+        email: `${OUTSIDER_UID}@example.com`,
+        createdAt: serverTimestamp(),
+        role: 'admin'
+      })
+    );
+    // … und nachträglich ändern lässt sich das Profil ohnehin nicht.
+    await seed(`users/${OUTSIDER_UID}`, {
+      displayName: 'Outsider',
+      email: `${OUTSIDER_UID}@example.com`,
+      createdAt: NOW
+    });
+    await assertFails(updateDoc(doc(db, `users/${OUTSIDER_UID}`), { role: 'admin' }));
   });
 });
 

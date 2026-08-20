@@ -25,6 +25,7 @@ export const en: Translations = {
   'nav.costs': 'Kitty',
   'nav.more': 'More',
   'nav.settings': 'Settings',
+  'nav.administration': 'Administration',
 
   // --- Common -----------------------------------------------------------
   'common.save': 'Save',
@@ -553,6 +554,16 @@ export const en: Translations = {
   'inventory.empty': 'Inventory is empty',
   'inventory.emptyHint': 'Record food items with quantity and storage location.',
   'inventory.saved': 'Item saved',
+
+  'admin.title': 'Administration',
+  'admin.subtitle': 'All roadtrips of this installation',
+  'admin.tripsSection': 'Roadtrips ({count})',
+  'admin.owner': 'Owner: {name}',
+  'admin.memberCount_one': '{count} member',
+  'admin.memberCount_other': '{count} members',
+  'admin.empty': 'No roadtrips yet',
+  'admin.loadError': 'The roadtrips could not be loaded.',
+  'admin.noAccess': 'No administration access',
 
   'cockpit.dayOfTrip': 'Day {day} of {total}',
   'cockpit.tripDayLabel': 'Trip day'

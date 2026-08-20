@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   UtensilsCrossed,
   MoreHorizontal,
+  ShieldCheck,
   Compass,
   LucideIcon
 } from 'lucide-react';
@@ -38,6 +39,7 @@ import MealPlan from './pages/kombuese/MealPlan';
 import Dishes from './pages/kombuese/Dishes';
 import ShoppingList from './pages/kombuese/ShoppingList';
 import Inventory from './pages/kombuese/Inventory';
+import Administration from './pages/Administration';
 import Privacy from './pages/Privacy';
 import PrivacyOnboarding from './pages/PrivacyOnboarding';
 
@@ -55,16 +57,28 @@ const MORE_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] =
 ];
 
 /**
+ * Zusätzlicher Eintrag für Profile mit users/{uid}.role == 'admin'
+ * (siehe hooks/useRoadtrip.tsx). Ausgeblendet zu sein ist nur Kosmetik –
+ * lesen darf die Seite ohnehin nur, wen firestore.rules als Admin kennt.
+ */
+const ADMIN_MORE_ITEM: { to: string; labelKey: TranslationKey; icon: LucideIcon } = {
+  to: '/administration',
+  labelKey: 'nav.administration',
+  icon: ShieldCheck
+};
+
+/**
  * Die eigentliche App-Oberfläche für ein bestätigtes Roadtrip-Mitglied.
  * Zugriffsschutz sitzt eine Ebene höher (RoadtripProvider/AppGate) – hier
  * geht es nur noch um Navigation und Routing.
  */
 function AppShell() {
-  const { tripId, displayName, authUser } = useRoadtrip();
+  const { tripId, displayName, authUser, isPlatformAdmin } = useRoadtrip();
   const { users } = useCrew();
   const [moreOpen, setMoreOpen] = useState(false);
   const t = useT();
   const user = displayName ?? '';
+  const moreItems = isPlatformAdmin ? [...MORE_ITEMS, ADMIN_MORE_ITEM] : MORE_ITEMS;
 
   // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) dem Roadtrip und
   // Crewmitglied zu, ohne echte personenbezogene Daten zu senden – tripId
@@ -96,6 +110,7 @@ function AppShell() {
               element={<ShoppingList currentUser={user} />}
             />
             <Route path="/settings/verpflegung/lager" element={<Inventory currentUser={user} />} />
+            <Route path="/administration" element={<Administration />} />
             <Route path="/datenschutz" element={<Privacy />} />
           </Routes>
         </div>
@@ -104,7 +119,7 @@ function AppShell() {
         )}
         {moreOpen && (
           <div className="more-dropup">
-            {MORE_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+            {moreItems.map(({ to, labelKey, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
