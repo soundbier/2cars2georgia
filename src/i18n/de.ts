@@ -170,6 +170,7 @@ export const de = {
   'cockpit.moreLogs': 'Weitere ({count})',
   'cockpit.fewerLogs': 'Weniger',
   'cockpit.today': 'Heute',
+  'cockpit.driveMode': 'Fahrmodus',
   'cockpit.noEntriesToday': 'Heute noch keine Einträge.',
 
   // --- Karte ------------------------------------------------------------

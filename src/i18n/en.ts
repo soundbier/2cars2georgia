@@ -163,6 +163,7 @@ export const en: Translations = {
   'cockpit.moreLogs': 'More ({count})',
   'cockpit.fewerLogs': 'Less',
   'cockpit.today': 'Today',
+  'cockpit.driveMode': 'Drive mode',
   'cockpit.noEntriesToday': 'No entries yet today.',
 
   // --- Map --------------------------------------------------------------
