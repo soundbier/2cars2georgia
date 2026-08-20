@@ -20,7 +20,8 @@ import {
 } from '../lib/units';
 import { GpsPoint, LogType, LogEvent } from '../types';
 import { useT } from '../i18n';
-import { Button, EmptyState, useToast } from '../components/ui';
+import { Button, EmptyState, Toggle, useToast } from '../components/ui';
+import { DriveMap } from '../components/DriveMap';
 import './Dashboard.css';
 
 /**
@@ -73,6 +74,11 @@ export default function Dashboard({ user }: { user: string }) {
   const { preferences } = usePreferences();
   const [isLogging, setIsLogging] = useState(false);
   const [showAllQuickLogs, setShowAllQuickLogs] = useState(false);
+  // Reine Ansichtssache: Der Fahrmodus räumt den Bildschirm für die Fahrt frei
+  // und hat mit der Aufzeichnung nichts zu tun – er startet und stoppt nichts.
+  // Deshalb auch nicht gespeichert: Wer die App neu öffnet, sitzt nicht
+  // zwangsläufig wieder am Steuer.
+  const [driveMode, setDriveMode] = useState(false);
   const { notify } = useToast();
   const t = useT();
 
@@ -146,11 +152,70 @@ export default function Dashboard({ user }: { user: string }) {
   const hiddenQuickLogCount = Math.max(0, quickLogs.length - VISIBLE_QUICK_LOGS);
   const tripDay = dayOfTrip(startDate, endDate);
 
+  // GPS-Status und Geschwindigkeit stehen in beiden Modi – einmal beschrieben,
+  // damit der Fahrmodus nicht zu einer zweiten, langsam auseinanderlaufenden
+  // Anzeige derselben Werte wird.
+  const gpsStatus = (
+    <span className={`instrument-status instrument-status-${gpsTone}`}>
+      <Satellite size={15} strokeWidth={2} aria-hidden="true" />
+      <span>{gpsLabel}</span>
+    </span>
+  );
+
+  const speedReadout = (
+    <div className="instrument-speed">
+      <span className={`instrument-speed-value${position ? '' : ' instrument-speed-value-empty'}`}>
+        {position
+          ? toDisplaySpeed(position.speedKmh, preferences.unitSystem).toFixed(1)
+          : t('cockpit.noValue')}
+      </span>
+      <span className="instrument-speed-unit">{speedUnitLabel(preferences.unitSystem)}</span>
+    </div>
+  );
+
+  // Der Umschalter steht in beiden Modi an derselben Stelle oben rechts:
+  // Wer im Fahrmodus zurück will, sucht ihn dort, wo er ihn eingeschaltet hat.
+  const driveModeSwitch = (
+    <div className="cockpit-drive-switch">
+      <span className="cockpit-drive-switch-label">{t('cockpit.driveMode')}</span>
+      <Toggle checked={driveMode} onChange={setDriveMode} label={t('cockpit.driveMode')} />
+    </div>
+  );
+
+  /* Fahrmodus: alles weg, was am Steuer nicht abgelesen wird. Keine
+     Schnell-Logs, kein Tageslog, keine Tour-Tasten – die Aufzeichnung läuft
+     davon unberührt weiter oder eben nicht, der Fahrmodus rührt sie nicht an.
+     Übrig bleiben Geschwindigkeit, Position, GPS-Status und die Karte, die
+     der eigenen Position folgt. */
+  if (driveMode) {
+    return (
+      <div className="cockpit-drive">
+        <header className="cockpit-header">
+          <h1 className="page-title cockpit-title">{tripName ?? t('cockpit.title')}</h1>
+          {driveModeSwitch}
+        </header>
+
+        <section className="instrument cockpit-drive-instrument" aria-label={t('cockpit.title')}>
+          {speedReadout}
+          <div className="cockpit-drive-facts">
+            {gpsStatus}
+            <div className="cockpit-drive-coords">{coordinates}</div>
+          </div>
+        </section>
+
+        <div className="cockpit-drive-map">
+          <DriveMap position={position} user={user} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cockpit">
       {/* Ebene 1: Expedition – welcher Roadtrip, wer ist an Bord. */}
       <header className="cockpit-header">
         <h1 className="page-title cockpit-title">{tripName ?? t('cockpit.title')}</h1>
+        {driveModeSwitch}
         <div
           className="profile-chip"
           title={t('cockpit.signedInAs', { name: user })}
@@ -172,10 +237,7 @@ export default function Dashboard({ user }: { user: string }) {
             Ablesegerät. */}
         <section className="instrument" aria-label={t('cockpit.title')}>
           <div className="instrument-statusbar">
-            <span className={`instrument-status instrument-status-${gpsTone}`}>
-              <Satellite size={15} strokeWidth={2} aria-hidden="true" />
-              <span>{gpsLabel}</span>
-            </span>
+            {gpsStatus}
             <span className={`instrument-status instrument-status-${recordingTone}`}>
               <Circle
                 size={11}
@@ -189,16 +251,7 @@ export default function Dashboard({ user }: { user: string }) {
             </span>
           </div>
 
-          <div className="instrument-speed">
-            <span
-              className={`instrument-speed-value${position ? '' : ' instrument-speed-value-empty'}`}
-            >
-              {position
-                ? toDisplaySpeed(position.speedKmh, preferences.unitSystem).toFixed(1)
-                : t('cockpit.noValue')}
-            </span>
-            <span className="instrument-speed-unit">{speedUnitLabel(preferences.unitSystem)}</span>
-          </div>
+          {speedReadout}
 
           <dl className="instrument-readout">
             {tripDay && (

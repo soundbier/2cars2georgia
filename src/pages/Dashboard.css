@@ -446,3 +446,105 @@
     min-height: 64px;
   }
 }
+
+/* ============================================================
+   Fahrmodus
+
+   Am Steuer wird nichts bedient und nichts nachgelesen: Was hier steht, muss
+   im Vorbeischauen ablesbar sein. Deshalb bleiben nur Geschwindigkeit,
+   Position und GPS-Status stehen, und der ganze übrige Platz gehört der
+   Karte. Der Modus ist reine Ansicht – die Aufzeichnung läuft davon
+   unabhängig weiter (siehe Dashboard.tsx).
+   ============================================================ */
+
+/* Bewusst nicht `.cockpit`: Die Spalten- und Querformat-Regeln oben gelten
+   für die Ablese-und-Erfassen-Seite, nicht für eine Vollflächenkarte. */
+.cockpit-drive {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* Die Karte soll die Restfläche füllen, ohne dass die Seite scrollt – die
+     Höhe ist deshalb fest an das Fenster gebunden statt an den Inhalt. svh
+     rechnet die eingeblendete Browserleiste auf dem Handy mit ein. */
+  height: calc(100svh - var(--nav-height) - var(--safe-bottom) - 2 * var(--content-pad-y));
+}
+
+/* --- Umschalter (in beiden Modi in der Kopfzeile) ----------------------- */
+.cockpit-drive-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.cockpit-drive-switch-label {
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+}
+
+/* --- Instrument im Fahrmodus -------------------------------------------- */
+/* Eine Zeile statt drei Blöcke: die Geschwindigkeit groß links, daneben das
+   Kleingedruckte. Was das Instrument an Höhe spart, gewinnt die Karte. */
+.cockpit-drive-instrument {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  flex-shrink: 0;
+}
+
+.cockpit-drive-instrument .instrument-speed {
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.cockpit-drive-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cockpit-drive-coords {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-on-instrument);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Karte -------------------------------------------------------------- */
+.cockpit-drive-map {
+  flex: 1;
+  /* Ohne das drückt die Karte als Flex-Kind über die Fensterhöhe hinaus. */
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Die Karte selbst füllt ihren Rahmen; die Marker-Stile stehen bei der
+   Kartenseite (pages/MapTab.css), sie sind dieselben. */
+.cockpit-drive-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* Im flachen Querformat ist die Höhe knapp: Instrument und Kopfzeile rücken
+   zusammen, damit von der Karte etwas übrig bleibt. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .cockpit-drive {
+    gap: var(--space-2);
+  }
+
+  .cockpit-drive-instrument {
+    padding: var(--space-2) var(--space-3);
+  }
+}
