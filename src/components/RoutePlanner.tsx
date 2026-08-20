@@ -1,28 +1,27 @@
 /**
- * Route von Hand abstecken.
+ * Karten-Bausteine des Routenplaners.
  *
- * Wie beim Downloadmodus stehen die drei zusammengehörigen Teile in einer
- * Datei: `useRoutePlanner` hält den Zustand, `RoutePlannerLayer` zeichnet
- * Wegpunkte und Verbindungslinie in die Karte und nimmt Klicks entgegen,
- * `RoutePlannerPanel` ist die Bedienleiste. Aus der abgesteckten Route
- * entsteht anschließend dasselbe Downloadraster wie aus einem Track.
+ * Hier steht nur, was mit der Leaflet-Karte zu tun hat: `PlannedRouteLine`
+ * zeichnet eine geplante Route (auch auf dem Kartentab, damit man sieht,
+ * wofür das Downloadraster gilt), `RouteEditorLayer` nimmt zusätzlich Klicks
+ * entgegen und zeigt die verschiebbaren Wegpunkte. Die Seite mit der
+ * Routenverwaltung liegt unter pages/RoutePlanner.tsx, die Daten in
+ * lib/plannedRoute.ts.
  */
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { Marker, Polyline, useMapEvents } from 'react-leaflet';
-import { DownloadCloud, Trash2, Undo2, X } from 'lucide-react';
 import L from 'leaflet';
-import { Button } from './ui';
 import { useT } from '../i18n';
-import { usePreferences } from '../hooks/usePreferences';
-import { formatDistance } from '../lib/units';
 import {
   createWaypoint,
+  findRoute,
+  PlannedRoute,
   plannedRouteLengthMeters,
   PlannedWaypoint,
-  readPlannedRoute,
-  subscribePlannedRoute,
-  writePlannedRoute
+  readPlannedRoutes,
+  setRouteWaypoints,
+  subscribePlannedRoutes
 } from '../lib/plannedRoute';
 import './RoutePlanner.css';
 
@@ -48,10 +47,13 @@ function waypointIcon(index: number): L.DivIcon {
   return icon;
 }
 
-export interface RoutePlannerState {
-  active: boolean;
-  open: () => void;
-  close: () => void;
+/** Aktive Route – die, deren Strecke auf der Karte und im Download gilt. */
+export function useActivePlannedRoute(): PlannedRoute | null {
+  const store = useSyncExternalStore(subscribePlannedRoutes, readPlannedRoutes);
+  return useMemo(() => findRoute(store, store.activeId), [store]);
+}
+
+export interface RouteEditorState {
   waypoints: PlannedWaypoint[];
   addAt: (lat: number, lng: number) => void;
   moveTo: (id: string, lat: number, lng: number) => void;
@@ -61,53 +63,77 @@ export interface RoutePlannerState {
   lengthMeters: number;
 }
 
-/** Zustand der Routenplanung. Die Wegpunkte selbst liegen in lib/plannedRoute. */
-export function useRoutePlanner(): RoutePlannerState {
-  const [active, setActive] = useState(false);
-  const waypoints = useSyncExternalStore(subscribePlannedRoute, readPlannedRoute);
+/**
+ * Bearbeitet die Wegpunkte einer Route.
+ *
+ * Jede Änderung geht direkt in den Speicher: Auf dem Wasser gibt es kein
+ * „Speichern nicht vergessen“, und der Stand muss auch nach einem Neuladen
+ * ohne Netz noch da sein.
+ */
+export function useRouteEditor(routeId: string | null): RouteEditorState {
+  const store = useSyncExternalStore(subscribePlannedRoutes, readPlannedRoutes);
+  const waypoints = useMemo(() => findRoute(store, routeId)?.waypoints ?? [], [store, routeId]);
 
-  const addAt = useCallback(
-    (lat: number, lng: number) => writePlannedRoute([...readPlannedRoute(), createWaypoint(lat, lng)]),
-    []
+  const current = useCallback(
+    () => (routeId ? (findRoute(readPlannedRoutes(), routeId)?.waypoints ?? []) : []),
+    [routeId]
   );
 
-  const moveTo = useCallback((id: string, lat: number, lng: number) => {
-    writePlannedRoute(readPlannedRoute().map((point) => (point.id === id ? { ...point, lat, lng } : point)));
-  }, []);
-
-  const remove = useCallback((id: string) => {
-    writePlannedRoute(readPlannedRoute().filter((point) => point.id !== id));
-  }, []);
-
-  const undo = useCallback(() => writePlannedRoute(readPlannedRoute().slice(0, -1)), []);
-
-  const clear = useCallback(() => writePlannedRoute([]), []);
-
-  const lengthMeters = useMemo(() => plannedRouteLengthMeters(waypoints), [waypoints]);
+  const write = useCallback(
+    (next: PlannedWaypoint[]) => {
+      if (routeId) setRouteWaypoints(routeId, next);
+    },
+    [routeId]
+  );
 
   return {
-    active,
-    open: useCallback(() => setActive(true), []),
-    close: useCallback(() => setActive(false), []),
     waypoints,
-    addAt,
-    moveTo,
-    remove,
-    undo,
-    clear,
-    lengthMeters
+    addAt: useCallback(
+      (lat: number, lng: number) => write([...current(), createWaypoint(lat, lng)]),
+      [current, write]
+    ),
+    moveTo: useCallback(
+      (id: string, lat: number, lng: number) =>
+        write(current().map((point) => (point.id === id ? { ...point, lat, lng } : point))),
+      [current, write]
+    ),
+    remove: useCallback(
+      (id: string) => write(current().filter((point) => point.id !== id)),
+      [current, write]
+    ),
+    undo: useCallback(() => write(current().slice(0, -1)), [current, write]),
+    clear: useCallback(() => write([]), [write]),
+    lengthMeters: useMemo(() => plannedRouteLengthMeters(waypoints), [waypoints])
   };
 }
 
+/** Nur die Linie einer geplanten Route – ohne Bedienung. */
+export function PlannedRouteLine({ waypoints }: { waypoints: PlannedWaypoint[] }) {
+  if (waypoints.length < 2) return null;
+  const line = waypoints.map((point) => [point.lat, point.lng] as [number, number]);
+
+  return (
+    <>
+      {/* Heller Rand darunter: sonst verschwindet die Linie auf Satellit und Topo. */}
+      <Polyline
+        positions={line}
+        pathOptions={{ color: PLANNED_CASING_COLOR, weight: 6, opacity: 0.6, lineCap: 'round' }}
+      />
+      <Polyline
+        positions={line}
+        pathOptions={{ color: PLANNED_COLOR, weight: 3, dashArray: '8 6', lineCap: 'round' }}
+      />
+    </>
+  );
+}
+
 /**
- * Wegpunkte und Verbindungslinie in der Karte.
+ * Wegpunkte setzen, verschieben und entfernen.
  *
- * Die Linie bleibt auch außerhalb des Planungsmodus sichtbar – sonst wüsste
- * man beim Download nicht, wofür das Raster gilt. Klicks nimmt die Karte nur
- * im Planungsmodus entgegen, damit sich sonst niemand versehentlich Punkte
- * setzt.
+ * Klicks nimmt die Karte nur an, solange `active` gilt – auf der Planerseite
+ * heißt das: erst eine Route auswählen, dann abstecken.
  */
-export function RoutePlannerLayer({
+export function RouteEditorLayer({
   active,
   waypoints,
   onAdd,
@@ -128,22 +154,9 @@ export function RoutePlannerLayer({
     }
   });
 
-  const line = waypoints.map((point) => [point.lat, point.lng] as [number, number]);
-
   return (
     <>
-      {line.length > 1 && (
-        <>
-          <Polyline
-            positions={line}
-            pathOptions={{ color: PLANNED_CASING_COLOR, weight: 6, opacity: 0.6, lineCap: 'round' }}
-          />
-          <Polyline
-            positions={line}
-            pathOptions={{ color: PLANNED_COLOR, weight: 3, dashArray: '8 6', lineCap: 'round' }}
-          />
-        </>
-      )}
+      <PlannedRouteLine waypoints={waypoints} />
 
       {active &&
         waypoints.map((point, index) => (
@@ -161,63 +174,10 @@ export function RoutePlannerLayer({
               },
               click: () => onRemove(point.id)
             }}
-            title={t('map.planRemovePoint')}
+            title={t('plan.removePoint')}
             zIndexOffset={900}
           />
         ))}
     </>
-  );
-}
-
-/** Bedienleiste der Routenplanung. */
-export function RoutePlannerPanel({
-  state,
-  onDownload
-}: {
-  state: RoutePlannerState;
-  onDownload: () => void;
-}) {
-  const t = useT();
-  const { preferences } = usePreferences();
-  const count = state.waypoints.length;
-
-  return (
-    <div className="offline-panel" role="dialog" aria-label={t('map.planTitle')}>
-      <div className="offline-panel-header">
-        <strong>{t('map.planTitle')}</strong>
-        <button
-          type="button"
-          className="offline-panel-close"
-          onClick={state.close}
-          aria-label={t('map.planClose')}
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      <p className="helper-text">{t('map.planIntro')}</p>
-
-      <div className="offline-panel-stats">
-        <span>{t('map.planPoints', { count })}</span>
-        {count > 1 && (
-          <span className="helper-text">
-            {formatDistance(state.lengthMeters / 1000, preferences.unitSystem)}
-          </span>
-        )}
-      </div>
-
-      <div className="row">
-        <Button variant="secondary" fullWidth onClick={state.undo} disabled={count === 0}>
-          <Undo2 size={16} /> {t('map.planUndo')}
-        </Button>
-        <Button variant="secondary" fullWidth onClick={state.clear} disabled={count === 0}>
-          <Trash2 size={16} /> {t('map.planClear')}
-        </Button>
-      </div>
-
-      <Button fullWidth onClick={onDownload} disabled={count < 2}>
-        <DownloadCloud size={16} /> {t('map.planDownload')}
-      </Button>
-    </div>
   );
 }

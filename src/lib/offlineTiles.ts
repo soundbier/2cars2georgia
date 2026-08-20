@@ -181,7 +181,7 @@ export function estimateBytes(tileCount: number): number {
  * Bereits gespeicherte Kacheln werden übersprungen – ein zweiter Durchlauf
  * über dieselbe Strecke lädt also nur die Lücken nach. Fehlschläge brechen den
  * Lauf nicht ab: Unterwegs ist eine wacklige Verbindung der Normalfall, und
- * ein Feld mit 340 von 345 Kacheln ist immer noch nützlich.
+ * ein Feld mit 85 von 90 Kacheln ist immer noch nützlich.
  */
 export async function downloadCells(
   cells: TileCoords[],

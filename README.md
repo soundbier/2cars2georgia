@@ -102,19 +102,22 @@ Die Karte lädt Kacheln weiterhin von den Diensten aus `src/lib/mapLayers.ts`.
 Zusätzlich lassen sich Bereiche entlang der Route für die Fahrt ohne Netz
 mitnehmen:
 
-* Der Knopf mit dem Routensymbol öffnet die Routenplanung: Ein Tipp auf die
-  Karte setzt einen Wegpunkt, Punkte lassen sich ziehen, ein Tipp darauf
-  entfernt sie wieder (`src/components/RoutePlanner.tsx`). Die geplante Route
-  liegt in localStorage (`src/lib/plannedRoute.ts`) – sie gehört zum Gerät,
-  das offline gehen soll.
+* Unter Mehr → Routenplaner (`src/pages/RoutePlanner.tsx`) lassen sich Routen
+  je Tag anlegen, benennen, kopieren und abstecken: Ein Tipp auf die Karte
+  setzt einen Wegpunkt, Punkte lassen sich ziehen, ein Tipp darauf entfernt
+  sie wieder. Genau eine Route ist aktiv – sie wird auf dem Kartentab
+  gezeichnet und für den Download verwendet. Alle Routen liegen in
+  localStorage (`src/lib/plannedRoute.ts`); sie gehören zum Gerät, das offline
+  gehen soll, und lassen sich deshalb vorab am Rechner vorbereiten.
 * Der Knopf mit der Download-Wolke auf der Karte öffnet den Downloadmodus.
-  Grundlage ist die abgesteckte Route, sobald sie mindestens zwei Wegpunkte
-  hat; sonst der aufgezeichnete Track.
+  Grundlage ist die aktive geplante Route, sobald sie mindestens zwei
+  Wegpunkte hat; sonst der aufgezeichnete Track.
 * Aus der Route entsteht ein Korridor (±12 km), zerlegt in Rasterfelder –
-  jedes Feld ist genau eine Kachel der Zoomstufe 10 (`src/lib/tileGrid.ts`).
-  Gewählte Felder sind terracotta, bereits geladene türkis markiert.
+  jedes Feld ist genau eine Kachel der Zoomstufe 11 (`src/lib/tileGrid.ts`),
+  also rund 13–20 km Kantenlänge. Gewählte Felder sind terracotta, bereits
+  geladene türkis markiert.
 * Der Download holt für jedes gewählte Feld die Zoomstufen 6–14 der aktiven
-  Grundkarte und aller eingeschalteten Overlays (~345 Kacheln je Feld und
+  Grundkarte und aller eingeschalteten Overlays (~90 Kacheln je Feld und
   Ebene) und legt sie in der Cache Storage ab (`src/lib/offlineTiles.ts`).
   Welche Felder vorliegen, steht in localStorage – der Bestand ist eine
   Eigenschaft des Geräts, nicht des Roadtrips.
