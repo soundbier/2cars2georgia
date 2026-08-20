@@ -1,0 +1,134 @@
+/* Bedienleiste des Downloadmodus – liegt über der Karte, unter den Popups. */
+.offline-panel {
+  position: absolute;
+  left: calc(var(--space-3) + var(--safe-left));
+  right: calc(var(--space-3) + var(--safe-right));
+  bottom: calc(var(--space-3) + var(--safe-bottom));
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 60%;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--shadow-overlay);
+  font-family: var(--font-ui);
+}
+
+.offline-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.offline-panel-header strong {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+}
+
+.offline-panel-close {
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  padding: var(--space-1);
+}
+
+.offline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.offline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Die Farbpunkte spiegeln die Rechtecke auf der Karte (GRID_STYLE). */
+.offline-legend-item::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentcolor;
+}
+
+.offline-legend-selected::before {
+  background: var(--color-accent);
+  border-color: var(--color-accent-strong);
+}
+
+.offline-legend-downloaded::before {
+  background: var(--color-live);
+  border-color: var(--color-live-text);
+}
+
+.offline-panel-stats {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.offline-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.offline-progress-bar {
+  height: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  overflow: hidden;
+}
+
+.offline-progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width var(--duration-fast);
+}
+
+.offline-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.offline-panel-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: var(--text-label);
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+/* Kachel, die weder gespeichert noch (offline) ladbar ist: erkennbar leer,
+   statt als kaputtes Bild. */
+.offline-tile-missing {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      var(--color-surface) 0 8px,
+      var(--color-surface-hover) 8px 16px
+    );
+  opacity: 0.7;
+}
