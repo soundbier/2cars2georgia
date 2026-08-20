@@ -22,7 +22,7 @@ export const en: Translations = {
   'nav.cockpit': 'Cockpit',
   'nav.map': 'Map',
   'nav.logbook': 'Log',
-  'nav.costs': 'Kitty',
+  'nav.costs': 'Cash',
   'nav.more': 'More',
   'nav.settings': 'Settings',
   'nav.administration': 'Administration',
@@ -201,8 +201,8 @@ export const en: Translations = {
   'dayRecap.background.standard': 'Standard',
   'dayRecap.background.satellite': 'Satellite',
 
-  // --- Trip kitty -------------------------------------------------------
-  'costs.title': 'Trip kitty',
+  // --- Trip Cash -------------------------------------------------------
+  'costs.title': 'Trip cash',
   'costs.subtitle': 'Record and keep track of the crew’s spending',
   'costs.total': 'Total spending',
   'costs.history': 'History',
@@ -212,7 +212,7 @@ export const en: Translations = {
   'costs.descriptionShort': 'Description',
   'costs.amountPlaceholder': 'Amount in €',
   'costs.submit': 'Add',
-  'costs.sharedPayer': 'Shared kitty',
+  'costs.sharedPayer': 'Shared cash',
   'costs.self': 'Me ({name})',
   'costs.descriptionRequired': 'The description cannot be empty.',
   'costs.invalidAmount': 'Invalid amount.',
@@ -229,9 +229,9 @@ export const en: Translations = {
   'costs.category.schleuse': 'Lock',
   'costs.category.sonstiges': 'Other',
 
-  // --- Settlement (trip kitty) -------------------------------------------
+  // --- Settlement (trip Cash) -------------------------------------------
   'settlement.title': 'Settlement',
-  'settlement.nothingToSettle': 'So far everything was paid directly from the shared kitty – nothing to settle.',
+  'settlement.nothingToSettle': 'So far everything was paid directly from the shared cash – nothing to settle.',
   'settlement.nothingToSettleShort': 'Nothing to settle',
   'settlement.youGet': 'You get {amount}',
   'settlement.youOwe': 'You owe {amount}',
