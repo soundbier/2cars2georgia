@@ -15,12 +15,6 @@ import './RoadtripGate.css';
 
 type Mode = 'signIn' | 'signUp';
 
-/**
- * Erster Schritt der neuen App-Flow (siehe App.tsx): Ohne Firebase-Auth-
- * Sitzung gibt es keinen Zugriff auf irgendetwas – weder Profil noch
- * Roadtrip. E-Mail/Passwort und Google, wie in firestore.rules erwartet
- * (request.auth.uid).
- */
 export default function AuthGate() {
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
@@ -55,11 +49,11 @@ export default function AuthGate() {
     try {
       if (mode === 'signUp') {
         await registerWithEmail(email, password);
+        notify(t('auth.verifyEmailSent' as Parameters<typeof t>[0]), 'success');
+        switchMode('signIn');
       } else {
         await signInWithEmail(email, password);
       }
-      // Kein manuelles Weiterleiten nötig: onAuthStateChanged in
-      // RoadtripProvider übernimmt den Wechsel zum Profil-/Roadtrip-Gate.
     } catch (err) {
       reportError(err);
     } finally {
