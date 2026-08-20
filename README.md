@@ -106,9 +106,15 @@ mitnehmen:
   je Tag anlegen, benennen, kopieren und abstecken: Ein Tipp auf die Karte
   setzt einen Wegpunkt, Punkte lassen sich ziehen, ein Tipp darauf entfernt
   sie wieder. Genau eine Route ist aktiv – sie wird auf dem Kartentab
-  gezeichnet und für den Download verwendet. Alle Routen liegen in
-  localStorage (`src/lib/plannedRoute.ts`); sie gehören zum Gerät, das offline
-  gehen soll, und lassen sich deshalb vorab am Rechner vorbereiten.
+  gezeichnet und für den Download verwendet.
+* Die Routen gehören zum Roadtrip (`roadtrips/{tripId}/plannedRoutes`, siehe
+  `src/hooks/usePlannedRoutes.ts`): Am Rechner vorbereitete Routen sind auf
+  jedem Gerät der Crew da, und geladen wird dort, wo die Karten gebraucht
+  werden. Dank `persistentLocalCache` stehen sie auch ohne Netz bereit, sobald
+  sie einmal geladen waren. Nur die Auswahl der aktiven Route bleibt lokal
+  (`src/lib/plannedRoute.ts`) – auf zwei Booten sind das zwei verschiedene.
+  Früher gerätelokal gespeicherte Routen wandern beim ersten Start
+  automatisch in den Roadtrip.
 * Der Knopf mit der Download-Wolke auf der Karte öffnet den Downloadmodus.
   Grundlage ist die aktive geplante Route, sobald sie mindestens zwei
   Wegpunkte hat; sonst der aufgezeichnete Track.

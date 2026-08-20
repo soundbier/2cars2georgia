@@ -128,6 +128,17 @@ const validMealPlanEntry = {
   timestamp: NOW
 };
 
+const validPlannedRoute = {
+  name: 'Tag 3: Passau – Linz',
+  date: '2026-07-03',
+  waypoints: [
+    { id: 'a', lat: 48.5667, lng: 13.4319 },
+    { id: 'b', lat: 48.3069, lng: 14.2858 }
+  ],
+  author: 'Leon',
+  updatedAt: NOW
+};
+
 const validInventoryItem = {
   name: 'Paprika',
   quantity: 4,
@@ -786,6 +797,54 @@ describe('Gerichte', () => {
     await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
     await assertFails(deleteDoc(doc(db, path)));
     await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
+  });
+});
+
+describe('Geplante Routen', () => {
+  const path = `roadtrips/${TRIP}/plannedRoutes/tag-3`;
+
+  it('nimmt eine gültige Route an', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validPlannedRoute));
+  });
+
+  it('erlaubt eine Route ohne Namen und ohne Tag', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
+    await assertSucceeds(setDoc(doc(db, path), { ...validPlannedRoute, name: '', date: '' }));
+    const { name, date, ...ohneBeides } = validPlannedRoute;
+    void name;
+    void date;
+    await assertSucceeds(setDoc(doc(db, path), ohneBeides));
+  });
+
+  it('weist ein Datum in falschem Format ab', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validPlannedRoute, date: '3.7.2026' }));
+  });
+
+  it('weist Wegpunkte ab, die keine Liste sind, und deckelt ihre Zahl', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, path), { ...validPlannedRoute, waypoints: 'viele' }));
+    const zuViele = Array.from({ length: 501 }, (_, i) => ({ id: `p${i}`, lat: 48, lng: 13 }));
+    await assertFails(setDoc(doc(db, path), { ...validPlannedRoute, waypoints: zuViele }));
+  });
+
+  it('lässt Nur-Lesen und Fremde nicht heran', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validPlannedRoute);
+    await assertSucceeds(getDoc(doc(readonlyDb(), path)));
+    await assertFails(setDoc(doc(readonlyDb(), path), validPlannedRoute));
+    await assertFails(getDoc(doc(outsiderDb(), path)));
+  });
+
+  it('lässt die Crew ihre Planung selbst aufräumen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validPlannedRoute);
+    // Anders als beim Logbuch kein Owner-Vorbehalt: eine geplante Route ist
+    // Vorbereitung, kein Protokoll.
+    await assertSucceeds(deleteDoc(doc(memberDb(), path)));
   });
 });
 

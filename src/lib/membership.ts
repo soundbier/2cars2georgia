@@ -213,6 +213,7 @@ const CASCADE_COLLECTIONS = [
   'inventory',
   'shoppingListExtras',
   'shoppingListChecks',
+  'plannedRoutes',
   'errors'
 ];
 

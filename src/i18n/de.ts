@@ -229,6 +229,8 @@ export const de = {
   // --- Routenplaner -----------------------------------------------------
   'plan.title': 'Routenplaner',
   'plan.subtitle': 'Tagesrouten vorher abstecken, unterwegs die passende aktivieren',
+  'plan.sharedHint':
+    'Die Routen gehören zum Roadtrip: Am Rechner angelegte Routen sind auf jedem Gerät der Crew da. Welche Route aktiv ist, entscheidet jedes Gerät für sich.',
   'plan.routes': 'Gespeicherte Routen',
   'plan.addTitle': 'Neue Route',
   'plan.add': 'Route anlegen',
@@ -246,7 +248,7 @@ export const de = {
   'plan.copyName': '{name} (Kopie)',
   'plan.delete': 'Route löschen',
   'plan.deleteTitle': 'Route löschen?',
-  'plan.deleteDescription': 'Die Wegpunkte dieser Route werden vom Gerät entfernt. Bereits heruntergeladene Karten bleiben erhalten.',
+  'plan.deleteDescription': 'Die Route wird für die ganze Crew gelöscht. Bereits heruntergeladene Karten bleiben erhalten.',
   'plan.intro': 'Auf die Karte tippen setzt einen Wegpunkt. Punkte lassen sich ziehen, ein Tipp darauf entfernt sie wieder.',
   'plan.removePoint': 'Wegpunkt entfernen',
   'plan.undo': 'Letzter zurück',

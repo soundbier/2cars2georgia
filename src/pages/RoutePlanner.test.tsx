@@ -1,18 +1,40 @@
 import { ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import RoutePlanner from './RoutePlanner';
 import {
-  createRoute,
-  createWaypoint,
-  readPlannedRoutes,
-  resetPlannedRoutesCache,
-  setActiveRoute,
-  setRouteWaypoints
-} from '../lib/plannedRoute';
+  fakeFirestoreModule,
+  readFakeCollection,
+  resetFakeFirestore,
+  seedFakeDoc
+} from '../test/fakeFirestore';
 import { resetOfflineAreasCache } from '../lib/offlineTiles';
 import { PreferencesProvider } from '../hooks/usePreferences';
 import { I18nProvider } from '../i18n';
+
+vi.mock('../firebase', () => ({ db: {} }));
+vi.mock('firebase/firestore', () => fakeFirestoreModule());
+vi.mock('../hooks/useRoadtrip', () => ({
+  useRoadtrip: () => ({ tripId: 'sommertour', displayName: 'Skipper', role: 'owner' }),
+  tripPath: (tripId: string, ...segments: string[]) => ['roadtrips', tripId, ...segments].join('/')
+}));
+
+const RoutePlanner = (await import('./RoutePlanner')).default;
+const { readActiveRouteId, resetActiveRouteCache, writeActiveRouteId } = await import(
+  '../lib/plannedRoute'
+);
+
+const ROUTES_PATH = 'roadtrips/sommertour/plannedRoutes';
+
+/** Eine fertige Route direkt im Roadtrip ablegen. */
+function seedRoute(id: string, name: string, date: string, waypoints: Array<{ id: string; lat: number; lng: number }>) {
+  seedFakeDoc(`${ROUTES_PATH}/${id}`, {
+    name,
+    date,
+    waypoints,
+    author: 'Skipper',
+    updatedAt: 1_770_000_000_000
+  });
+}
 
 const PASSAU = { lat: 48.5667, lng: 13.4319 };
 const LINZ = { lat: 48.3069, lng: 14.2858 };
@@ -23,7 +45,8 @@ beforeEach(() => {
   localStorage.clear();
   // Sprache festnageln: sonst hinge der Test an der Browsersprache von jsdom.
   localStorage.setItem('boat_preferences', JSON.stringify({ language: 'de' }));
-  resetPlannedRoutesCache();
+  resetActiveRouteCache();
+  resetFakeFirestore();
   resetOfflineAreasCache();
 
   // Leaflet braucht in jsdom eine Containergröße, sonst wirft die Karte.
@@ -46,7 +69,8 @@ afterEach(() => {
   for (const restore of sizeSpies) restore();
   sizeSpies = [];
   localStorage.clear();
-  resetPlannedRoutesCache();
+  resetActiveRouteCache();
+  resetFakeFirestore();
   resetOfflineAreasCache();
 });
 
@@ -67,18 +91,19 @@ describe('Routenplaner-Seite', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Route anlegen' }));
 
-    const store = readPlannedRoutes();
-    expect(store.routes.map((route) => route.name)).toEqual(['Tag 3: Passau – Linz']);
+    // Die Route liegt im Roadtrip, nicht auf dem Gerät – jedes Crewmitglied
+    // sieht sie.
+    const stored = readFakeCollection(ROUTES_PATH);
+    expect(stored.map((entry) => entry.data.name)).toEqual(['Tag 3: Passau – Linz']);
     // Neu angelegte Routen sind sofort aktiv und offen zum Abstecken.
-    expect(store.activeId).toBe(store.routes[0].id);
+    expect(readActiveRouteId()).toBe(stored[0].id);
     expect(screen.getByText('Abstecken: Tag 3: Passau – Linz')).toBeTruthy();
   });
 
   it('listet gespeicherte Routen mit Tag, Wegpunkten und Länge', () => {
-    const route = createRoute('Tag 1: Passau – Linz', '2026-05-04');
-    setRouteWaypoints(route.id, [
-      createWaypoint(PASSAU.lat, PASSAU.lng),
-      createWaypoint(LINZ.lat, LINZ.lng)
+    seedRoute('tag-1', 'Tag 1: Passau – Linz', '2026-05-04', [
+      { id: 'a', ...PASSAU },
+      { id: 'b', ...LINZ }
     ]);
 
     render(<RoutePlanner />, { wrapper: Wrapper });
@@ -92,20 +117,20 @@ describe('Routenplaner-Seite', () => {
   });
 
   it('schaltet die aktive Route um', () => {
-    const day1 = createRoute('Tag 1', '2026-05-04');
-    const day2 = createRoute('Tag 2', '2026-05-05');
-    setActiveRoute(day2.id);
+    seedRoute('tag-1', 'Tag 1', '2026-05-04', [{ id: 'a', ...PASSAU }]);
+    seedRoute('tag-2', 'Tag 2', '2026-05-05', [{ id: 'b', ...LINZ }]);
+    writeActiveRouteId('tag-2');
 
     render(<RoutePlanner />, { wrapper: Wrapper });
 
     const rows = screen.getAllByText(/^Tag [12]$/).map((el) => el.closest('.list-item') as HTMLElement);
     fireEvent.click(within(rows[0]).getByRole('button', { name: 'Für die Karte aktivieren' }));
-    expect(readPlannedRoutes().activeId).toBe(day1.id);
+    expect(readActiveRouteId()).toBe('tag-1');
 
     // Erneutes Antippen der aktiven Route gibt die Karte wieder dem Track frei.
     fireEvent.click(
       within(rows[0]).getByRole('button', { name: 'Nicht mehr auf der Karte verwenden' })
     );
-    expect(readPlannedRoutes().activeId).toBeNull();
+    expect(readActiveRouteId()).toBeNull();
   });
 });

@@ -1,24 +1,18 @@
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useState } from 'react';
 import { MapContainer } from 'react-leaflet';
 import { Check, Copy, MapPin, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { OfflineTileLayer } from '../components/OfflineTileLayer';
 import { RouteEditorLayer, useRouteEditor } from '../components/RoutePlanner';
+import { usePlannedRoutes } from '../hooks/usePlannedRoutes';
 import { usePreferences } from '../hooks/usePreferences';
 import { getBaseLayer } from '../lib/mapLayers';
 import { readMapView } from '../lib/mapView';
 import { formatDistance } from '../lib/units';
 import {
-  createRoute,
-  deleteRoute,
-  duplicateRoute,
   findRoute,
   PlannedRoute,
   plannedRouteLengthMeters,
-  readPlannedRoutes,
-  renameRoute,
-  setActiveRoute,
-  sortRoutes,
-  subscribePlannedRoutes
+  PlannedWaypoint
 } from '../lib/plannedRoute';
 import { useI18n, useT } from '../i18n';
 import {
@@ -48,23 +42,31 @@ function todayIso(): string {
  *
  * Erreichbar über das "Mehr"-Dropup neben Kombüse und Einstellungen – die
  * Planung passiert typischerweise vorher am großen Bildschirm, nicht während
- * der Fahrt. Unterwegs wird auf dem Kartentab nur noch die aktive Route
- * angezeigt und ihr Kartenraster geladen (siehe components/OfflineMapDownload).
+ * der Fahrt. Die Routen gehören zum Roadtrip, sind also auf allen Geräten der
+ * Crew da; welche davon aktiv ist, entscheidet jedes Gerät für sich. Unterwegs
+ * wird auf dem Kartentab nur noch die aktive Route angezeigt und ihr
+ * Kartenraster geladen (siehe components/OfflineMapDownload).
  */
 export default function RoutePlanner() {
   const t = useT();
   const { locale } = useI18n();
   const { preferences } = usePreferences();
-  const store = useSyncExternalStore(subscribePlannedRoutes, readPlannedRoutes);
-  const routes = useMemo(() => sortRoutes(store.routes), [store.routes]);
+  const planner = usePlannedRoutes();
+  const { routes } = planner;
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [date, setDate] = useState(todayIso());
 
-  const editing = findRoute(store, editingId);
-  const editor = useRouteEditor(editingId);
+  const editing = findRoute(routes, editingId);
+  const writeWaypoints = useCallback(
+    (next: PlannedWaypoint[]) => {
+      if (editing) planner.setWaypoints(editing, next);
+    },
+    [editing, planner]
+  );
+  const editor = useRouteEditor(editing?.waypoints ?? [], writeWaypoints);
 
   const baseLayer = getBaseLayer(preferences.baseLayer);
   // Beim Einhängen einmal gelesen (MapContainer wertet center/zoom nur initial
@@ -93,20 +95,23 @@ export default function RoutePlanner() {
 
   const handleCreate = (event: React.FormEvent) => {
     event.preventDefault();
-    const route = createRoute(name, date);
+    const route = planner.create(name, date);
+    if (!route) return;
     setName('');
     setEditingId(route.id);
   };
 
   const handleDuplicate = (route: PlannedRoute) => {
-    const copy = duplicateRoute(route.id, t('plan.copyName', { name: routeLabel(route) }));
+    const copy = planner.duplicate(route, t('plan.copyName', { name: routeLabel(route) }));
     if (copy) setEditingId(copy.id);
   };
 
   const confirmDelete = () => {
-    if (!deleteId) return;
-    if (editingId === deleteId) setEditingId(null);
-    deleteRoute(deleteId);
+    const route = findRoute(routes, deleteId);
+    if (route) {
+      if (editingId === route.id) setEditingId(null);
+      planner.remove(route);
+    }
     setDeleteId(null);
   };
 
@@ -114,19 +119,19 @@ export default function RoutePlanner() {
     <div className="settings-page">
       <PageHeader title={t('plan.title')} subtitle={t('plan.subtitle')} />
 
-      {editing && (
+      {editing && planner.canEdit && (
         <Section title={t('plan.editTitle', { name: routeLabel(editing) })}>
           <div className="stack">
             <div className="row">
               <Input
                 value={editing.name}
                 placeholder={t('plan.namePlaceholder')}
-                onChange={(e) => renameRoute(editing.id, e.target.value, editing.date)}
+                onChange={(e) => planner.rename(editing, e.target.value, editing.date)}
               />
               <Input
                 type="date"
                 value={editing.date}
-                onChange={(e) => renameRoute(editing.id, editing.name, e.target.value)}
+                onChange={(e) => planner.rename(editing, editing.name, e.target.value)}
               />
             </div>
 
@@ -199,7 +204,7 @@ export default function RoutePlanner() {
         ) : (
           <div className="settings-list">
             {routes.map((route) => {
-              const isActive = store.activeId === route.id;
+              const isActive = planner.activeId === route.id;
               return (
                 <ListItem
                   key={route.id}
@@ -220,26 +225,33 @@ export default function RoutePlanner() {
                       <IconButton
                         tone={isActive ? 'accent' : 'default'}
                         label={isActive ? t('plan.deactivate') : t('plan.activate')}
-                        onClick={() => setActiveRoute(isActive ? null : route.id)}
+                        onClick={() => planner.setActive(isActive ? null : route.id)}
                       >
                         <Check size={18} />
                       </IconButton>
-                      <IconButton
-                        label={t('plan.edit')}
-                        onClick={() => setEditingId(editingId === route.id ? null : route.id)}
-                      >
-                        <Pencil size={18} />
-                      </IconButton>
-                      <IconButton label={t('plan.duplicate')} onClick={() => handleDuplicate(route)}>
-                        <Copy size={18} />
-                      </IconButton>
-                      <IconButton
-                        tone="danger"
-                        label={t('plan.delete')}
-                        onClick={() => setDeleteId(route.id)}
-                      >
-                        <Trash2 size={18} />
-                      </IconButton>
+                      {planner.canEdit && (
+                        <>
+                          <IconButton
+                            label={t('plan.edit')}
+                            onClick={() => setEditingId(editingId === route.id ? null : route.id)}
+                          >
+                            <Pencil size={18} />
+                          </IconButton>
+                          <IconButton
+                            label={t('plan.duplicate')}
+                            onClick={() => handleDuplicate(route)}
+                          >
+                            <Copy size={18} />
+                          </IconButton>
+                          <IconButton
+                            tone="danger"
+                            label={t('plan.delete')}
+                            onClick={() => setDeleteId(route.id)}
+                          >
+                            <Trash2 size={18} />
+                          </IconButton>
+                        </>
+                      )}
                     </div>
                   }
                 />
@@ -249,23 +261,28 @@ export default function RoutePlanner() {
         )}
 
         <p className="helper-text">{t('plan.downloadHint')}</p>
+        <p className="helper-text">
+          {planner.canEdit ? t('plan.sharedHint') : t('crew.readonlyHint')}
+        </p>
       </Section>
 
-      <Section title={t('plan.addTitle')}>
-        <form className="stack" onSubmit={handleCreate}>
-          <div className="row">
-            <Input
-              placeholder={t('plan.namePlaceholder')}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <Button type="submit" fullWidth>
-            <Plus size={16} /> {t('plan.add')}
-          </Button>
-        </form>
-      </Section>
+      {planner.canEdit && (
+        <Section title={t('plan.addTitle')}>
+          <form className="stack" onSubmit={handleCreate}>
+            <div className="row">
+              <Input
+                placeholder={t('plan.namePlaceholder')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <Button type="submit" fullWidth>
+              <Plus size={16} /> {t('plan.add')}
+            </Button>
+          </form>
+        </Section>
+      )}
 
       <ConfirmDialog
         open={deleteId !== null}

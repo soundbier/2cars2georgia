@@ -1,17 +1,11 @@
-import { ReactNode } from 'react';
+import { ReactNode, useCallback, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { MapContainer, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { PlannedRouteLine, RouteEditorLayer, useActivePlannedRoute, useRouteEditor } from './RoutePlanner';
+import { PlannedRouteLine, RouteEditorLayer, useRouteEditor } from './RoutePlanner';
 import { useOfflineDownload } from './OfflineMapDownload';
-import {
-  createRoute,
-  findRoute,
-  readPlannedRoutes,
-  resetPlannedRoutesCache,
-  setActiveRoute
-} from '../lib/plannedRoute';
+import { PlannedWaypoint } from '../lib/plannedRoute';
 import { resetOfflineAreasCache } from '../lib/offlineTiles';
 import { GRID_ZOOM, pointToTile, tileKey } from '../lib/tileGrid';
 import { PreferencesProvider } from '../hooks/usePreferences';
@@ -24,7 +18,6 @@ let sizeSpies: Array<() => void> = [];
 
 beforeEach(() => {
   localStorage.clear();
-  resetPlannedRoutesCache();
   resetOfflineAreasCache();
 
   // Wie im Kachel-Test: In jsdom hat der Kartencontainer sonst keine Größe.
@@ -47,7 +40,6 @@ afterEach(() => {
   for (const restore of sizeSpies) restore();
   sizeSpies = [];
   localStorage.clear();
-  resetPlannedRoutesCache();
   resetOfflineAreasCache();
 });
 
@@ -65,12 +57,23 @@ function ExposeMap({ onReady }: { onReady: (map: L.Map) => void }) {
   return null;
 }
 
-function renderEditor(routeId: string, active: boolean) {
+/**
+ * Ersetzt im Test, was auf der Planerseite der Firestore-Hook tut: die
+ * Wegpunkte halten und jede Änderung entgegennehmen.
+ */
+function useStoredWaypoints() {
+  const [waypoints, setWaypoints] = useState<PlannedWaypoint[]>([]);
+  const onChange = useCallback((next: PlannedWaypoint[]) => setWaypoints(next), []);
+  return { waypoints, onChange };
+}
+
+function renderEditor(active: boolean) {
   let map: L.Map | null = null;
   const editor = { current: null as ReturnType<typeof useRouteEditor> | null };
 
   function Harness() {
-    const state = useRouteEditor(routeId);
+    const stored = useStoredWaypoints();
+    const state = useRouteEditor(stored.waypoints, stored.onChange);
     editor.current = state;
     return (
       // Renderer explizit: jsdom meldet weder SVG- noch Canvas-Unterstützung.
@@ -101,8 +104,7 @@ function renderEditor(routeId: string, active: boolean) {
 
 describe('Routenplanung', () => {
   it('setzt bei einem Kartenklick einen nummerierten Wegpunkt', async () => {
-    const route = createRoute('Tag 1', '2026-05-04');
-    const { container, clickMap } = renderEditor(route.id, true);
+    const { container, clickMap, editor } = renderEditor(true);
 
     clickMap(PASSAU);
     clickMap(LINZ);
@@ -114,22 +116,23 @@ describe('Routenplanung', () => {
 
     // Die Verbindungslinie liegt zwischen den Punkten.
     expect(container.querySelectorAll('path.leaflet-interactive').length).toBeGreaterThan(0);
-    expect(findRoute(readPlannedRoutes(), route.id)?.waypoints).toHaveLength(2);
+    expect(editor.current?.waypoints).toHaveLength(2);
   });
 
   it('nimmt außerhalb des Planungsmodus keine Klicks an', () => {
-    const route = createRoute('Tag 1', '');
-    const { container, clickMap } = renderEditor(route.id, false);
+    const { container, clickMap, editor } = renderEditor(false);
 
     clickMap(PASSAU);
 
-    expect(findRoute(readPlannedRoutes(), route.id)?.waypoints).toHaveLength(0);
+    expect(editor.current?.waypoints).toHaveLength(0);
     expect(container.querySelectorAll('.route-waypoint')).toHaveLength(0);
   });
 
   it('verschiebt, entfernt und löscht Wegpunkte einer Route', () => {
-    const route = createRoute('Tag 1', '');
-    const { result } = renderHook(() => useRouteEditor(route.id));
+    const { result } = renderHook(() => {
+      const stored = useStoredWaypoints();
+      return useRouteEditor(stored.waypoints, stored.onChange);
+    });
 
     act(() => result.current.addAt(PASSAU.lat, PASSAU.lng));
     act(() => result.current.addAt(LINZ.lat, LINZ.lng));
@@ -148,34 +151,6 @@ describe('Routenplanung', () => {
 
     act(() => result.current.clear());
     expect(result.current.waypoints).toHaveLength(0);
-    expect(findRoute(readPlannedRoutes(), route.id)?.waypoints).toHaveLength(0);
-  });
-
-  it('hält die Routen getrennt und zeigt nur die aktive an', () => {
-    const day1 = createRoute('Tag 1', '2026-05-04');
-    const day2 = createRoute('Tag 2', '2026-05-05');
-
-    const { result } = renderHook(
-      () => ({
-        first: useRouteEditor(day1.id),
-        second: useRouteEditor(day2.id),
-        active: useActivePlannedRoute()
-      }),
-      { wrapper: Wrapper }
-    );
-
-    act(() => result.current.first.addAt(PASSAU.lat, PASSAU.lng));
-    act(() => result.current.second.addAt(LINZ.lat, LINZ.lng));
-
-    expect(result.current.first.waypoints).toHaveLength(1);
-    expect(result.current.second.waypoints).toHaveLength(1);
-    expect(result.current.first.waypoints[0].lat).toBeCloseTo(PASSAU.lat);
-
-    // Zuletzt angelegte Route ist aktiv; umschalten wechselt die Anzeige.
-    expect(result.current.active?.id).toBe(day2.id);
-    act(() => setActiveRoute(day1.id));
-    expect(result.current.active?.id).toBe(day1.id);
-    expect(result.current.active?.waypoints[0].lng).toBeCloseTo(PASSAU.lng);
   });
 
   it('zeichnet eine geplante Route auch ohne Bearbeitung', () => {
@@ -197,11 +172,10 @@ describe('Routenplanung', () => {
 
   it('erzeugt das Downloadraster aus der abgesteckten Route', () => {
     const layers = [{ id: 'osm', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' }];
-    const route = createRoute('Tag 1', '');
     const { result } = renderHook(() => {
-      const editor = useRouteEditor(route.id);
-      const active = useActivePlannedRoute();
-      const offline = useOfflineDownload(active?.waypoints ?? [], layers);
+      const stored = useStoredWaypoints();
+      const editor = useRouteEditor(stored.waypoints, stored.onChange);
+      const offline = useOfflineDownload(editor.waypoints, layers);
       return { editor, offline };
     });
 
