@@ -30,6 +30,7 @@ export const de = {
   'nav.costs': 'Kasse',
   'nav.more': 'Mehr',
   'nav.settings': 'Einstellungen',
+  'nav.administration': 'Administration',
 
   // --- Allgemein --------------------------------------------------------
   'common.save': 'Speichern',
@@ -567,6 +568,17 @@ export const de = {
   'inventory.empty': 'Lager ist leer',
   'inventory.emptyHint': 'Lebensmittel mit Menge und Lagerort erfassen.',
   'inventory.saved': 'Posten gespeichert',
+
+  // --- Administration (nur für users/{uid}.role == 'admin') -------------
+  'admin.title': 'Administration',
+  'admin.subtitle': 'Alle Roadtrips dieser Installation',
+  'admin.tripsSection': 'Roadtrips ({count})',
+  'admin.owner': 'Owner: {name}',
+  'admin.memberCount_one': '{count} Mitglied',
+  'admin.memberCount_other': '{count} Mitglieder',
+  'admin.empty': 'Noch keine Roadtrips vorhanden',
+  'admin.loadError': 'Die Roadtrips konnten nicht geladen werden.',
+  'admin.noAccess': 'Kein Administrationszugriff',
 
   'cockpit.dayOfTrip': 'Tag {day} von {total}',
   'cockpit.tripDayLabel': 'Reisetag'

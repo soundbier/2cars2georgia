@@ -15,6 +15,13 @@ interface RoadtripContextValue {
   loading: boolean;
   /** Anzeigename aus users/{uid}, oder null solange noch kein Profil angelegt wurde. */
   displayName: string | null;
+  /**
+   * Plattform-Administration: users/{uid}.role == 'admin'. Wird ausschließlich
+   * direkt in Firebase gesetzt, nie von der App geschrieben. Maßgeblich ist
+   * auch hier firestore.rules (isPlatformAdmin) – die Oberfläche blendet damit
+   * nur den Menüpunkt "Administration" ein.
+   */
+  isPlatformAdmin: boolean;
   /** ID des aktuell ausgewählten Roadtrips, oder null solange keiner aktiv ist. */
   tripId: string | null;
   /** Anzeigename des Roadtrips, fällt auf die ID zurück solange er noch lädt. */
@@ -48,6 +55,7 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
 
   const [profileLoading, setProfileLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   const [tripId, setTripId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY_TRIP_ID));
   const [tripName, setTripName] = useState<string | null>(null);
@@ -64,6 +72,7 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authUser) {
       setDisplayName(null);
+      setIsPlatformAdmin(false);
       setProfileLoading(false);
       return;
     }
@@ -72,6 +81,7 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
       doc(db, 'users', authUser.uid),
       (snap) => {
         setDisplayName(snap.exists() ? ((snap.data().displayName as string | undefined) ?? null) : null);
+        setIsPlatformAdmin(snap.exists() && snap.data().role === 'admin');
         setProfileLoading(false);
       },
       () => setProfileLoading(false)
@@ -132,6 +142,7 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
       authUser,
       loading,
       displayName,
+      isPlatformAdmin,
       tripId: role ? tripId : null,
       tripName: role ? tripName : null,
       role,
@@ -139,7 +150,7 @@ export function RoadtripProvider({ children }: { children: ReactNode }) {
       selectTrip,
       clearTrip
     }),
-    [authLoading, authUser, loading, displayName, tripId, tripName, role]
+    [authLoading, authUser, loading, displayName, isPlatformAdmin, tripId, tripName, role]
   );
 
   return <RoadtripContext.Provider value={value}>{children}</RoadtripContext.Provider>;

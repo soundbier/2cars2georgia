@@ -144,3 +144,25 @@
   background: var(--color-accent-muted);
   color: var(--color-accent-text);
 }
+
+/* ============================================================
+   Administration (Plattform-Übersicht aller Roadtrips)
+   ============================================================ */
+/* Die ganze Zeile ist der Aufklapp-Schalter für die Mitgliederliste –
+   der Button erbt deshalb Breite und Aussehen der Liste statt eigener
+   Button-Optik. */
+.admin-trip-row {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-member-list {
+  padding-left: var(--space-3);
+}

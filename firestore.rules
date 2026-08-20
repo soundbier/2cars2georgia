@@ -100,6 +100,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Plattform-Administration: eine einzelne Person, die in ihrem eigenen
+    // Profil users/{uid} das Feld `role: "admin"` trägt. Die Rolle wird
+    // bewusst nirgends vom Client geschrieben (users/ erlaubt kein update
+    // und beim create kein role-Feld) – sie wird einmalig direkt in der
+    // Firebase-Konsole gesetzt. Sie erlaubt ausschließlich Lesen zur
+    // Übersicht (siehe src/pages/Administration.tsx), keinerlei Schreiben.
+    function isPlatformAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+    }
+
     // usernames/{normalizedName}: reserviert einen Anzeigenamen für genau
     // eine UID. Wird immer gemeinsam mit users/{uid} in derselben
     // Transaktion angelegt (siehe src/lib/username.ts) – beide oder keins.
@@ -170,7 +182,9 @@ service cloud.firestore {
       // Beitritts-Code (siehe RoadtripGate) und ihr Inhalt ist unkritisch;
       // eine Auflistung fremder Roadtrips bleibt aber gesperrt.
       allow get: if signedIn();
-      allow list: if isMember();
+      // Auflisten bleibt Mitgliedern vorbehalten; zusätzlich darf die
+      // Plattform-Administration alle Roadtrips sehen (nur lesen).
+      allow list: if isMember() || isPlatformAdmin();
 
       // Name/Erstellungsdatum/Owner eines Roadtrips ändern sich nach dem Anlegen nicht.
       allow update: if false;
@@ -208,8 +222,8 @@ service cloud.firestore {
         // angelegt wird. `get` erlaubt deshalb zusätzlich den Blick auf das
         // eigene Dokument unabhängig vom Mitgliedsstatus – fremde
         // Mitgliedsdaten bleiben, wie zuvor, nur für Mitglieder sichtbar.
-        allow get: if isMember() || (signedIn() && request.auth.uid == memberUid);
-        allow list: if isMember();
+        allow get: if isMember() || isPlatformAdmin() || (signedIn() && request.auth.uid == memberUid);
+        allow list: if isMember() || isPlatformAdmin();
 
         // Rolle ändern: nur der Owner, und nur die Rolle selbst – Name und
         // Beitrittsdatum bleiben unangetastet.
