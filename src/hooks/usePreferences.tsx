@@ -19,7 +19,21 @@ export interface Preferences {
   language: Language;
   /** Hintergrundstil des Tagesbilds (Logbuch-Export für Instagram & Co.). */
   dayRecapBackground: BackgroundStyle;
+  /**
+   * Wie viele Reihen Schnell-Logs im Cockpit ohne Aufklappen sichtbar sind.
+   * `0` steht für „alle" – dann entfällt das Aufklappen ganz.
+   */
+  quickLogRows: number;
 }
+
+/**
+ * Auswahl für die Reihen unter „Log hinzufügen".
+ *
+ * Wie viele Tasten eine Reihe fasst, entscheidet die Bildschirmbreite (drei
+ * auf dem Handy, mehr auf großen Displays) – deshalb wird in Reihen gewählt
+ * und nicht in Tasten.
+ */
+export const QUICK_LOG_ROW_OPTIONS = [1, 2, 3, 0] as const;
 
 const BACKGROUND_STYLES: BackgroundStyle[] = ['reduced', 'standard', 'satellite'];
 
@@ -31,7 +45,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // Erst beim ersten Start ausgewertet: Danach steht die einmal gespeicherte
   // Wahl im localStorage und überschreibt die Geräteeinstellung nicht mehr.
   language: detectLanguage(),
-  dayRecapBackground: 'reduced'
+  dayRecapBackground: 'reduced',
+  quickLogRows: 1
 };
 
 /** Stand vor der Ebenenauswahl: ein einzelner Schalter für die Seezeichen. */
@@ -52,6 +67,9 @@ function readStored(): Preferences {
     if (!LANGUAGES.includes(merged.language)) merged.language = DEFAULT_PREFERENCES.language;
     if (!BACKGROUND_STYLES.includes(merged.dayRecapBackground)) {
       merged.dayRecapBackground = DEFAULT_PREFERENCES.dayRecapBackground;
+    }
+    if (!QUICK_LOG_ROW_OPTIONS.includes(merged.quickLogRows as (typeof QUICK_LOG_ROW_OPTIONS)[number])) {
+      merged.quickLogRows = DEFAULT_PREFERENCES.quickLogRows;
     }
 
     // Overlays einzeln zusammenführen: Neue Ebenen einer App-Version starten
