@@ -109,7 +109,9 @@ export default function Dashboard({ user }: { user: string }) {
     isPaused,
     setIsPaused,
     finishedSession,
-    dismissFinishedSession
+    dismissFinishedSession,
+    screenLockHeld,
+    screenLockSupported
   } = useTracking();
   const { tripId, tripName } = useRoadtrip();
   const { canEdit } = usePermissions(user);
@@ -376,6 +378,15 @@ export default function Dashboard({ user }: { user: string }) {
             </Button>
           )}
         </div>
+
+        {/* Nur während der Aufzeichnung und nur einmal: Was mit der Spur
+            passiert, wenn das Handy zugeht, ist genau dann die Frage. */}
+        {isTracking && !screenLockSupported && (
+          <p className="helper-text cockpit-note">{t('cockpit.screenLockUnavailable')}</p>
+        )}
+        {isTracking && screenLockHeld && (
+          <p className="helper-text cockpit-note">{t('cockpit.screenLockHint')}</p>
+        )}
 
         {!canEdit && <p className="helper-text cockpit-note">{t('crew.readonlyHint')}</p>}
       </div>

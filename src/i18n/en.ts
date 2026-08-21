@@ -153,6 +153,10 @@ export const en: Translations = {
   'cockpit.recording': 'Recording',
   'cockpit.recordingPaused': 'Recording paused',
   'cockpit.recordingOff': 'Not recording',
+  'cockpit.screenLockHint':
+    'The screen stays on for the recording. If the phone is locked, positioning pauses until the app is in the foreground again.',
+  'cockpit.screenLockUnavailable':
+    'This device cannot keep the screen on. Recording continues while the app is in the foreground and resumes when you open it again.',
   'cockpit.position': 'Position',
   'cockpit.noValue': '—',
   'cockpit.north': 'N',
@@ -369,6 +373,10 @@ export const en: Translations = {
   'settings.interval30s': 'Every 30 seconds',
   'settings.interval60s': 'Every minute',
   'settings.interval300s': 'Every 5 minutes',
+  'settings.keepScreenAwake': 'Keep screen on',
+  'settings.keepScreenAwakeDescription':
+    'Keeps the screen on while recording. Without it the phone suspends the app and the track gets gaps – at the cost of battery.',
+  'settings.keepScreenAwakeToggle': 'Keep the screen on while recording',
   'settings.management': 'Management',
   'settings.data': 'Data',
   'settings.export': 'Export',
@@ -455,6 +463,8 @@ export const en: Translations = {
   // --- Sync and updates -------------------------------------------------
   'sync.syncing': 'Syncing … ({count})',
   'sync.offlineQueued': 'Saved offline, will sync once there is a connection ({count})',
+  'sync.trackPointsQueued_one': '{count} track point still on this device',
+  'sync.trackPointsQueued_other': '{count} track points still on this device',
   'update.title': 'Update available',
   'update.description':
     'There is a new version of 2cars2georgia. A quick restart loads it – data you have already recorded is kept.',

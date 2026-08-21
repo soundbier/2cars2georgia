@@ -644,6 +644,22 @@ describe('Trackpunkte', () => {
     await assertFails(setDoc(doc(memberDb(), path), { ...validTrackPoint, speedKmh: 200 }));
   });
 
+  it('lässt denselben Punkt wortgleich noch einmal schreiben', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackPoint);
+    // Der Offline-Puffer (src/lib/trackBuffer.ts) kann einen Punkt nach einem
+    // App-Neustart ein zweites Mal hochladen. Weil die Dokument-ID aus
+    // Aufzeichnung und Zeitstempel abgeleitet ist, trifft er dasselbe
+    // Dokument – und darf es, solange nichts anderes darin steht.
+    await assertSucceeds(setDoc(doc(memberDb(), path), validTrackPoint));
+  });
+
+  it('lässt auch die wortgleiche Wiederholung nicht von Readonly zu', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackPoint);
+    await assertFails(setDoc(doc(readonlyDb(), path), validTrackPoint));
+  });
+
   it('erlaubt das endgültige Löschen nur dem Owner', async () => {
     await seedTripWithCrew(TRIP);
     await seed(path, validTrackPoint);

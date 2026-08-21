@@ -288,7 +288,15 @@ service cloud.firestore {
         allow read: if isMember();
         allow create: if canWrite() && isTrackPoint();
         // Trackpunkte werden nur angehängt, nie nachträglich verändert.
-        allow update: if false;
+        //
+        // Einzige Ausnahme: dasselbe Dokument noch einmal mit exakt
+        // denselben Werten. Die Dokument-ID eines Punktes leitet sich aus
+        // Aufzeichnung und Zeitstempel ab (src/lib/trackBuffer.ts), damit ein
+        // Punkt aus dem Offline-Puffer, der nach einem App-Neustart ein
+        // zweites Mal hochgeht, nicht doppelt in der Spur landet. Dieser
+        // zweite Schreibvorgang ist formal ein update – inhaltlich ändert er
+        // nichts, und genau das steht hier.
+        allow update: if canWrite() && request.resource.data == resource.data;
         allow delete: if isOwner();
       }
 

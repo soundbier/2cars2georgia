@@ -108,6 +108,18 @@ export function fakeFirestoreModule() {
     getDocs: async (ref: Ref) => ({
       docs: collectionDocs(ref.__path).map(({ id, data }) => ({ id, data: () => data }))
     }),
+    writeBatch: () => {
+      const staged: Array<[Ref, DocData]> = [];
+      return {
+        set: (ref: Ref, data: DocData) => {
+          staged.push([ref, data]);
+        },
+        commit: async () => {
+          for (const [ref, data] of staged) documents.set(ref.__path, data);
+          notify();
+        }
+      };
+    },
     serverTimestamp: () => Date.now()
   };
 }

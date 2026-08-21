@@ -97,6 +97,60 @@ Dauer, Strecke und Punktzahl genau dieser Fahrt und einem Namensvorschlag
 * Umbenennen ist erlaubt (der Name ist Beschriftung, keine Aufzeichnung),
   endgültiges Löschen bleibt wie bei den Trackpunkten dem Owner vorbehalten.
 
+## Aufzeichnung ohne Netz und über Neustarts hinweg
+
+Die Spur darf weder an einem Funkloch noch daran scheitern, dass das
+Betriebssystem die App im Hintergrund abräumt. Dafür gibt es drei Teile:
+
+**Ausgangspuffer** (`src/lib/trackBuffer.ts`). Jeder GPS-Punkt wird zuerst in
+IndexedDB festgeschrieben und erst gelöscht, wenn der Server ihn bestätigt hat.
+Der Puffer überlebt Neustart, App-Kill und leeren Akku. Parallel geht der
+frische Punkt sofort einzeln nach Firestore – nur so steht er ohne Verzögerung
+auf der Karte, offline über die Warteschlange des SDK. Beides zusammen heißt:
+Was im SDK hängen bleibt, liegt trotzdem noch auf dem Gerät.
+
+**Nachschub** (`src/lib/trackUploader.ts`). Beim Start, bei Rückkehr des Netzes,
+bei Rückkehr in den Vordergrund und alle 30 Sekunden wird der Puffer in Stapeln
+zu 200 Punkten hochgeladen. Die Dokument-ID eines Punktes ist
+`{sessionId}_{timestamp}` – ein zweiter Anlauf trifft damit dasselbe Dokument
+statt die Spur zu verdoppeln. `firestore.rules` lässt deshalb genau ein
+wortgleiches Überschreiben eines Trackpunkts zu, sonst nach wie vor keine
+Änderung. Ein Punkt, den der Server dauerhaft ablehnt, fliegt nach drei
+Anläufen raus, damit er nicht den Rest der Fahrt blockiert.
+
+**Laufende Aufzeichnung** (`src/lib/activeTrackSession.ts`). Dass gerade
+aufgezeichnet wird, steht in localStorage – mit Kennung, Startzeit,
+Pausenzustand und dem Zeitstempel des letzten Punktes. Startet die App neu,
+läuft dieselbe Aufzeichnung weiter, statt still zu enden. Liegt der letzte
+Punkt mehr als sechs Stunden zurück, war es kein Aussetzer, sondern das Ende
+der Fahrt: Dann wird die Aufzeichnung zum Benennen angeboten.
+
+Wie viel noch auf dem Gerät liegt, steht im Sync-Banner
+(`src/components/SyncStatusBanner.tsx`) – anders als der Zähler laufender
+Schreibvorgänge überlebt diese Zahl den Neustart.
+
+### Grenze: Bildschirm aus
+
+Ein Browser hat keine Ortung im Hintergrund. Ist der Bildschirm aus oder die
+App nicht im Vordergrund, friert das Betriebssystem die Seite ein und
+`watchPosition` liefert nichts mehr – keine API der Welt ändert daran etwas,
+solange die App eine Web-App ist. Was dagegen getan wird:
+
+* Während der Aufzeichnung hält die Wake-Lock-API den Bildschirm an
+  (`src/hooks/useWakeLock.ts`, abschaltbar unter Einstellungen →
+  Aufzeichnung). Die Sperre wird nach jeder Rückkehr in den Vordergrund neu
+  angefordert.
+* Kommt die App zurück, wird der Geolocation-Watcher neu aufgesetzt statt
+  darauf zu hoffen, dass der eingefrorene von selbst wieder anspringt. Eine
+  Aufsicht prüft alle 15 Sekunden, ob überhaupt noch Fixes ankommen, und
+  startet ihn sonst neu.
+* Die Aufzeichnung selbst läuft weiter: Nach dem Entsperren geht es in
+  derselben Aufzeichnung weiter, die Lücke ist die Zeit im Schlaf.
+
+Wirklich lückenlos im Hintergrund aufzeichnen könnte nur eine native Hülle
+(Capacitor o.ä.) mit Hintergrund-Standortdienst. Solange es die nicht gibt,
+gilt fürs Fahren: Handy angesteckt lassen und die App im Vordergrund.
+
 ## Firestore-Regeln veröffentlichen
 
 `firestore.rules` liegt im Repo, wird aber von keinem Workflow ausgerollt.
