@@ -160,6 +160,10 @@ export const de = {
   'cockpit.recording': 'Aufzeichnung läuft',
   'cockpit.recordingPaused': 'Aufzeichnung pausiert',
   'cockpit.recordingOff': 'Keine Aufzeichnung',
+  'cockpit.screenLockHint':
+    'Bildschirm bleibt für die Aufzeichnung an. Wird das Handy gesperrt, pausiert die Ortung, bis die App wieder im Vordergrund ist.',
+  'cockpit.screenLockUnavailable':
+    'Dieses Gerät kann den Bildschirm nicht anlassen. Bleibt die App im Vordergrund, läuft die Aufzeichnung weiter; nach dem Sperren setzt sie beim Öffnen fort.',
   'cockpit.position': 'Position',
   'cockpit.noValue': '—',
   'cockpit.north': 'N',
@@ -378,6 +382,10 @@ export const de = {
   'settings.interval30s': 'Alle 30 Sekunden',
   'settings.interval60s': 'Jede Minute',
   'settings.interval300s': 'Alle 5 Minuten',
+  'settings.keepScreenAwake': 'Bildschirm anlassen',
+  'settings.keepScreenAwakeDescription':
+    'Während der Aufzeichnung bleibt der Bildschirm an. Ohne das hält das Handy die App im Ruhezustand an und die Spur bekommt Lücken – kostet dafür Akku.',
+  'settings.keepScreenAwakeToggle': 'Bildschirm während der Aufzeichnung anlassen',
   'settings.management': 'Verwaltung',
   'settings.data': 'Daten',
   'settings.export': 'Export',
@@ -466,6 +474,8 @@ export const de = {
   // --- Sync und Updates -------------------------------------------------
   'sync.syncing': 'Wird synchronisiert … ({count})',
   'sync.offlineQueued': 'Offline gespeichert, wird bei Empfang synchronisiert ({count})',
+  'sync.trackPointsQueued_one': '{count} Trackpunkt auf dem Gerät',
+  'sync.trackPointsQueued_other': '{count} Trackpunkte auf dem Gerät',
   'update.title': 'Update verfügbar',
   'update.description':
     'Es gibt eine neue Version von 2cars2georgia. Ein kurzer Neustart lädt sie – bereits erfasste Daten bleiben erhalten.',

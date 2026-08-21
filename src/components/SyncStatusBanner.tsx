@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { CloudUpload } from 'lucide-react';
 import { usePendingWrites } from '../hooks/usePendingWrites';
+import { useQueuedTrackPoints } from '../hooks/useQueuedTrackPoints';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useT } from '../i18n';
 import './SyncStatusBanner.css';
@@ -17,10 +18,15 @@ import './SyncStatusBanner.css';
  * ausgerechnet die Meldung, dass noch etwas ungesichert ist.
  */
 export function SyncStatusBanner() {
-  const pending = usePendingWrites();
+  const pendingWrites = usePendingWrites();
+  const queuedPoints = useQueuedTrackPoints();
   const isOnline = useOnlineStatus();
   const t = useT();
 
+  // Zwei Quellen, eine Aussage: laufende Firestore-Schreibvorgänge dieser
+  // Sitzung und Trackpunkte, die noch im Ausgangspuffer liegen – letztere
+  // auch dann, wenn sie aus einer früheren Sitzung stammen.
+  const pending = pendingWrites + queuedPoints;
   const visible = pending > 0;
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export function SyncStatusBanner() {
         {isOnline
           ? t('sync.syncing', { count: pending })
           : t('sync.offlineQueued', { count: pending })}
+        {queuedPoints > 0 && ` · ${t('sync.trackPointsQueued', { count: queuedPoints })}`}
       </span>
     </div>
   );

@@ -15,6 +15,15 @@ export interface Preferences {
   overlays: Record<OverlayId, boolean>;
   /** Mindestabstand zwischen zwei gespeicherten Trackpunkten. */
   trackIntervalMs: number;
+  /**
+   * Bildschirm während der Aufzeichnung anlassen.
+   *
+   * Der Browser kennt keine Ortung im Hintergrund: Geht der Bildschirm aus,
+   * friert das System die Seite ein und die Spur bekommt ein Loch. Deshalb
+   * standardmäßig an – abschaltbar, weil es Akku kostet (siehe
+   * hooks/useWakeLock.ts).
+   */
+  keepScreenAwake: boolean;
   /** Sprache der Oberfläche auf diesem Gerät. */
   language: Language;
   /** Hintergrundstil des Tagesbilds (Logbuch-Export für Instagram & Co.). */
@@ -42,6 +51,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   baseLayer: 'osm',
   overlays: { seamarks: true, cycling: false, hiking: false },
   trackIntervalMs: 30_000,
+  keepScreenAwake: true,
   // Erst beim ersten Start ausgewertet: Danach steht die einmal gespeicherte
   // Wahl im localStorage und überschreibt die Geräteeinstellung nicht mehr.
   language: detectLanguage(),
@@ -65,6 +75,9 @@ function readStored(): Preferences {
     const merged: Preferences = { ...DEFAULT_PREFERENCES, ...stored };
     if (!(merged.baseLayer in BASE_LAYERS)) merged.baseLayer = DEFAULT_PREFERENCES.baseLayer;
     if (!LANGUAGES.includes(merged.language)) merged.language = DEFAULT_PREFERENCES.language;
+    if (typeof merged.keepScreenAwake !== 'boolean') {
+      merged.keepScreenAwake = DEFAULT_PREFERENCES.keepScreenAwake;
+    }
     if (!BACKGROUND_STYLES.includes(merged.dayRecapBackground)) {
       merged.dayRecapBackground = DEFAULT_PREFERENCES.dayRecapBackground;
     }

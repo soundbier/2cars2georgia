@@ -300,6 +300,17 @@ export default function Settings({ currentUser, users }: Props) {
             ))}
           </Select>
         </SettingRow>
+
+        <SettingRow
+          label={t('settings.keepScreenAwake')}
+          description={t('settings.keepScreenAwakeDescription')}
+        >
+          <Toggle
+            label={t('settings.keepScreenAwakeToggle')}
+            checked={preferences.keepScreenAwake}
+            onChange={(value) => setPreference('keepScreenAwake', value)}
+          />
+        </SettingRow>
       </Section>
 
       <Section title={t('settings.management')}>
