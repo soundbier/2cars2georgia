@@ -206,6 +206,7 @@ export function removeMember(tripId: string, uid: string): Promise<void> {
 
 const CASCADE_COLLECTIONS = [
   'track',
+  'trackSessions',
   'events',
   'expenses',
   'dishes',

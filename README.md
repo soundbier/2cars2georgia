@@ -79,6 +79,24 @@ in der Firebase Console unter Authentication → Templates → „E-Mail-Adresse
 bestätigen"; die App-Domain muss dort unter Authentication → Settings →
 Authorized domains eingetragen sein.
 
+## Aufzeichnung benennen
+
+Eine Tour im Cockpit ist alles zwischen „Tour starten" und „Tour stoppen".
+Beim Start bekommt sie eine Kennung, die an jedem Trackpunkt mitläuft
+(`sessionId`, siehe `src/hooks/useTracking.tsx`); beim Stoppen öffnet sich das
+Speichern-Fenster (`src/components/TrackSessionDialog.tsx`) mit Startzeit,
+Dauer, Strecke und Punktzahl genau dieser Fahrt und einem Namensvorschlag
+(„Fahrt 04.05., 09:30").
+
+* Gespeichert wird ein Dokument unter `roadtrips/{tripId}/trackSessions/{sessionId}`
+  mit Name, Start, Ende und Autor – bewusst ohne Strecke oder Dauer: Beides
+  steckt in den Punkten und würde hier nur veralten.
+* „Ohne Namen" verwirft nichts. Die Punkte sind längst geschrieben; sie bleiben
+  dann namenlos Teil der Gesamtspur, genau wie alle Punkte aus der Zeit vor
+  dieser Funktion.
+* Umbenennen ist erlaubt (der Name ist Beschriftung, keine Aufzeichnung),
+  endgültiges Löschen bleibt wie bei den Trackpunkten dem Owner vorbehalten.
+
 ## Firestore-Regeln veröffentlichen
 
 `firestore.rules` liegt im Repo, wird aber von keinem Workflow ausgerollt.

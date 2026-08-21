@@ -166,6 +166,20 @@ export const en: Translations = {
   'cockpit.driveMode': 'Drive mode',
   'cockpit.noEntriesToday': 'No entries yet today.',
 
+  // --- Saving a recording (after stopping the tour) ---------------------
+  'trackSession.title': 'Save recording',
+  'trackSession.description':
+    'Give the trip a name so you can recognise it later. The recorded points are kept either way.',
+  'trackSession.emptyDescription':
+    'No point has been recorded for this trip yet – there is nothing to name.',
+  'trackSession.defaultName': 'Trip {date}, {time}',
+  'trackSession.nameLabel': 'Trip name',
+  'trackSession.startedAt': 'Start',
+  'trackSession.points': 'Points',
+  'trackSession.skip': 'Leave unnamed',
+  'trackSession.saved': '“{name}” saved',
+  'trackSession.saveFailed': 'The recording could not be saved.',
+
   // --- Map --------------------------------------------------------------
   'map.currentPosition': 'Current position ({name})',
   'map.unfollow': 'Stop following position',

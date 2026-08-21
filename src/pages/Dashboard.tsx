@@ -22,6 +22,7 @@ import { GpsPoint, LogType, LogEvent } from '../types';
 import { useT } from '../i18n';
 import { Button, EmptyState, Toggle, useToast } from '../components/ui';
 import { DriveMap } from '../components/DriveMap';
+import { TrackSessionDialog } from '../components/TrackSessionDialog';
 import './Dashboard.css';
 
 /**
@@ -100,7 +101,16 @@ function dayOfTrip(startDate: string | undefined, endDate: string | undefined): 
 }
 
 export default function Dashboard({ user }: { user: string }) {
-  const { position, error, isTracking, setIsTracking, isPaused, setIsPaused } = useTracking();
+  const {
+    position,
+    error,
+    isTracking,
+    setIsTracking,
+    isPaused,
+    setIsPaused,
+    finishedSession,
+    dismissFinishedSession
+  } = useTracking();
   const { tripId, tripName } = useRoadtrip();
   const { canEdit } = usePermissions(user);
   const quickLogs = useQuickLogs();
@@ -224,6 +234,19 @@ export default function Dashboard({ user }: { user: string }) {
     </div>
   );
 
+  /* Nach dem Stoppen: die Aufzeichnung benennen, damit sie später
+     wiederzufinden ist. Rendert sich selbst als Portal und liefert null,
+     solange keine Aufzeichnung wartet – deshalb steht sie in beiden Modi an
+     derselben Stelle. */
+  const saveDialog = (
+    <TrackSessionDialog
+      session={finishedSession}
+      points={track}
+      author={user}
+      onClose={dismissFinishedSession}
+    />
+  );
+
   /* Fahrmodus: alles weg, was am Steuer nicht abgelesen wird. Keine
      Schnell-Logs, kein Tageslog, keine Tour-Tasten – die Aufzeichnung läuft
      davon unberührt weiter oder eben nicht, der Fahrmodus rührt sie nicht an.
@@ -258,6 +281,7 @@ export default function Dashboard({ user }: { user: string }) {
         <div className="cockpit-drive-map">
           <DriveMap position={position} user={user} />
         </div>
+        {saveDialog}
       </div>
     );
   }
@@ -423,6 +447,7 @@ export default function Dashboard({ user }: { user: string }) {
           )}
         </section>
       </div>
+      {saveDialog}
     </div>
   );
 }
