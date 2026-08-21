@@ -173,6 +173,20 @@ export const de = {
   'cockpit.driveMode': 'Fahrmodus',
   'cockpit.noEntriesToday': 'Heute noch keine Einträge.',
 
+  // --- Aufzeichnung speichern (nach dem Stoppen der Tour) ---------------
+  'trackSession.title': 'Aufzeichnung speichern',
+  'trackSession.description':
+    'Gib der Fahrt einen Namen, damit du sie später wiedererkennst. Die aufgezeichneten Punkte bleiben in jedem Fall erhalten.',
+  'trackSession.emptyDescription':
+    'Für diese Fahrt wurde noch kein Punkt aufgezeichnet – es gibt nichts zu benennen.',
+  'trackSession.defaultName': 'Fahrt {date}, {time}',
+  'trackSession.nameLabel': 'Name der Fahrt',
+  'trackSession.startedAt': 'Start',
+  'trackSession.points': 'Punkte',
+  'trackSession.skip': 'Ohne Namen',
+  'trackSession.saved': '„{name}“ gespeichert',
+  'trackSession.saveFailed': 'Aufzeichnung konnte nicht gespeichert werden.',
+
   // --- Karte ------------------------------------------------------------
   'map.currentPosition': 'Aktuelle Position ({name})',
   'map.unfollow': 'Position nicht mehr folgen',

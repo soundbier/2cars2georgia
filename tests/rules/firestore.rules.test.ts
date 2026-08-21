@@ -86,6 +86,13 @@ const validTrackPoint = {
   headingDeg: 87
 };
 
+const validTrackSession = {
+  name: 'Passau – Linz',
+  startedAt: NOW,
+  endedAt: NOW + 3_600_000,
+  author: 'Lukas'
+};
+
 const validEvent = {
   timestamp: NOW,
   author: 'Lukas',
@@ -585,6 +592,14 @@ describe('Trackpunkte', () => {
     await assertFails(setDoc(doc(memberDb(), `${path}-2`), { ...validTrackPoint, authorId: OWNER_UID }));
   });
 
+  it('nimmt die Zugehörigkeit zu einer benannten Aufzeichnung an', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), { ...validTrackPoint, sessionId: 'session-1' }));
+    // Punkte aus der Zeit vor den benannten Aufzeichnungen haben keine.
+    await assertSucceeds(setDoc(doc(memberDb(), `${path}-2`), validTrackPoint));
+    await assertFails(setDoc(doc(memberDb(), `${path}-3`), { ...validTrackPoint, sessionId: 'x'.repeat(65) }));
+  });
+
   it('weist unmögliche Koordinaten ab', async () => {
     await seedTripWithCrew(TRIP);
     const db = memberDb();
@@ -634,6 +649,62 @@ describe('Trackpunkte', () => {
     await seed(path, validTrackPoint);
     await assertFails(deleteDoc(doc(memberDb(), path)));
     await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
+  });
+});
+
+describe('Benannte Aufzeichnungen', () => {
+  const path = `roadtrips/${TRIP}/trackSessions/session-1`;
+
+  it('nimmt eine gültige Aufzeichnung von Owner und Member an, aber nicht von Readonly', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validTrackSession));
+    await assertFails(setDoc(doc(readonlyDb(), `${path}-2`), validTrackSession));
+  });
+
+  it('nimmt eine optionale authorId nur an, wenn sie der eigenen UID entspricht', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), { ...validTrackSession, authorId: MEMBER_UID }));
+    await assertFails(setDoc(doc(memberDb(), `${path}-2`), { ...validTrackSession, authorId: OWNER_UID }));
+  });
+
+  it('verlangt einen nicht leeren, nicht überlangen Namen', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, path), { ...validTrackSession, name: '' }));
+    await assertFails(setDoc(doc(db, path), { ...validTrackSession, name: 'x'.repeat(121) }));
+  });
+
+  it('weist ein Ende vor dem Start ab', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validTrackSession, endedAt: NOW - 1 }));
+  });
+
+  it('weist unplausible Zeitstempel und unbekannte Felder ab', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, path), { ...validTrackSession, startedAt: 0 }));
+    await assertFails(setDoc(doc(db, path), { ...validTrackSession, distanceKm: 42 }));
+  });
+
+  it('erlaubt das Umbenennen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackSession);
+    // Der Name ist Beschriftung, keine Aufzeichnung – anders als die
+    // Trackpunkte darf er sich nachträglich ändern.
+    await assertSucceeds(setDoc(doc(memberDb(), path), { ...validTrackSession, name: 'Tag 1' }));
+  });
+
+  it('erlaubt das Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackSession);
+    await assertFails(deleteDoc(doc(memberDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
+  });
+
+  it('bleibt für Außenstehende unsichtbar', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackSession);
+    await assertFails(getDoc(doc(outsiderDb(), path)));
   });
 });
 

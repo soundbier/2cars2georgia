@@ -266,10 +266,14 @@ service cloud.firestore {
       // entstehen tausende Punkte pro Tour. Entsprechend eng ist die Prüfung.
       match /track/{pointId} {
         function isTrackPoint() {
-          return fieldsAre(['timestamp', 'author', 'lat', 'lng', 'speedKmh', 'headingDeg'], ['authorId'])
+          return fieldsAre(['timestamp', 'author', 'lat', 'lng', 'speedKmh', 'headingDeg'],
+                           ['authorId', 'sessionId'])
             && isEpochMillis('timestamp')
             && isText('author', 60)
             && isOptionalAuthorId()
+            // Zugehörigkeit zu einer benannten Aufzeichnung (siehe
+            // trackSessions unten). Fehlt bei Punkten aus der Zeit davor.
+            && isOptionalText('sessionId', 64)
             && isLatitude('lat')
             && isLongitude('lng')
             && data().speedKmh is number
@@ -285,6 +289,31 @@ service cloud.firestore {
         allow create: if canWrite() && isTrackPoint();
         // Trackpunkte werden nur angehängt, nie nachträglich verändert.
         allow update: if false;
+        allow delete: if isOwner();
+      }
+
+      // --- Benannte Aufzeichnungen ----------------------------------------
+      // Eine Tour zwischen "starten" und "stoppen", benannt beim Speichern
+      // (siehe src/components/TrackSessionDialog.tsx). Die Dokument-ID ist
+      // dieselbe sessionId, die an den zugehörigen Trackpunkten steht.
+      //
+      // Bewusst ohne Strecke/Dauer: Beides steckt in den Punkten und ließe
+      // sich hier weder prüfen noch aktuell halten.
+      match /trackSessions/{sessionId} {
+        function isTrackSession() {
+          return fieldsAre(['name', 'startedAt', 'endedAt', 'author'], ['authorId'])
+            && isText('name', 120)
+            && isEpochMillis('startedAt')
+            && isEpochMillis('endedAt')
+            && data().endedAt >= data().startedAt
+            && isText('author', 60)
+            && isOptionalAuthorId();
+        }
+
+        allow read: if isMember();
+        // Umbenennen bleibt erlaubt: Der Name ist reine Beschriftung, anders
+        // als die Trackpunkte selbst ist er keine Aufzeichnung.
+        allow create, update: if canWrite() && isTrackSession();
         allow delete: if isOwner();
       }
 

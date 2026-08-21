@@ -92,6 +92,31 @@ export interface GpsPoint extends LivePosition {
   author: string;
   /** UID der Person, die den Punkt erzeugt hat, siehe firestore.rules. Optional für ältere Punkte. */
   authorId?: string;
+  /**
+   * Aufzeichnung, zu der dieser Punkt gehört – vergeben beim Start der Tour
+   * (siehe hooks/useTracking.tsx). Optional, weil Punkte aus der Zeit vor den
+   * benannten Aufzeichnungen keine haben; sie bilden zusammen die namenlose
+   * Grundspur des Roadtrips.
+   */
+  sessionId?: string;
+}
+
+/**
+ * Eine benannte Aufzeichnung: alles zwischen „Tour starten" und „Tour stoppen".
+ *
+ * Bewusst ohne Strecke, Dauer oder Punktzahl – die stehen in den Trackpunkten
+ * mit derselben sessionId und würden hier nur veralten. Das Dokument entsteht
+ * erst beim Speichern nach dem Stoppen (siehe components/TrackSessionDialog.tsx):
+ * Wer die Aufzeichnung nicht benennt, behält die Punkte, aber keine Session.
+ */
+export interface TrackSession {
+  id?: string;
+  name: string;
+  startedAt: number;
+  endedAt: number;
+  author: string;
+  /** UID der Person, die aufgezeichnet hat, siehe firestore.rules. */
+  authorId?: string;
 }
 
 export interface LogEvent extends Coordinates {
