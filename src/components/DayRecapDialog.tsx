@@ -8,6 +8,7 @@ import { exportFileName } from '../lib/exportFormats';
 import { formatDuration } from '../lib/tripStats';
 import { distanceUnitLabel, toDisplayDistance } from '../lib/units';
 import { usePreferences } from '../hooks/usePreferences';
+import { useQuickLogs } from '../hooks/useSettings';
 import { useI18n, useT } from '../i18n';
 import { Button, Select, useToast } from './ui';
 import './DayRecapDialog.css';
@@ -34,6 +35,8 @@ export function DayRecapDialog({ open, onClose, tripName, days, initialDayKey }:
   const [dayKey, setDayKey] = useState(initialDayKey ?? days[0]?.key ?? '');
   const [busy, setBusy] = useState(false);
   const { preferences, setPreference } = usePreferences();
+  // Die Kategorien liefern das Icon je Ereignis – siehe lib/quickLogIconShapes.ts.
+  const quickLogs = useQuickLogs();
   const { locale } = useI18n();
   const { notify } = useToast();
   const t = useT();
@@ -68,9 +71,19 @@ export function DayRecapDialog({ open, onClose, tripName, days, initialDayKey }:
       durationLabel,
       track: day.track,
       events: day.events,
+      quickLogs,
       backgroundStyle: preferences.dayRecapBackground
     });
-  }, [open, day, tripName, dateLabel, distanceLabel, durationLabel, preferences.dayRecapBackground]);
+  }, [
+    open,
+    day,
+    tripName,
+    dateLabel,
+    distanceLabel,
+    durationLabel,
+    quickLogs,
+    preferences.dayRecapBackground
+  ]);
 
   if (!open) return null;
 

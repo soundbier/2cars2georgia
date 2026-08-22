@@ -18,6 +18,7 @@ import {
   LucideIcon
 } from 'lucide-react';
 import { QuickLogIconName } from '../types';
+import { DEFAULT_QUICK_LOG_ICON } from './quickLogIconShapes';
 
 export const QUICK_LOG_ICONS: Record<QuickLogIconName, LucideIcon> = {
   anchor: Anchor,
@@ -38,7 +39,9 @@ export const QUICK_LOG_ICONS: Record<QuickLogIconName, LucideIcon> = {
   users: Users
 };
 
-export const DEFAULT_QUICK_LOG_ICON: QuickLogIconName = 'tag';
+// Steht bei der Geometrie fürs Tagesbild, damit Oberfläche und Bild bei einer
+// unbekannten Kategorie dasselbe Ersatz-Icon zeigen.
+export { DEFAULT_QUICK_LOG_ICON };
 
 export function getQuickLogIcon(name?: string): LucideIcon {
   return QUICK_LOG_ICONS[name as QuickLogIconName] ?? QUICK_LOG_ICONS[DEFAULT_QUICK_LOG_ICON];
