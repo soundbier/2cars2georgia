@@ -1,4 +1,10 @@
-import { GpsPoint, LogEvent } from '../types';
+import { GpsPoint, LogEvent, QuickLogConfig } from '../types';
+import {
+  iconShapesForEvent,
+  IconShape,
+  ICON_STROKE_WIDTH,
+  ICON_VIEWBOX
+} from './quickLogIconShapes';
 import { getUserColor } from './userColors';
 
 /**
@@ -41,6 +47,12 @@ interface Palette {
   brandText: string;
   brandBg: string;
   emptyText: string;
+  /**
+   * Kontur hinter den Ereignis-Icons. Liegt nah am Hintergrund: Sie soll das
+   * Symbol vom Untergrund und von der Routenlinie trennen, nicht selbst
+   * auffallen.
+   */
+  markerHalo: string;
 }
 
 const PALETTES: Record<BackgroundStyle, Palette> = {
@@ -55,7 +67,8 @@ const PALETTES: Record<BackgroundStyle, Palette> = {
     statLabel: '#93a5c2',
     brandText: '#ffffff',
     brandBg: 'rgba(255, 255, 255, 0.12)',
-    emptyText: '#5b6b7a'
+    emptyText: '#5b6b7a',
+    markerHalo: 'rgba(11, 18, 32, 0.9)'
   },
   standard: {
     routeStart: '#2563eb',
@@ -68,7 +81,8 @@ const PALETTES: Record<BackgroundStyle, Palette> = {
     statLabel: '#475569',
     brandText: '#ffffff',
     brandBg: 'rgba(15, 23, 42, 0.85)',
-    emptyText: '#94a3b8'
+    emptyText: '#94a3b8',
+    markerHalo: 'rgba(238, 242, 246, 0.95)'
   },
   satellite: {
     routeStart: '#facc15',
@@ -81,7 +95,8 @@ const PALETTES: Record<BackgroundStyle, Palette> = {
     statLabel: '#d9e4d3',
     brandText: '#0f172a',
     brandBg: 'rgba(255, 255, 255, 0.85)',
-    emptyText: '#c9d6c2'
+    emptyText: '#c9d6c2',
+    markerHalo: 'rgba(0, 0, 0, 0.6)'
   }
 };
 
@@ -92,8 +107,16 @@ export interface RouteImageOptions {
   durationLabel: string;
   track: GpsPoint[];
   events: LogEvent[];
+  /**
+   * Schnell-Log-Kategorien des Roadtrips – sie ordnen jedem Ereignis sein
+   * Icon zu (siehe lib/quickLogIconShapes.ts).
+   */
+  quickLogs: QuickLogConfig[];
   backgroundStyle: BackgroundStyle;
 }
+
+/** Kantenlänge eines Ereignis-Icons im Bild. */
+const EVENT_ICON_SIZE = 38;
 
 interface Projected {
   x: number;
@@ -106,10 +129,15 @@ interface Projected {
  * Für die kurzen Distanzen eines Reisetags ist die Verzerrung einer
  * unechten Projektion nicht sichtbar – eine Mercator-Rechnung wäre hier
  * spürbar mehr Code für keinen erkennbaren Unterschied im Ergebnis.
+ *
+ * `bounds` legt den Ausschnitt fest, `project` rechnet darin. Beides ist
+ * getrennt, weil Route und Ereignisse denselben Ausschnitt brauchen: Würde
+ * jede Liste ihren eigenen bekommen, säßen die Ereignis-Icons irgendwo neben
+ * der Strecke, an der sie protokolliert wurden.
  */
-function project(points: { lat: number; lng: number }[]): Projected[] {
-  const lats = points.map((p) => p.lat);
-  const lngs = points.map((p) => p.lng);
+function createProjector(bounds: { lat: number; lng: number }[]): (p: { lat: number; lng: number }) => Projected {
+  const lats = bounds.map((p) => p.lat);
+  const lngs = bounds.map((p) => p.lng);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs);
@@ -129,10 +157,73 @@ function project(points: { lat: number; lng: number }[]): Projected[] {
   const offsetX = PADDING + (availableW - drawW) / 2;
   const offsetY = ROUTE_TOP + (availableH - drawH) / 2;
 
-  return points.map((p) => ({
+  return (p) => ({
     x: offsetX + (p.lng - minLng) * Math.cos(midLatRad) * scale,
     y: offsetY + (maxLat - p.lat) * scale
-  }));
+  });
+}
+
+/**
+ * Zeichnet ein Schnell-Log-Icon mittig auf (x, y).
+ *
+ * Zwei Durchgänge: erst breit im Kontraston, dann in der Autorenfarbe darüber.
+ * Das ergibt die Kontur, die ein Strichsymbol braucht, um auf einer
+ * Satellitenfläche oder quer über der Routenlinie noch lesbar zu sein – ohne
+ * eine Scheibe darunter, die das Symbol selbst kleiner machen würde.
+ */
+function drawIconShapes(
+  ctx: CanvasRenderingContext2D,
+  shapes: IconShape[],
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  halo: string
+): void {
+  const scale = size / ICON_VIEWBOX;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.translate(-ICON_VIEWBOX / 2, -ICON_VIEWBOX / 2);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (const pass of [
+    { paint: halo, width: ICON_STROKE_WIDTH + 2.5, grow: 1.25 },
+    { paint: color, width: ICON_STROKE_WIDTH, grow: 0 }
+  ]) {
+    ctx.strokeStyle = pass.paint;
+    ctx.fillStyle = pass.paint;
+    ctx.lineWidth = pass.width;
+    for (const shape of shapes) traceShape(ctx, shape, pass.grow);
+  }
+
+  ctx.restore();
+}
+
+/** Eine einzelne Form eines Icons, im lucide-Raster gezeichnet. */
+function traceShape(ctx: CanvasRenderingContext2D, shape: IconShape, grow: number): void {
+  if (shape.kind === 'path') {
+    ctx.stroke(new Path2D(shape.d));
+    return;
+  }
+
+  ctx.beginPath();
+  if (shape.kind === 'circle') {
+    // Gefüllte Punkte (z.B. das Loch im Preisschild) wachsen im Kontur-
+    // Durchgang mit, statt eine Linie um sich herum zu bekommen.
+    ctx.arc(shape.cx, shape.cy, shape.r + (shape.filled ? grow : 0), 0, Math.PI * 2);
+    if (shape.filled) {
+      ctx.fill();
+      return;
+    }
+  } else if (shape.kind === 'line') {
+    ctx.moveTo(shape.x1, shape.y1);
+    ctx.lineTo(shape.x2, shape.y2);
+  } else {
+    shape.points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+  }
+  ctx.stroke();
 }
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -209,7 +300,8 @@ function paintBackground(ctx: CanvasRenderingContext2D, style: BackgroundStyle):
 
 /** Zeichnet die Tagesübersicht auf ein bereits im DOM vorhandenes Canvas. */
 export function drawRouteImage(canvas: HTMLCanvasElement, options: RouteImageOptions): void {
-  const { tripName, dateLabel, distanceLabel, durationLabel, track, events, backgroundStyle } = options;
+  const { tripName, dateLabel, distanceLabel, durationLabel, track, events, quickLogs, backgroundStyle } =
+    options;
   const palette = PALETTES[backgroundStyle];
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
@@ -246,70 +338,79 @@ export function drawRouteImage(canvas: HTMLCanvasElement, options: RouteImageOpt
   ctx.font = '400 30px system-ui, -apple-system, "Segoe UI", sans-serif';
   ctx.fillText(dateLabel, PADDING, 152);
 
-  if (track.length > 1) {
-    const projectedTrack = project(track);
+  const hasRoute = track.length > 1;
 
-    // Sanfter Schatten unter der Route, wie bei den Karten-Overlays selbst.
-    ctx.save();
-    ctx.strokeStyle = palette.routeShadow;
-    ctx.lineWidth = 14;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    projectedTrack.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y + 4) : ctx.lineTo(p.x, p.y + 4)));
-    ctx.stroke();
-    ctx.restore();
+  if (hasRoute || events.length) {
+    // Ein gemeinsamer Ausschnitt für Strecke und Ereignisse: Nur so sitzt das
+    // Icon eines Logs dort, wo es aufgenommen wurde.
+    const project = createProjector([...track, ...events]);
 
-    const routeGradient = ctx.createLinearGradient(
-      projectedTrack[0].x,
-      projectedTrack[0].y,
-      projectedTrack[projectedTrack.length - 1].x,
-      projectedTrack[projectedTrack.length - 1].y
-    );
-    routeGradient.addColorStop(0, palette.routeStart);
-    routeGradient.addColorStop(1, palette.routeEnd);
+    if (hasRoute) {
+      const projectedTrack = track.map(project);
 
-    ctx.strokeStyle = routeGradient;
-    ctx.lineWidth = 9;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    projectedTrack.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.stroke();
+      // Sanfter Schatten unter der Route, wie bei den Karten-Overlays selbst.
+      ctx.save();
+      ctx.strokeStyle = palette.routeShadow;
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      projectedTrack.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y + 4) : ctx.lineTo(p.x, p.y + 4)));
+      ctx.stroke();
+      ctx.restore();
 
-    // Start (hohler Ring) und Ziel (voller Punkt) heben Anfang und Ende hervor.
-    const start = projectedTrack[0];
-    const end = projectedTrack[projectedTrack.length - 1];
-    ctx.fillStyle = palette.routeStart;
-    ctx.beginPath();
-    ctx.arc(start.x, start.y, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = palette.emptyText;
-    ctx.lineWidth = 3;
-    ctx.stroke();
+      const routeGradient = ctx.createLinearGradient(
+        projectedTrack[0].x,
+        projectedTrack[0].y,
+        projectedTrack[projectedTrack.length - 1].x,
+        projectedTrack[projectedTrack.length - 1].y
+      );
+      routeGradient.addColorStop(0, palette.routeStart);
+      routeGradient.addColorStop(1, palette.routeEnd);
 
-    ctx.fillStyle = palette.routeEnd;
-    ctx.beginPath();
-    ctx.arc(end.x, end.y, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = palette.heading;
-    ctx.lineWidth = 3;
-    ctx.stroke();
+      ctx.strokeStyle = routeGradient;
+      ctx.lineWidth = 9;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      projectedTrack.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.stroke();
 
-    // Ereignisse als kleine Punkte in der Farbe ihres Autors – die gleiche
-    // Zuordnung wie auf der Karte selbst, siehe lib/userColors.ts.
-    if (events.length) {
-      const projectedEvents = project(events);
-      events.forEach((evt, i) => {
-        const p = projectedEvents[i];
-        ctx.fillStyle = getUserColor(evt.author);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = palette.emptyText;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      });
+      // Start (hohler Ring) und Ziel (voller Punkt) heben Anfang und Ende hervor.
+      const start = projectedTrack[0];
+      const end = projectedTrack[projectedTrack.length - 1];
+      ctx.fillStyle = palette.routeStart;
+      ctx.beginPath();
+      ctx.arc(start.x, start.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = palette.emptyText;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = palette.routeEnd;
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = palette.heading;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Ereignisse mit dem Icon ihrer Kategorie, in der Farbe ihres Autors – die
+    // gleiche Zuordnung wie in Cockpit und Logbuch (lib/quickLogIconShapes.ts,
+    // lib/userColors.ts). Kein Titel dazu: Auf einem Bild, das ohne App-Kontext
+    // kursiert, sind Ortsnamen und Notizen der Crew nichts für Fremde.
+    for (const evt of events) {
+      const p = project(evt);
+      drawIconShapes(
+        ctx,
+        iconShapesForEvent(evt.type, quickLogs),
+        p.x,
+        p.y,
+        EVENT_ICON_SIZE,
+        getUserColor(evt.author),
+        palette.markerHalo
+      );
     }
   } else {
     ctx.fillStyle = palette.emptyText;

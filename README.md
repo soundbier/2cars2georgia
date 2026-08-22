@@ -151,6 +151,27 @@ Wirklich lückenlos im Hintergrund aufzeichnen könnte nur eine native Hülle
 (Capacitor o.ä.) mit Hintergrund-Standortdienst. Solange es die nicht gibt,
 gilt fürs Fahren: Handy angesteckt lassen und die App im Vordergrund.
 
+## Tagesbild
+
+Unter Statistik lässt sich ein Tag als teilbares Bild exportieren
+(`src/lib/routeImage.ts`, Vorschau in `src/components/DayRecapDialog.tsx`).
+Gezeichnet wird die Tagesroute, dazu jedes Logbuch-Ereignis mit dem Icon
+seiner Schnell-Log-Kategorie in der Farbe seines Autors – dieselbe Zuordnung
+wie im Cockpit.
+
+* Die Symbole liegen als reine Geometrie in `src/lib/quickLogIconShapes.ts`:
+  lucide-react gibt seine Pfaddaten nicht nach außen, und eine
+  React-Komponente lässt sich nicht auf ein Canvas zeichnen. Kommt ein Icon
+  in der Oberfläche dazu, gehört es dort ebenfalls hinein – ein Test
+  vergleicht beide Listen.
+* Gezeichnet wird jedes Symbol zweimal: breit im Kontraston, dann in der
+  Autorenfarbe darüber. Diese Kontur hält es auch quer über der Routenlinie
+  und auf dem Satelliten-Hintergrund lesbar, ohne eine Scheibe darunter.
+* Kein Titel und keine Notiz am Symbol: Das Bild kursiert ohne App-Kontext.
+* Route und Ereignisse teilen sich einen Bildausschnitt. Zuvor bekam jede
+  Liste ihren eigenen – die Ereignisse landeten dadurch neben der Strecke,
+  an der sie protokolliert wurden.
+
 ## Firestore-Regeln veröffentlichen
 
 `firestore.rules` liegt im Repo, wird aber von keinem Workflow ausgerollt.
