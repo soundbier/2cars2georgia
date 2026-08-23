@@ -14,10 +14,11 @@ interface Recorded {
   moveTo: [number, number][];
   translate: [number, number][];
   strokedPaths: string[];
+  arcRadii: number[];
 }
 
 function recordingCanvas() {
-  const recorded: Recorded = { moveTo: [], translate: [], strokedPaths: [] };
+  const recorded: Recorded = { moveTo: [], translate: [], strokedPaths: [], arcRadii: [] };
   const ctx = {
     canvas: null as unknown,
     createLinearGradient: () => ({ addColorStop: () => undefined }),
@@ -28,7 +29,7 @@ function recordingCanvas() {
     closePath: () => undefined,
     moveTo: (x: number, y: number) => void recorded.moveTo.push([x, y]),
     lineTo: () => undefined,
-    arc: () => undefined,
+    arc: (_x: number, _y: number, r: number) => void recorded.arcRadii.push(r),
     arcTo: () => undefined,
     ellipse: () => undefined,
     fill: () => undefined,
@@ -111,9 +112,17 @@ describe('drawRouteImage', () => {
 
     for (const shape of QUICK_LOG_ICON_SHAPES.coffee) {
       if (shape.kind !== 'path') continue;
-      // Je Ereignis zweimal: einmal als Kontur, einmal in der Autorenfarbe.
-      expect(recorded.strokedPaths.filter((d) => d === shape.d)).toHaveLength(4);
+      expect(recorded.strokedPaths.filter((d) => d === shape.d)).toHaveLength(2);
     }
+  });
+
+  it('setzt das Symbol auf eine Scheibe, die größer ist als die Streckenpunkte', () => {
+    // Ohne die Scheibe ging das Strichsymbol auf der gemusterten Fläche unter.
+    // Start- und Zielpunkt der Route sind 9 bzw. 12 groß – der Marker deutlich
+    // darüber, sonst wäre er wieder nur ein Punkt.
+    const recorded = draw([event({})]);
+
+    expect(recorded.arcRadii.filter((r) => r > 20).length).toBeGreaterThanOrEqual(1);
   });
 
   it('setzt das Icon genau dort ab, wo die Route den Punkt hat', () => {

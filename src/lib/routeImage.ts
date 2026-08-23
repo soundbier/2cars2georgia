@@ -48,11 +48,11 @@ interface Palette {
   brandBg: string;
   emptyText: string;
   /**
-   * Kontur hinter den Ereignis-Icons. Liegt nah am Hintergrund: Sie soll das
-   * Symbol vom Untergrund und von der Routenlinie trennen, nicht selbst
-   * auffallen.
+   * Ring um die Ereignis-Marker. Liegt nah am Hintergrund: Er trennt die
+   * farbige Scheibe vom Untergrund und von der Routenlinie, ohne selbst
+   * aufzufallen.
    */
-  markerHalo: string;
+  markerRing: string;
 }
 
 const PALETTES: Record<BackgroundStyle, Palette> = {
@@ -68,7 +68,7 @@ const PALETTES: Record<BackgroundStyle, Palette> = {
     brandText: '#ffffff',
     brandBg: 'rgba(255, 255, 255, 0.12)',
     emptyText: '#5b6b7a',
-    markerHalo: 'rgba(11, 18, 32, 0.9)'
+    markerRing: 'rgba(11, 18, 32, 0.85)'
   },
   standard: {
     routeStart: '#2563eb',
@@ -82,7 +82,7 @@ const PALETTES: Record<BackgroundStyle, Palette> = {
     brandText: '#ffffff',
     brandBg: 'rgba(15, 23, 42, 0.85)',
     emptyText: '#94a3b8',
-    markerHalo: 'rgba(238, 242, 246, 0.95)'
+    markerRing: 'rgba(255, 255, 255, 0.95)'
   },
   satellite: {
     routeStart: '#facc15',
@@ -96,7 +96,7 @@ const PALETTES: Record<BackgroundStyle, Palette> = {
     brandText: '#0f172a',
     brandBg: 'rgba(255, 255, 255, 0.85)',
     emptyText: '#c9d6c2',
-    markerHalo: 'rgba(0, 0, 0, 0.6)'
+    markerRing: 'rgba(0, 0, 0, 0.55)'
   }
 };
 
@@ -115,8 +115,18 @@ export interface RouteImageOptions {
   backgroundStyle: BackgroundStyle;
 }
 
-/** Kantenlänge eines Ereignis-Icons im Bild. */
-const EVENT_ICON_SIZE = 38;
+/**
+ * Ereignis-Marker: Scheibe in der Autorenfarbe, Symbol in Weiß darauf.
+ *
+ * Ein bloßes Strichsymbol ging auf der gemusterten Fläche unter, auch mit
+ * Kontur – bei 1080 px Bildbreite steht die Linie eines Icons nur zwei Pixel
+ * breit da. Die Scheibe gibt dem Symbol eine ruhige Fläche und trägt
+ * weiterhin die Autorenfarbe; Weiß darauf ist auf jedem Ton der Crew-Palette
+ * lesbar (siehe lib/userColors.ts).
+ */
+const EVENT_MARKER_RADIUS = 27;
+const EVENT_ICON_SIZE = 30;
+const EVENT_ICON_INK = '#ffffff';
 
 interface Projected {
   x: number;
@@ -163,22 +173,14 @@ function createProjector(bounds: { lat: number; lng: number }[]): (p: { lat: num
   });
 }
 
-/**
- * Zeichnet ein Schnell-Log-Icon mittig auf (x, y).
- *
- * Zwei Durchgänge: erst breit im Kontraston, dann in der Autorenfarbe darüber.
- * Das ergibt die Kontur, die ein Strichsymbol braucht, um auf einer
- * Satellitenfläche oder quer über der Routenlinie noch lesbar zu sein – ohne
- * eine Scheibe darunter, die das Symbol selbst kleiner machen würde.
- */
+/** Zeichnet ein Schnell-Log-Icon mittig auf (x, y). */
 function drawIconShapes(
   ctx: CanvasRenderingContext2D,
   shapes: IconShape[],
   x: number,
   y: number,
   size: number,
-  color: string,
-  halo: string
+  color: string
 ): void {
   const scale = size / ICON_VIEWBOX;
   ctx.save();
@@ -187,22 +189,46 @@ function drawIconShapes(
   ctx.translate(-ICON_VIEWBOX / 2, -ICON_VIEWBOX / 2);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
-  for (const pass of [
-    { paint: halo, width: ICON_STROKE_WIDTH + 2.5, grow: 1.25 },
-    { paint: color, width: ICON_STROKE_WIDTH, grow: 0 }
-  ]) {
-    ctx.strokeStyle = pass.paint;
-    ctx.fillStyle = pass.paint;
-    ctx.lineWidth = pass.width;
-    for (const shape of shapes) traceShape(ctx, shape, pass.grow);
-  }
-
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  // Etwas kräftiger als in der Oberfläche: Das Symbol steht hier ohne
+  // Beschriftung und wird im Feed noch einmal verkleinert.
+  ctx.lineWidth = ICON_STROKE_WIDTH + 0.4;
+  for (const shape of shapes) traceShape(ctx, shape);
   ctx.restore();
 }
 
+/**
+ * Ein Ereignis auf der Karte: Scheibe in der Autorenfarbe, Symbol darauf.
+ */
+function drawEventMarker(
+  ctx: CanvasRenderingContext2D,
+  shapes: IconShape[],
+  x: number,
+  y: number,
+  color: string,
+  palette: Palette
+): void {
+  // Derselbe versetzte Schatten wie unter der Route – er hebt den Marker von
+  // der Linie ab, über der er meistens sitzt.
+  ctx.fillStyle = palette.routeShadow;
+  ctx.beginPath();
+  ctx.arc(x, y + 3, EVENT_MARKER_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, EVENT_MARKER_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = palette.markerRing;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  drawIconShapes(ctx, shapes, x, y, EVENT_ICON_SIZE, EVENT_ICON_INK);
+}
+
 /** Eine einzelne Form eines Icons, im lucide-Raster gezeichnet. */
-function traceShape(ctx: CanvasRenderingContext2D, shape: IconShape, grow: number): void {
+function traceShape(ctx: CanvasRenderingContext2D, shape: IconShape): void {
   if (shape.kind === 'path') {
     ctx.stroke(new Path2D(shape.d));
     return;
@@ -210,9 +236,7 @@ function traceShape(ctx: CanvasRenderingContext2D, shape: IconShape, grow: numbe
 
   ctx.beginPath();
   if (shape.kind === 'circle') {
-    // Gefüllte Punkte (z.B. das Loch im Preisschild) wachsen im Kontur-
-    // Durchgang mit, statt eine Linie um sich herum zu bekommen.
-    ctx.arc(shape.cx, shape.cy, shape.r + (shape.filled ? grow : 0), 0, Math.PI * 2);
+    ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2);
     if (shape.filled) {
       ctx.fill();
       return;
@@ -402,15 +426,7 @@ export function drawRouteImage(canvas: HTMLCanvasElement, options: RouteImageOpt
     // kursiert, sind Ortsnamen und Notizen der Crew nichts für Fremde.
     for (const evt of events) {
       const p = project(evt);
-      drawIconShapes(
-        ctx,
-        iconShapesForEvent(evt.type, quickLogs),
-        p.x,
-        p.y,
-        EVENT_ICON_SIZE,
-        getUserColor(evt.author),
-        palette.markerHalo
-      );
+      drawEventMarker(ctx, iconShapesForEvent(evt.type, quickLogs), p.x, p.y, getUserColor(evt.author), palette);
     }
   } else {
     ctx.fillStyle = palette.emptyText;

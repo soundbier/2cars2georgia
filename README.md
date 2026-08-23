@@ -164,9 +164,12 @@ wie im Cockpit.
   React-Komponente lässt sich nicht auf ein Canvas zeichnen. Kommt ein Icon
   in der Oberfläche dazu, gehört es dort ebenfalls hinein – ein Test
   vergleicht beide Listen.
-* Gezeichnet wird jedes Symbol zweimal: breit im Kontraston, dann in der
-  Autorenfarbe darüber. Diese Kontur hält es auch quer über der Routenlinie
-  und auf dem Satelliten-Hintergrund lesbar, ohne eine Scheibe darunter.
+* Jedes Ereignis ist eine Scheibe in der Autorenfarbe mit dem Symbol in Weiß
+  darauf. Ein bloßes Strichsymbol ging auf der gemusterten Fläche unter, auch
+  mit Kontur – bei 1080 px Bildbreite steht die Linie eines Icons nur zwei
+  Pixel breit da. Weiß ist auf jedem Ton der Crew-Palette lesbar (siehe
+  `src/lib/userColors.ts`), ein Ring im Hintergrundton trennt die Scheibe vom
+  Untergrund.
 * Kein Titel und keine Notiz am Symbol: Das Bild kursiert ohne App-Kontext.
 * Route und Ereignisse teilen sich einen Bildausschnitt. Zuvor bekam jede
   Liste ihren eigenen – die Ereignisse landeten dadurch neben der Strecke,
