@@ -202,9 +202,17 @@ ein Vertipper blieb für immer stehen. Jetzt liest sie
 sondern kommen aus den Trackpunkten mit derselben Kennung (einmal gruppiert in
 `sessionStatsById`, `src/lib/trackSession.ts`).
 
-„Fahrt entfernen“ löscht nur das Dokument mit dem Namen – die aufgezeichneten
-Punkte bleiben Teil der Gesamtspur, dann eben namenlos. Das darf, wie bei den
-Punkten selbst, nur der Owner.
+Gelöscht wird in beiden Listen weich: Route und Fahrt wandern in den
+Papierkorb (`deletedAt`, siehe `src/lib/trash.ts`), sind über den
+Rückgängig-Toast sofort und unter Einstellungen → Papierkorb noch 30 Tage
+zurückzuholen. Endgültig entfernt sie erst der Papierkorb, und das darf nur
+der Owner. Der Grund ist derselbe wie bei Logbuch und Bordkasse: Der
+Löschen-Knopf sitzt auf dem Telefon direkt neben dem Stift, und eine
+abgesteckte Route ist eine Stunde Arbeit.
+
+Bei einer Fahrt betrifft das ohnehin nur die Beschriftung: Die aufgezeichneten
+Punkte bleiben in jedem Fall Teil der Gesamtspur, auch nach dem endgültigen
+Löschen – sie sind Aufzeichnung, der Eintrag ist nur ihr Name.
 
 ## Firestore-Regeln veröffentlichen
 

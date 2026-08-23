@@ -55,6 +55,12 @@ export function readFakeCollection(path: string): Array<{ id: string; data: DocD
   return collectionDocs(path);
 }
 
+/**
+ * Platzhalter für deleteField(): Ein Feld mit diesem Wert wird beim
+ * updateDoc entfernt statt gesetzt – so, wie Firestore es tut.
+ */
+const DELETED_FIELD = Symbol('deleteField');
+
 /** Die Nachbildung der von der App benutzten firebase/firestore-Funktionen. */
 export function fakeFirestoreModule() {
   return {
@@ -93,8 +99,14 @@ export function fakeFirestoreModule() {
       documents.set(ref.__path, data);
       notify();
     },
+    deleteField: () => DELETED_FIELD,
     updateDoc: async (ref: Ref, patch: DocData) => {
-      documents.set(ref.__path, { ...(documents.get(ref.__path) ?? {}), ...patch });
+      const next: DocData = { ...(documents.get(ref.__path) ?? {}) };
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === DELETED_FIELD) delete next[key];
+        else next[key] = value;
+      }
+      documents.set(ref.__path, next);
       notify();
     },
     deleteDoc: async (ref: Ref) => {

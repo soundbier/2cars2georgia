@@ -186,6 +186,29 @@ describe('Routenmenü', () => {
     expect(subtitle).toMatch(/6\d[.,]\d\s*km/);
   });
 
+  it('legt eine geplante Route in den Papierkorb und holt sie zurück', async () => {
+    seedRoute('tag-1', 'Tag 1', '2026-05-04', [
+      { id: 'a', ...PASSAU },
+      { id: 'b', ...LINZ }
+    ]);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Route löschen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+
+    await waitFor(() => expect(screen.queryByText('Tag 1')).toBeNull());
+    // Die Wegpunkte bleiben mit dem Dokument liegen, sonst wäre der Weg
+    // zurück nur der Name.
+    const [stored] = readFakeCollection(ROUTES_PATH);
+    expect(stored.data).toMatchObject({ deletedAt: expect.any(Number) });
+    expect((stored.data.waypoints as unknown[]).length).toBe(2);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+
+    await waitFor(() => expect(screen.getByText('Tag 1')).toBeTruthy());
+    expect(readFakeCollection(ROUTES_PATH)[0].data).not.toHaveProperty('deletedAt');
+  });
+
   it('schaltet die aktive Route um', () => {
     seedRoute('tag-1', 'Tag 1', '2026-05-04', [{ id: 'a', ...PASSAU }]);
     seedRoute('tag-2', 'Tag 2', '2026-05-05', [{ id: 'b', ...LINZ }]);
@@ -240,15 +263,49 @@ describe('Routenmenü', () => {
     expect(readFakeCollection(TRACK_PATH)).toHaveLength(2);
   });
 
-  it('entfernt eine Aufzeichnung nur nach Rückfrage und lässt die Punkte liegen', async () => {
+  it('legt eine Aufzeichnung nach Rückfrage in den Papierkorb und lässt die Punkte liegen', async () => {
     seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
     render(<RoutePlanner />, { wrapper: Wrapper });
 
     fireEvent.click(screen.getByRole('button', { name: 'Fahrt aus der Liste entfernen' }));
     fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
 
-    await waitFor(() => expect(readFakeCollection(SESSIONS_PATH)).toHaveLength(0));
+    await waitFor(() => expect(screen.queryByText('Fahrt 04.05., 09:30')).toBeNull());
+    // Das Dokument bleibt mit Zeitstempel liegen – der Papierkorb lebt davon.
+    const [stored] = readFakeCollection(SESSIONS_PATH);
+    expect(stored.data).toMatchObject({ name: 'Fahrt 04.05., 09:30', deletedAt: expect.any(Number) });
+    // Die Spur selbst ist keine Beschriftung und bleibt in jedem Fall.
     expect(readFakeCollection(TRACK_PATH)).toHaveLength(2);
+  });
+
+  it('holt die entfernte Aufzeichnung über den Rückgängig-Toast zurück', async () => {
+    seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fahrt aus der Liste entfernen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+
+    await waitFor(() => expect(screen.getByText('Fahrt 04.05., 09:30')).toBeTruthy());
+    expect(readFakeCollection(SESSIONS_PATH)[0].data).not.toHaveProperty('deletedAt');
+  });
+
+  it('lässt auch die Crew ohne Owner-Rolle eine Fahrt wegräumen', async () => {
+    roadtrip.role = 'member';
+    seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fahrt aus der Liste entfernen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+
+    // Rückholbar ist der Schritt ohnehin; endgültig löschen darf nur der
+    // Owner, und das erst im Papierkorb (firestore.rules).
+    await waitFor(() =>
+      expect(readFakeCollection(SESSIONS_PATH)[0].data).toMatchObject({
+        deletedAt: expect.any(Number)
+      })
+    );
   });
 
   it('bietet Read-only weder Umbenennen noch Entfernen an', () => {

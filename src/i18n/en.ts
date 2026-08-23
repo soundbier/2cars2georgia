@@ -196,8 +196,9 @@ export const en: Translations = {
   'trackSession.delete': 'Remove trip from the list',
   'trackSession.deleteTitle': 'Remove trip?',
   'trackSession.deleteDescription':
-    'Only the name goes away – the recorded points stay part of the overall track, just no longer tied to this trip.',
-  'trackSession.deleted': 'Trip removed',
+    'The trip moves to the trash and stays restorable there for 30 days. The recorded points remain part of the overall track either way.',
+  'trackSession.trashed': 'Trip moved to the trash',
+  'trackSession.restored': 'Trip restored',
   'trackSession.deleteFailed': 'The trip could not be removed.',
 
   // --- Map --------------------------------------------------------------
@@ -280,7 +281,11 @@ export const en: Translations = {
   'plan.copyName': '{name} (copy)',
   'plan.delete': 'Delete route',
   'plan.deleteTitle': 'Delete route?',
-  'plan.deleteDescription': 'The route is deleted for the whole crew. Maps already downloaded are kept.',
+  'plan.deleteDescription':
+    'The route moves to the trash for the whole crew and stays restorable there for 30 days. Maps already downloaded are kept.',
+  'plan.trashed': 'Route moved to the trash',
+  'plan.restored': 'Route restored',
+  'plan.deleteFailed': 'The route could not be deleted.',
   'plan.intro': 'Tap the map to place a waypoint. Drag points to move them, tap one to remove it.',
   'plan.removePoint': 'Remove waypoint',
   'plan.undo': 'Undo last',
@@ -572,7 +577,7 @@ export const en: Translations = {
 
   // --- Trash --------------------------------------------------------------
   'trash.title': 'Trash',
-  'trash.subtitle': 'Restore deleted entries and expenses',
+  'trash.subtitle': 'Restore deleted entries',
   'trash.section': 'Deleted ({count})',
   'trash.empty': 'Trash is empty',
   'trash.emptyHint_one': 'Deleted entries land here and stay restorable for {count} day.',

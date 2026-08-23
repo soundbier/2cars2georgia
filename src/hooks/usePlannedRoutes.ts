@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCollection } from './useCollection';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { usePermissions } from './usePermissions';
 import { trackWrite } from '../lib/pendingWrites';
+import { activeOnly } from '../lib/trash';
 import {
   createId,
   createWaypoint,
@@ -49,13 +50,22 @@ export interface PlannedRoutesState {
   rename: (route: PlannedRoute, name: string, date: string) => void;
   setWaypoints: (route: PlannedRoute, waypoints: PlannedWaypoint[]) => void;
   duplicate: (route: PlannedRoute, name: string) => PlannedRoute | null;
-  remove: (route: PlannedRoute) => void;
+  /** Legt die Route in den Papierkorb; false, wenn der Server sie nicht annimmt. */
+  remove: (route: PlannedRoute) => Promise<boolean>;
+  /** Holt sie von dort zurück – der Weg des Rückgängig-Toasts. */
+  restore: (routeId: string) => Promise<boolean>;
 }
 
 function useStoredRoutes(): PlannedRoute[] {
   const { tripId } = useRoadtrip();
   const docs = useCollection<RouteDoc>(tripId ? tripPath(tripId, COLLECTION) : null, 'updatedAt', 'desc');
-  return useMemo(() => sortRoutes(docs.map((entry) => routeFromDoc(entry.id, entry))), [docs]);
+  // Was im Papierkorb liegt, ist aus Sicht der App weg: nicht in der Liste,
+  // nicht auf der Karte, nicht im Kartendownload. Sichtbar bleibt es allein
+  // unter Einstellungen → Papierkorb (pages/settings/TrashSettings.tsx).
+  return useMemo(
+    () => sortRoutes(activeOnly(docs.map((entry) => routeFromDoc(entry.id, entry)))),
+    [docs]
+  );
 }
 
 /** Aktive Route dieses Geräts, unabhängig von der Planerseite abrufbar. */
@@ -149,13 +159,37 @@ export function usePlannedRoutes(): PlannedRoutesState {
       },
       [build, canEdit, tripId, write]
     ),
+    // Gelöscht wird weich: Der Löschen-Knopf sitzt auf dem Telefon direkt
+    // neben dem Stift, und eine abgesteckte Route ist eine Stunde Arbeit.
+    // Endgültig entfernt sie erst der Papierkorb (siehe lib/trash.ts).
     remove: useCallback(
-      (route) => {
-        if (!tripId || !canEdit) return;
+      async (route) => {
+        if (!tripId || !canEdit) return false;
         if (readActiveRouteId() === route.id) writeActiveRouteId(null);
-        trackWrite(deleteDoc(doc(db, tripPath(tripId, COLLECTION, route.id)))).catch((err) =>
-          console.error('Route konnte nicht gelöscht werden:', err)
-        );
+        try {
+          await trackWrite(
+            updateDoc(doc(db, tripPath(tripId, COLLECTION, route.id)), { deletedAt: Date.now() })
+          );
+          return true;
+        } catch (err) {
+          console.error('Route konnte nicht gelöscht werden:', err);
+          return false;
+        }
+      },
+      [canEdit, tripId]
+    ),
+    restore: useCallback(
+      async (routeId) => {
+        if (!tripId || !canEdit) return false;
+        try {
+          await trackWrite(
+            updateDoc(doc(db, tripPath(tripId, COLLECTION, routeId)), { deletedAt: deleteField() })
+          );
+          return true;
+        } catch (err) {
+          console.error('Route konnte nicht wiederhergestellt werden:', err);
+          return false;
+        }
       },
       [canEdit, tripId]
     )

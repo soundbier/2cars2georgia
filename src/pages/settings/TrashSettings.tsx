@@ -9,7 +9,9 @@ import {
   UtensilsCrossed,
   CalendarDays,
   Package,
-  ShoppingCart
+  ShoppingCart,
+  Route as RouteIcon,
+  Waypoints
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { useCollection } from '../../hooks/useCollection';
@@ -18,8 +20,11 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { writeOptimistically } from '../../lib/writeOutcome';
 import { activeOnly, deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
-import { useT } from '../../i18n';
-import { Dish, Expense, InventoryItem, LogEvent, MealPlanEntry, ShoppingListExtra } from '../../types';
+import { plannedRouteLengthMeters, routeFromDoc } from '../../lib/plannedRoute';
+import { formatDistance } from '../../lib/units';
+import { usePreferences } from '../../hooks/usePreferences';
+import { useI18n, useT } from '../../i18n';
+import { Dish, Expense, InventoryItem, LogEvent, MealPlanEntry, ShoppingListExtra, TrackSession } from '../../types';
 import {
   Button,
   Section,
@@ -34,7 +39,18 @@ import '../Settings.css';
 
 const RETENTION_DAYS = Math.round(TRASH_RETENTION_MS / (24 * 60 * 60 * 1000));
 
-type TrashCollection = 'events' | 'expenses' | 'dishes' | 'mealPlanEntries' | 'inventory' | 'shoppingListExtras';
+type TrashCollection =
+  | 'events'
+  | 'expenses'
+  | 'dishes'
+  | 'mealPlanEntries'
+  | 'inventory'
+  | 'shoppingListExtras'
+  | 'plannedRoutes'
+  | 'trackSessions';
+
+/** Wie eine geplante Route aus Firestore hereinkommt (siehe lib/plannedRoute.ts). */
+type PlannedRouteDoc = Record<string, unknown> & { id: string };
 
 const ICON_BY_COLLECTION: Record<TrashCollection, typeof BookOpen> = {
   events: BookOpen,
@@ -42,7 +58,9 @@ const ICON_BY_COLLECTION: Record<TrashCollection, typeof BookOpen> = {
   dishes: UtensilsCrossed,
   mealPlanEntries: CalendarDays,
   inventory: Package,
-  shoppingListExtras: ShoppingCart
+  shoppingListExtras: ShoppingCart,
+  plannedRoutes: Waypoints,
+  trackSessions: RouteIcon
 };
 
 interface TrashItem {
@@ -60,7 +78,9 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
   const { tripId, isAdmin } = useRoadtrip();
   const { canEdit } = usePermissions(currentUser);
   const quickLogs = useQuickLogs();
+  const { preferences } = usePreferences();
   const { notify } = useToast();
+  const { locale } = useI18n();
   const t = useT();
   const [purgeTarget, setPurgeTarget] = useState<PurgeTarget | null>(null);
 
@@ -76,6 +96,17 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
   const shoppingListExtras = useCollection<ShoppingListExtra>(
     tripId ? tripPath(tripId, 'shoppingListExtras') : null,
     'timestamp',
+    'desc'
+  );
+
+  const plannedRoutes = useCollection<PlannedRouteDoc>(
+    tripId ? tripPath(tripId, 'plannedRoutes') : null,
+    'updatedAt',
+    'desc'
+  );
+  const trackSessions = useCollection<TrackSession>(
+    tripId ? tripPath(tripId, 'trackSessions') : null,
+    'startedAt',
     'desc'
   );
 
@@ -134,15 +165,55 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
       deletedAt: extra.deletedAt!
     }));
 
+    // Geplante Routen tragen ihren Namen selten – dann sagt die Länge mehr
+    // als „Ohne Namen" allein.
+    const deletedRoutes = deletedOnly(
+      plannedRoutes.map((entry) => routeFromDoc(entry.id, entry))
+    ).map<TrashItem>((route) => ({
+      id: route.id,
+      collectionName: 'plannedRoutes',
+      title: route.name || t('plan.unnamed'),
+      subtitle: `${t('plan.points', { count: route.waypoints.length })} · ${formatDistance(
+        plannedRouteLengthMeters(route.waypoints) / 1000,
+        preferences.unitSystem
+      )}`,
+      deletedAt: route.deletedAt!
+    }));
+
+    // Die Trackpunkte der Fahrt bleiben auf der Karte, gelöscht ist nur ihr
+    // Name – deshalb hier bewusst ohne Strecke, die ist nicht weg.
+    const deletedSessions = deletedOnly(trackSessions).map<TrashItem>((session) => ({
+      id: session.id!,
+      collectionName: 'trackSessions',
+      title: session.name,
+      subtitle: `${new Date(session.startedAt).toLocaleDateString(locale)} · ${session.author}`,
+      deletedAt: session.deletedAt!
+    }));
+
     return [
       ...deletedEvents,
       ...deletedExpenses,
       ...deletedDishes,
       ...deletedMealPlanEntries,
       ...deletedInventory,
-      ...deletedExtras
+      ...deletedExtras,
+      ...deletedRoutes,
+      ...deletedSessions
     ].sort((a, b) => b.deletedAt - a.deletedAt);
-  }, [events, expenses, dishes, mealPlanEntries, inventory, shoppingListExtras, quickLogs, t]);
+  }, [
+    events,
+    expenses,
+    dishes,
+    mealPlanEntries,
+    inventory,
+    shoppingListExtras,
+    plannedRoutes,
+    trackSessions,
+    preferences.unitSystem,
+    locale,
+    quickLogs,
+    t
+  ]);
 
   const expiredCount = useMemo(() => items.filter((item) => isExpired(item)).length, [items]);
 
