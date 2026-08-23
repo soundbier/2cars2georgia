@@ -190,6 +190,22 @@ export const de = {
   'trackSession.skip': 'Ohne Namen',
   'trackSession.saved': '„{name}“ gespeichert',
   'trackSession.saveFailed': 'Aufzeichnung konnte nicht gespeichert werden.',
+  'trackSession.listTitle': 'Aufgezeichnete Fahrten',
+  'trackSession.emptyTitle': 'Noch keine Fahrt gespeichert',
+  'trackSession.emptyHint':
+    'Nach dem Stoppen einer Tour im Cockpit lässt sie sich benennen – benannte Fahrten stehen danach hier.',
+  'trackSession.listHint':
+    'Der Name ist reine Beschriftung: Umbenennen und Löschen lassen die aufgezeichneten Punkte unberührt.',
+  'trackSession.rename': 'Fahrt umbenennen',
+  'trackSession.renameTitle': 'Fahrt umbenennen',
+  'trackSession.renamed': 'Fahrt heißt jetzt „{name}“',
+  'trackSession.renameFailed': 'Fahrt konnte nicht umbenannt werden.',
+  'trackSession.delete': 'Fahrt aus der Liste entfernen',
+  'trackSession.deleteTitle': 'Fahrt entfernen?',
+  'trackSession.deleteDescription':
+    'Nur der Name verschwindet – die aufgezeichneten Punkte bleiben Teil der Gesamtspur, dann ohne Zuordnung zu dieser Fahrt.',
+  'trackSession.deleted': 'Fahrt entfernt',
+  'trackSession.deleteFailed': 'Fahrt konnte nicht entfernt werden.',
 
   // --- Karte ------------------------------------------------------------
   'map.currentPosition': 'Aktuelle Position ({name})',
@@ -246,11 +262,11 @@ export const de = {
   'map.offlineSourceTrack': 'aufgezeichnetem Track',
 
   // --- Routenplaner -----------------------------------------------------
-  'plan.title': 'Routenplaner',
-  'plan.subtitle': 'Tagesrouten vorher abstecken, unterwegs die passende aktivieren',
+  'plan.title': 'Routen',
+  'plan.subtitle': 'Tagesrouten abstecken, gefahrene Aufzeichnungen benennen',
   'plan.sharedHint':
     'Die Routen gehören zum Roadtrip: Am Rechner angelegte Routen sind auf jedem Gerät der Crew da. Welche Route aktiv ist, entscheidet jedes Gerät für sich.',
-  'plan.routes': 'Gespeicherte Routen',
+  'plan.planned': 'Geplante Routen',
   'plan.addTitle': 'Neue Route',
   'plan.add': 'Route anlegen',
   'plan.namePlaceholder': 'Name, z. B. Tag 3: Passau – Linz',
@@ -261,8 +277,12 @@ export const de = {
   'plan.active': 'aktiv',
   'plan.activate': 'Für die Karte aktivieren',
   'plan.deactivate': 'Nicht mehr auf der Karte verwenden',
-  'plan.edit': 'Route abstecken',
+  'plan.stake': 'Route abstecken',
   'plan.editTitle': 'Abstecken: {name}',
+  'plan.rename': 'Route bearbeiten',
+  'plan.renameTitle': 'Route bearbeiten',
+  'plan.nameLabel': 'Name der Route',
+  'plan.dateLabel': 'Tag der Route',
   'plan.duplicate': 'Route kopieren',
   'plan.copyName': '{name} (Kopie)',
   'plan.delete': 'Route löschen',

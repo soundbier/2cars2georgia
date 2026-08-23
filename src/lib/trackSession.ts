@@ -62,3 +62,40 @@ export function sessionStartParts(startedAt: number, locale: string): { date: st
 
 /** Höchstlänge des Namens – identisch zur Prüfung in firestore.rules. */
 export const SESSION_NAME_MAX_LENGTH = 120;
+
+/**
+ * Kennzahlen aller Aufzeichnungen auf einmal, nach Kennung abrufbar.
+ *
+ * Für die Liste der Fahrten (siehe pages/RoutePlanner.tsx) reicht
+ * `pointsOfSession` nicht: Es filterte die gesamte Spur einmal je Fahrt und
+ * damit bei zwanzig Aufzeichnungen zwanzigmal durch zehntausende Punkte. Hier
+ * wird stattdessen ein einziges Mal gruppiert.
+ *
+ * Punkte ohne `sessionId` gehören zur namenlosen Grundspur und bleiben außen
+ * vor – sie lassen sich keiner benannten Fahrt zuordnen.
+ */
+export function sessionStatsById(points: GpsPoint[]): Map<string, TrackSessionStats> {
+  const grouped = new Map<string, GpsPoint[]>();
+  for (const point of points) {
+    if (!point.sessionId) continue;
+    const bucket = grouped.get(point.sessionId);
+    if (bucket) bucket.push(point);
+    else grouped.set(point.sessionId, [point]);
+  }
+
+  const stats = new Map<string, TrackSessionStats>();
+  for (const [sessionId, bucket] of grouped) {
+    // Strecke und Dauer hängen an der Reihenfolge: Die Punkte kommen zwar
+    // sortiert aus Firestore, der Puffer kann sie aber nachliefern.
+    bucket.sort((a, b) => a.timestamp - b.timestamp);
+    stats.set(sessionId, trackSessionStats(bucket));
+  }
+  return stats;
+}
+
+/** Leere Kennzahlen – für eine Aufzeichnung, deren Punkte (noch) fehlen. */
+export const EMPTY_SESSION_STATS: TrackSessionStats = {
+  pointCount: 0,
+  distanceKm: 0,
+  durationMs: 0
+};

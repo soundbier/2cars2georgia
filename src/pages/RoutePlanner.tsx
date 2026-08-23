@@ -1,19 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { MapContainer } from 'react-leaflet';
-import { Check, Copy, MapPin, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Check, Copy, MapPin, Pencil, Plus, Route as RouteIcon, Trash2, Undo2, Waypoints } from 'lucide-react';
 import { OfflineTileLayer } from '../components/OfflineTileLayer';
 import { RouteEditorLayer, useRouteEditor } from '../components/RoutePlanner';
+import { RouteEditDialog } from '../components/RouteEditDialog';
+import { useCollection } from '../hooks/useCollection';
 import { usePlannedRoutes } from '../hooks/usePlannedRoutes';
+import { useTrackSessions } from '../hooks/useTrackSessions';
 import { usePreferences } from '../hooks/usePreferences';
+import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
 import { getBaseLayer } from '../lib/mapLayers';
 import { readMapView } from '../lib/mapView';
 import { formatDistance } from '../lib/units';
+import { formatDuration } from '../lib/tripStats';
+import { EMPTY_SESSION_STATS, sessionStatsById, SESSION_NAME_MAX_LENGTH } from '../lib/trackSession';
 import {
   findRoute,
   PlannedRoute,
   plannedRouteLengthMeters,
   PlannedWaypoint
 } from '../lib/plannedRoute';
+import { GpsPoint, TrackSession } from '../types';
 import { useI18n, useT } from '../i18n';
 import {
   Button,
@@ -23,7 +30,8 @@ import {
   Input,
   ListItem,
   PageHeader,
-  Section
+  Section,
+  useToast
 } from '../components/ui';
 import 'leaflet/dist/leaflet.css';
 import './Settings.css';
@@ -37,114 +45,70 @@ function todayIso(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-/** Wartezeit nach dem letzten Tastendruck, bevor der Name gespeichert wird. */
-const NAME_SAVE_DELAY_MS = 600;
-
 /**
- * Der Name der bearbeiteten Route, während getippt wird.
+ * Routenmenü: geplante Routen und gefahrene Aufzeichnungen an einem Ort.
  *
- * Jeden Tastendruck sofort zu speichern ging nicht: Der Speicher kürzt
- * Leerraum am Rand weg, sodass sich am Wortende gar kein Leerzeichen tippen
- * ließ – und jeder Buchstabe wäre ein eigener Schreibvorgang im Roadtrip.
- * Getippt wird deshalb lokal; gespeichert wird kurz nach dem letzten
- * Tastendruck und sobald das Feld verlassen wird.
- */
-function useNameDraft(route: PlannedRoute | null, save: (route: PlannedRoute, name: string) => void) {
-  const [draft, setDraft] = useState(route?.name ?? '');
-  const routeRef = useRef(route);
-  routeRef.current = route;
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cancel = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-
-  const store = useCallback(
-    (value: string) => {
-      const current = routeRef.current;
-      if (current && current.name !== value.trim()) save(current, value);
-    },
-    [save]
-  );
-
-  // Andere Route geöffnet: Entwurf frisch aus dem Speicher. Absichtlich nur
-  // an der Kennung hängend – bei jeder Namensänderung würde er sich sonst
-  // mitten im Tippen selbst überschreiben.
-  const routeId = route?.id ?? null;
-  useEffect(() => {
-    cancel();
-    setDraft(routeRef.current?.name ?? '');
-  }, [routeId]);
-
-  // Beim Verlassen der Seite den letzten Stand nicht verlieren.
-  useEffect(() => cancel, []);
-
-  return {
-    value: draft,
-    onChange: (value: string) => {
-      setDraft(value);
-      cancel();
-      timer.current = setTimeout(() => store(value), NAME_SAVE_DELAY_MS);
-    },
-    /** Speichert sofort – beim Verlassen des Feldes und wenn der Editor zugeht. */
-    flush: () => {
-      cancel();
-      store(draft);
-    }
-  };
-}
-
-/**
- * Routenplaner: Tagesrouten anlegen, abstecken und für unterwegs auswählen.
+ * Erreichbar über das "Mehr"-Dropup neben Kombüse und Einstellungen – hier
+ * wird verwaltet, nicht navigiert; das passiert typischerweise vorher am
+ * großen Bildschirm oder abends im Hafen, nicht während der Fahrt.
  *
- * Erreichbar über das "Mehr"-Dropup neben Kombüse und Einstellungen – die
- * Planung passiert typischerweise vorher am großen Bildschirm, nicht während
- * der Fahrt. Die Routen gehören zum Roadtrip, sind also auf allen Geräten der
- * Crew da; welche davon aktiv ist, entscheidet jedes Gerät für sich. Unterwegs
- * wird auf dem Kartentab nur noch die aktive Route angezeigt und ihr
- * Kartenraster geladen (siehe components/OfflineMapDownload).
+ * Zwei Listen, die sich bewusst unterscheiden:
+ *
+ * * **Geplante Routen** (`roadtrips/{tripId}/plannedRoutes`) sind Absicht:
+ *   Wegpunkte, die von Hand abgesteckt werden. Sie gehören dem Roadtrip, sind
+ *   also auf allen Geräten der Crew da; welche davon aktiv ist, entscheidet
+ *   jedes Gerät für sich. Unterwegs wird auf dem Kartentab nur noch die aktive
+ *   Route gezeichnet und ihr Kartenraster geladen (siehe
+ *   components/OfflineMapDownload).
+ * * **Aufgezeichnete Fahrten** (`roadtrips/{tripId}/trackSessions`) sind
+ *   Vergangenheit: alles zwischen „Tour starten" und „Tour stoppen", benannt
+ *   beim Speichern (components/TrackSessionDialog.tsx). Änderbar ist an ihnen
+ *   nur der Name – Start, Ende und Strecke sind Aufzeichnung, keine
+ *   Beschriftung. Bis hierher gab es dafür überhaupt keine Stelle: Wer sich
+ *   beim Speichern vertippt hatte, blieb darauf sitzen.
+ *
+ * Beide Listen benennen über denselben Dialog um (components/RouteEditDialog).
  */
 export default function RoutePlanner() {
   const t = useT();
   const { locale } = useI18n();
   const { preferences } = usePreferences();
+  const { notify } = useToast();
+  const { tripId } = useRoadtrip();
   const planner = usePlannedRoutes();
   const { routes } = planner;
+  const recordings = useTrackSessions();
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [stakingId, setStakingId] = useState<string | null>(null);
+  const [editRouteId, setEditRouteId] = useState<string | null>(null);
+  const [deleteRouteId, setDeleteRouteId] = useState<string | null>(null);
+  const [editSessionId, setEditSessionId] = useState<string | null>(null);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [date, setDate] = useState(todayIso());
 
-  const editing = findRoute(routes, editingId);
+  const staking = findRoute(routes, stakingId);
   const writeWaypoints = useCallback(
     (next: PlannedWaypoint[]) => {
-      if (editing) planner.setWaypoints(editing, next);
+      if (staking) planner.setWaypoints(staking, next);
     },
-    [editing, planner]
+    [staking, planner]
   );
-  const editor = useRouteEditor(editing?.waypoints ?? [], writeWaypoints);
-
-  const saveName = useCallback(
-    (route: PlannedRoute, value: string) => planner.rename(route, value, route.date),
-    [planner]
-  );
-  const nameDraft = useNameDraft(editing, saveName);
-
-  const closeEditor = () => {
-    nameDraft.flush();
-    setEditingId(null);
-  };
+  const editor = useRouteEditor(staking?.waypoints ?? [], writeWaypoints);
 
   const baseLayer = getBaseLayer(preferences.baseLayer);
   // Beim Einhängen einmal gelesen (MapContainer wertet center/zoom nur initial
   // aus): am liebsten dort, wo die bearbeitete Route beginnt.
   const [fallbackView] = useState(readMapView);
-  const start = editing?.waypoints[0];
+  const start = staking?.waypoints[0];
   const center: [number, number] = start
     ? [start.lat, start.lng]
     : [fallbackView.lat, fallbackView.lng];
+
+  // Strecke und Dauer einer Fahrt stehen nicht in ihrem Dokument, sondern in
+  // den Punkten mit derselben Kennung – einmal gruppiert für alle Fahrten.
+  const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
+  const statsById = useMemo(() => sessionStatsById(track), [track]);
 
   const routeLabel = useCallback(
     (route: PlannedRoute) => route.name || t('plan.unnamed'),
@@ -167,45 +131,66 @@ export default function RoutePlanner() {
     const route = planner.create(name, date);
     if (!route) return;
     setName('');
-    setEditingId(route.id);
+    setStakingId(route.id);
   };
 
   const handleDuplicate = (route: PlannedRoute) => {
     const copy = planner.duplicate(route, t('plan.copyName', { name: routeLabel(route) }));
-    if (copy) setEditingId(copy.id);
+    if (copy) setStakingId(copy.id);
   };
 
-  const confirmDelete = () => {
-    const route = findRoute(routes, deleteId);
+  const confirmDeleteRoute = () => {
+    const route = findRoute(routes, deleteRouteId);
     if (route) {
-      if (editingId === route.id) setEditingId(null);
+      if (stakingId === route.id) setStakingId(null);
       planner.remove(route);
     }
-    setDeleteId(null);
+    setDeleteRouteId(null);
+  };
+
+  const editingRoute = findRoute(routes, editRouteId);
+  const findSession = (id: string | null) =>
+    id ? (recordings.sessions.find((entry) => entry.id === id) ?? null) : null;
+  const editingSession = findSession(editSessionId);
+  const deletingSession = findSession(deleteSessionId);
+
+  const handleRenameSession = async (session: TrackSession, value: string) => {
+    setEditSessionId(null);
+    const saved = await recordings.rename(session, value);
+    notify(
+      saved ? t('trackSession.renamed', { name: value.trim() }) : t('trackSession.renameFailed'),
+      saved ? 'success' : 'danger'
+    );
+  };
+
+  const confirmDeleteSession = async () => {
+    const session = deletingSession;
+    setDeleteSessionId(null);
+    if (!session) return;
+    const removed = await recordings.remove(session);
+    notify(
+      removed ? t('trackSession.deleted') : t('trackSession.deleteFailed'),
+      removed ? 'success' : 'danger'
+    );
+  };
+
+  /** Datum und Uhrzeit einer Fahrt – die Fahrt trägt ihren Tag im Start. */
+  const sessionWhen = (session: TrackSession) => {
+    const started = new Date(session.startedAt);
+    return `${started.toLocaleDateString(locale, {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short'
+    })}, ${started.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`;
   };
 
   return (
     <div className="settings-page">
       <PageHeader title={t('plan.title')} subtitle={t('plan.subtitle')} />
 
-      {/* Die Überschrift folgt dem Getippten, nicht erst dem Gespeicherten. */}
-      {editing && planner.canEdit && (
-        <Section title={t('plan.editTitle', { name: nameDraft.value.trim() || t('plan.unnamed') })}>
+      {staking && planner.canEdit && (
+        <Section title={t('plan.editTitle', { name: routeLabel(staking) })}>
           <div className="stack">
-            <div className="row">
-              <Input
-                value={nameDraft.value}
-                placeholder={t('plan.namePlaceholder')}
-                onChange={(e) => nameDraft.onChange(e.target.value)}
-                onBlur={nameDraft.flush}
-              />
-              <Input
-                type="date"
-                value={editing.date}
-                onChange={(e) => planner.rename(editing, nameDraft.value, e.target.value)}
-              />
-            </div>
-
             <p className="helper-text">{t('plan.intro')}</p>
 
             <MapContainer
@@ -258,14 +243,14 @@ export default function RoutePlanner() {
               </Button>
             </div>
 
-            <Button fullWidth onClick={closeEditor}>
+            <Button fullWidth onClick={() => setStakingId(null)}>
               <Check size={16} /> {t('plan.done')}
             </Button>
           </div>
         </Section>
       )}
 
-      <Section title={t('plan.routes')}>
+      <Section title={t('plan.planned')}>
         {routes.length === 0 ? (
           <EmptyState
             icon={<MapPin size={20} strokeWidth={1.75} />}
@@ -303,13 +288,19 @@ export default function RoutePlanner() {
                       {planner.canEdit && (
                         <>
                           <IconButton
-                            label={t('plan.edit')}
-                            onClick={() => {
-                              nameDraft.flush();
-                              setEditingId(editingId === route.id ? null : route.id);
-                            }}
+                            label={t('plan.rename')}
+                            onClick={() => setEditRouteId(route.id)}
                           >
                             <Pencil size={18} />
+                          </IconButton>
+                          <IconButton
+                            tone={stakingId === route.id ? 'accent' : 'default'}
+                            label={t('plan.stake')}
+                            onClick={() =>
+                              setStakingId(stakingId === route.id ? null : route.id)
+                            }
+                          >
+                            <Waypoints size={18} />
                           </IconButton>
                           <IconButton
                             label={t('plan.duplicate')}
@@ -320,7 +311,7 @@ export default function RoutePlanner() {
                           <IconButton
                             tone="danger"
                             label={t('plan.delete')}
-                            onClick={() => setDeleteId(route.id)}
+                            onClick={() => setDeleteRouteId(route.id)}
                           >
                             <Trash2 size={18} />
                           </IconButton>
@@ -358,14 +349,102 @@ export default function RoutePlanner() {
         </Section>
       )}
 
+      <Section title={t('trackSession.listTitle')}>
+        {recordings.sessions.length === 0 ? (
+          <EmptyState
+            icon={<RouteIcon size={20} strokeWidth={1.75} />}
+            title={t('trackSession.emptyTitle')}
+            hint={t('trackSession.emptyHint')}
+          />
+        ) : (
+          <div className="settings-list">
+            {recordings.sessions.map((session) => {
+              const stats = statsById.get(session.id ?? '') ?? EMPTY_SESSION_STATS;
+              return (
+                <ListItem
+                  key={session.id}
+                  title={session.name}
+                  subtitle={`${sessionWhen(session)} · ${formatDuration(
+                    stats.durationMs
+                  )} · ${formatDistance(stats.distanceKm, preferences.unitSystem)} · ${session.author}`}
+                  trailing={
+                    <div className="route-planner-actions">
+                      {recordings.canEdit && (
+                        <IconButton
+                          label={t('trackSession.rename')}
+                          onClick={() => setEditSessionId(session.id ?? null)}
+                        >
+                          <Pencil size={18} />
+                        </IconButton>
+                      )}
+                      {recordings.canDelete && (
+                        <IconButton
+                          tone="danger"
+                          label={t('trackSession.delete')}
+                          onClick={() => setDeleteSessionId(session.id ?? null)}
+                        >
+                          <Trash2 size={18} />
+                        </IconButton>
+                      )}
+                    </div>
+                  }
+                />
+              );
+            })}
+          </div>
+        )}
+
+        <p className="helper-text">{t('trackSession.listHint')}</p>
+      </Section>
+
+      {editingRoute && (
+        <RouteEditDialog
+          key={editingRoute.id}
+          title={t('plan.renameTitle')}
+          nameLabel={t('plan.nameLabel')}
+          name={editingRoute.name}
+          placeholder={t('plan.namePlaceholder')}
+          date={editingRoute.date}
+          dateLabel={t('plan.dateLabel')}
+          requireName={false}
+          onSave={({ name: value, date: day }) => {
+            planner.rename(editingRoute, value, day);
+            setEditRouteId(null);
+          }}
+          onCancel={() => setEditRouteId(null)}
+        />
+      )}
+
+      {editingSession && (
+        <RouteEditDialog
+          key={editingSession.id}
+          title={t('trackSession.renameTitle')}
+          nameLabel={t('trackSession.nameLabel')}
+          name={editingSession.name}
+          maxLength={SESSION_NAME_MAX_LENGTH}
+          onSave={({ name: value }) => handleRenameSession(editingSession, value)}
+          onCancel={() => setEditSessionId(null)}
+        />
+      )}
+
       <ConfirmDialog
-        open={deleteId !== null}
+        open={deleteRouteId !== null}
         title={t('plan.deleteTitle')}
         description={t('plan.deleteDescription')}
         confirmLabel={t('common.delete')}
         destructive
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteId(null)}
+        onConfirm={confirmDeleteRoute}
+        onCancel={() => setDeleteRouteId(null)}
+      />
+
+      <ConfirmDialog
+        open={deletingSession !== null}
+        title={t('trackSession.deleteTitle')}
+        description={t('trackSession.deleteDescription')}
+        confirmLabel={t('common.delete')}
+        destructive
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setDeleteSessionId(null)}
       />
     </div>
   );

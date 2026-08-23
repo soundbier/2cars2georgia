@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { newSessionId, pointsOfSession, sessionStartParts, trackSessionStats } from './trackSession';
+import {
+  newSessionId,
+  pointsOfSession,
+  sessionStartParts,
+  sessionStatsById,
+  trackSessionStats
+} from './trackSession';
 import { GpsPoint } from '../types';
 
 const NOW = 1_770_000_000_000;
@@ -67,5 +73,31 @@ describe('sessionStartParts', () => {
     const parts = sessionStartParts(Date.UTC(2026, 4, 4, 9, 30), 'de-DE');
     expect(parts.date).toMatch(/^\d{2}\.\d{2}\.?$/);
     expect(parts.time).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe('sessionStatsById', () => {
+  const points = [
+    // Absichtlich durcheinander: Der Ausgangspuffer liefert Punkte nach, die
+    // zeitlich vor den bereits geschriebenen liegen.
+    point({ timestamp: NOW + 600_000, lat: 52.53, sessionId: 'a' }),
+    point({ timestamp: NOW, sessionId: 'a' }),
+    point({ timestamp: NOW + 60_000, sessionId: 'b' }),
+    // Punkt aus der Zeit vor den benannten Aufzeichnungen.
+    point({ timestamp: NOW + 120_000 })
+  ];
+
+  it('rechnet jede Aufzeichnung einzeln aus, in zeitlicher Reihenfolge', () => {
+    const stats = sessionStatsById(points);
+
+    expect(stats.get('a')?.pointCount).toBe(2);
+    expect(stats.get('a')?.durationMs).toBe(600_000);
+    expect(stats.get('a')?.distanceKm).toBeGreaterThan(1);
+    expect(stats.get('b')?.pointCount).toBe(1);
+    expect(stats.get('b')?.durationMs).toBe(0);
+  });
+
+  it('ordnet Punkte ohne Kennung keiner Aufzeichnung zu', () => {
+    expect([...sessionStatsById(points).keys()].sort()).toEqual(['a', 'b']);
   });
 });

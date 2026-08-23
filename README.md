@@ -96,6 +96,10 @@ Dauer, Strecke und Punktzahl genau dieser Fahrt und einem Namensvorschlag
   dieser Funktion.
 * Umbenennen ist erlaubt (der Name ist Beschriftung, keine Aufzeichnung),
   endgültiges Löschen bleibt wie bei den Trackpunkten dem Owner vorbehalten.
+  Beides geht nachträglich im Routenmenü (siehe unten); `firestore.rules`
+  lässt beim Ändern ausschließlich das Feld `name` zu – Start, Ende, Autor
+  und `authorId` müssen unverändert wiederkommen. Genau deshalb darf auch
+  jemand anderes als die aufzeichnende Person einen Vertipper richtigstellen.
 
 ## Aufzeichnung ohne Netz und über Neustarts hinweg
 
@@ -175,6 +179,33 @@ wie im Cockpit.
   Liste ihren eigenen – die Ereignisse landeten dadurch neben der Strecke,
   an der sie protokolliert wurden.
 
+## Routenmenü
+
+Unter Mehr → Routen stehen die beiden Arten von Route nebeneinander, weil sie
+im Kopf dasselbe sind und in den Daten nicht:
+
+* **Geplante Routen** (`roadtrips/{tripId}/plannedRoutes`) sind Absicht –
+  von Hand abgesteckte Wegpunkte, siehe „Offline-Karten“ weiter unten.
+* **Aufgezeichnete Fahrten** (`roadtrips/{tripId}/trackSessions`) sind
+  Vergangenheit – benannt beim Stoppen der Tour.
+
+Beide lassen sich nachträglich über denselben Dialog umbenennen
+(`src/components/RouteEditDialog.tsx`): bei der geplanten Route Name und Tag,
+bei der Fahrt nur der Name. Umbenannt wird aus der Liste heraus, ohne dass die
+Karte aufgeht – abgesteckt wird weiterhin auf der Karte, das ist ein eigener
+Knopf.
+
+Für die Fahrten war das bis dahin gar nicht möglich: Die Dokumente wurden
+einmal beim Speichern geschrieben und danach von keiner Seite mehr gelesen –
+ein Vertipper blieb für immer stehen. Jetzt liest sie
+`src/hooks/useTrackSessions.ts`; Dauer und Strecke stehen nicht im Dokument,
+sondern kommen aus den Trackpunkten mit derselben Kennung (einmal gruppiert in
+`sessionStatsById`, `src/lib/trackSession.ts`).
+
+„Fahrt entfernen“ löscht nur das Dokument mit dem Namen – die aufgezeichneten
+Punkte bleiben Teil der Gesamtspur, dann eben namenlos. Das darf, wie bei den
+Punkten selbst, nur der Owner.
+
 ## Firestore-Regeln veröffentlichen
 
 `firestore.rules` liegt im Repo, wird aber von keinem Workflow ausgerollt.
@@ -198,7 +229,7 @@ Die Karte lädt Kacheln weiterhin von den Diensten aus `src/lib/mapLayers.ts`.
 Zusätzlich lassen sich Bereiche entlang der Route für die Fahrt ohne Netz
 mitnehmen:
 
-* Unter Mehr → Routenplaner (`src/pages/RoutePlanner.tsx`) lassen sich Routen
+* Unter Mehr → Routen (`src/pages/RoutePlanner.tsx`) lassen sich Routen
   je Tag anlegen, benennen, kopieren und abstecken: Ein Tipp auf die Karte
   setzt einen Wegpunkt, Punkte lassen sich ziehen, ein Tipp darauf entfernt
   sie wieder. Genau eine Route ist aktiv – sie wird auf dem Kartentab
