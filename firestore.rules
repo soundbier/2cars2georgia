@@ -309,8 +309,9 @@ service cloud.firestore {
       // sich hier weder prüfen noch aktuell halten.
       match /trackSessions/{sessionId} {
         function isTrackSession() {
-          return fieldsAre(['name', 'startedAt', 'endedAt', 'author'], ['authorId'])
+          return fieldsAre(['name', 'startedAt', 'endedAt', 'author'], ['authorId', 'deletedAt'])
             && isText('name', 120)
+            && isOptionalEpochMillis('deletedAt')
             && isEpochMillis('startedAt')
             && isEpochMillis('endedAt')
             && data().endedAt >= data().startedAt
@@ -318,25 +319,28 @@ service cloud.firestore {
             && isOptionalAuthorId();
         }
 
-        // Beim Umbenennen darf sich ausschließlich der Name ändern. Deshalb
-        // hier eine eigene Prüfung statt isTrackSession(): Die dortige
-        // isOptionalAuthorId() verlangt die eigene UID und ließe damit
-        // niemanden die Fahrt einer anderen Person richtigstellen, obwohl
-        // genau das erlaubt sein soll – die authorId sagt, wer gefahren ist,
-        // nicht wer zuletzt getippt hat.
-        function renamesTrackSessionOnly() {
-          return fieldsAre(['name', 'startedAt', 'endedAt', 'author'], ['authorId'])
+        // Nachträglich änderbar sind genau zwei Dinge: der Name und der
+        // Papierkorb-Zeitstempel. Deshalb hier eine eigene Prüfung statt
+        // isTrackSession(): Die dortige isOptionalAuthorId() verlangt die
+        // eigene UID und ließe damit niemanden die Fahrt einer anderen Person
+        // richtigstellen oder wegräumen, obwohl genau das erlaubt sein soll –
+        // die authorId sagt, wer gefahren ist, nicht wer zuletzt getippt hat.
+        function editsTrackSessionLabelOnly() {
+          return fieldsAre(['name', 'startedAt', 'endedAt', 'author'], ['authorId', 'deletedAt'])
             && isText('name', 120)
+            && isOptionalEpochMillis('deletedAt')
             // Start, Ende, Autor (und die authorId) kommen unverändert zurück.
-            && data().diff(resource.data).affectedKeys().hasOnly(['name']);
+            && data().diff(resource.data).affectedKeys().hasOnly(['name', 'deletedAt']);
         }
 
         allow read: if isMember();
         allow create: if canWrite() && isTrackSession();
-        // Umbenennen bleibt erlaubt: Der Name ist reine Beschriftung, anders
-        // als die Trackpunkte selbst ist er keine Aufzeichnung. Alles andere
-        // am Dokument ist Aufzeichnung und bleibt, wie es war.
-        allow update: if canWrite() && renamesTrackSessionOnly();
+        // Umbenennen und in den Papierkorb legen bleiben erlaubt: Beides
+        // betrifft nur die Beschriftung, anders als die Trackpunkte selbst
+        // ist sie keine Aufzeichnung. Alles andere am Dokument ist
+        // Aufzeichnung und bleibt, wie es war.
+        allow update: if canWrite() && editsTrackSessionLabelOnly();
+        // Endgültig entfernen nur der Owner, über den Papierkorb.
         allow delete: if isOwner();
       }
 
@@ -506,7 +510,9 @@ service cloud.firestore {
       // steht gar nicht hier, sondern gerätelokal (src/lib/plannedRoute.ts).
       match /plannedRoutes/{routeId} {
         function isPlannedRoute() {
-          return fieldsAre(['waypoints', 'updatedAt'], ['name', 'date', 'author', 'authorId'])
+          return fieldsAre(['waypoints', 'updatedAt'],
+                           ['name', 'date', 'author', 'authorId', 'deletedAt'])
+            && isOptionalEpochMillis('deletedAt')
             && data().waypoints is list
             && data().waypoints.size() <= 500
             && isEpochMillis('updatedAt')
@@ -519,8 +525,10 @@ service cloud.firestore {
         }
 
         allow read: if isMember();
+        // Der Papierkorb (deletedAt) ist der Weg für die Crew; endgültig
+        // entfernen darf nur der Owner – wie bei Logbuch und Bordkasse.
         allow create, update: if canWrite() && isPlannedRoute();
-        allow delete: if canWrite();
+        allow delete: if isOwner();
       }
 
       // --- Roadtrip-weite Einstellungen ------------------------------------

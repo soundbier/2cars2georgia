@@ -117,6 +117,8 @@ export interface TrackSession {
   author: string;
   /** UID der Person, die aufgezeichnet hat, siehe firestore.rules. */
   authorId?: string;
+  /** Im Papierkorb seit diesem Zeitpunkt, siehe lib/trash.ts. */
+  deletedAt?: number;
 }
 
 export interface LogEvent extends Coordinates {

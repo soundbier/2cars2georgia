@@ -1,11 +1,12 @@
-import { useCallback } from 'react';
-import { deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { useCallback, useMemo } from 'react';
+import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCollection } from './useCollection';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { usePermissions } from './usePermissions';
 import { trackWrite } from '../lib/pendingWrites';
 import { SESSION_NAME_MAX_LENGTH } from '../lib/trackSession';
+import { activeOnly } from '../lib/trash';
 import { TrackSession } from '../types';
 
 /**
@@ -19,6 +20,11 @@ import { TrackSession } from '../types';
  * Was hier änderbar ist, ist ausschließlich der Name: Start, Ende und
  * Autor beschreiben die gefahrene Strecke und sind keine Beschriftung.
  * firestore.rules setzt genau das durch.
+ *
+ * Löschen legt die Fahrt in den Papierkorb, statt sie sofort zu entfernen –
+ * dieselbe Aufbewahrung wie bei Logbuch und Reisekasse (lib/trash.ts). Die
+ * Trackpunkte selbst bleiben in jedem Fall liegen: Sie sind Teil der
+ * durchgehenden Spur, der Eintrag hier ist nur ihre Beschriftung.
  */
 
 const COLLECTION = 'trackSessions';
@@ -26,24 +32,27 @@ const COLLECTION = 'trackSessions';
 export interface TrackSessionsState {
   /** Aufzeichnungen des Roadtrips, die zuletzt gefahrene zuerst. */
   sessions: TrackSession[];
-  /** false für Read-only: nichts umbenennen. */
+  /** false für Read-only: nichts umbenennen, nichts löschen. */
   canEdit: boolean;
-  /** Endgültiges Löschen bleibt dem Owner vorbehalten, wie bei den Punkten. */
-  canDelete: boolean;
+  /** Legt die Fahrt in den Papierkorb – die Trackpunkte selbst bleiben liegen. */
+  remove: (session: TrackSession) => Promise<boolean>;
+  /** Holt sie von dort zurück – der Weg des Rückgängig-Toasts. */
+  restore: (sessionId: string) => Promise<boolean>;
   /** Benennt die Aufzeichnung um; false, wenn der Server sie nicht annimmt. */
   rename: (session: TrackSession, name: string) => Promise<boolean>;
-  /** Entfernt den Namen der Fahrt – die Trackpunkte selbst bleiben liegen. */
-  remove: (session: TrackSession) => Promise<boolean>;
 }
 
 export function useTrackSessions(): TrackSessionsState {
   const { tripId } = useRoadtrip();
-  const { canEdit, isOwner } = usePermissions();
-  const sessions = useCollection<TrackSession>(
+  const { canEdit } = usePermissions();
+  const stored = useCollection<TrackSession>(
     tripId ? tripPath(tripId, COLLECTION) : null,
     'startedAt',
     'desc'
   );
+  // Im Papierkorb liegende Fahrten sind aus der Liste heraus – zu sehen sind
+  // sie nur noch unter Einstellungen → Papierkorb.
+  const sessions = useMemo(() => activeOnly(stored), [stored]);
 
   const rename = useCallback(
     async (session: TrackSession, name: string) => {
@@ -58,7 +67,8 @@ export function useTrackSessions(): TrackSessionsState {
         startedAt: session.startedAt,
         endedAt: session.endedAt,
         author: session.author,
-        ...(session.authorId ? { authorId: session.authorId } : {})
+        ...(session.authorId ? { authorId: session.authorId } : {}),
+        ...(typeof session.deletedAt === 'number' ? { deletedAt: session.deletedAt } : {})
       };
       try {
         await trackWrite(setDoc(doc(db, tripPath(tripId, COLLECTION, session.id)), entry));
@@ -71,19 +81,41 @@ export function useTrackSessions(): TrackSessionsState {
     [canEdit, tripId]
   );
 
+  // Weiches Löschen wie bei Logbuch und Reisekasse: Der Eintrag verschwindet
+  // aus der Liste, liegt aber noch im Papierkorb (siehe lib/trash.ts).
+  // Endgültig entfernen darf ihn nur der Owner – das setzt firestore.rules
+  // durch, hier reicht Schreibrecht.
   const remove = useCallback(
     async (session: TrackSession) => {
-      if (!tripId || !isOwner || !session.id) return false;
+      if (!tripId || !canEdit || !session.id) return false;
       try {
-        await trackWrite(deleteDoc(doc(db, tripPath(tripId, COLLECTION, session.id))));
+        await trackWrite(
+          updateDoc(doc(db, tripPath(tripId, COLLECTION, session.id)), { deletedAt: Date.now() })
+        );
         return true;
       } catch (err) {
         console.error('Aufzeichnung konnte nicht gelöscht werden:', err);
         return false;
       }
     },
-    [isOwner, tripId]
+    [canEdit, tripId]
   );
 
-  return { sessions, canEdit, canDelete: isOwner, rename, remove };
+  const restore = useCallback(
+    async (sessionId: string) => {
+      if (!tripId || !canEdit) return false;
+      try {
+        await trackWrite(
+          updateDoc(doc(db, tripPath(tripId, COLLECTION, sessionId)), { deletedAt: deleteField() })
+        );
+        return true;
+      } catch (err) {
+        console.error('Aufzeichnung konnte nicht wiederhergestellt werden:', err);
+        return false;
+      }
+    },
+    [canEdit, tripId]
+  );
+
+  return { sessions, canEdit, remove, restore, rename };
 }

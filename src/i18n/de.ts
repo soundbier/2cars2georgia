@@ -203,8 +203,9 @@ export const de = {
   'trackSession.delete': 'Fahrt aus der Liste entfernen',
   'trackSession.deleteTitle': 'Fahrt entfernen?',
   'trackSession.deleteDescription':
-    'Nur der Name verschwindet – die aufgezeichneten Punkte bleiben Teil der Gesamtspur, dann ohne Zuordnung zu dieser Fahrt.',
-  'trackSession.deleted': 'Fahrt entfernt',
+    'Die Fahrt wandert in den Papierkorb und ist dort noch 30 Tage wiederherstellbar. Die aufgezeichneten Punkte bleiben in jedem Fall Teil der Gesamtspur.',
+  'trackSession.trashed': 'Fahrt in den Papierkorb gelegt',
+  'trackSession.restored': 'Fahrt wiederhergestellt',
   'trackSession.deleteFailed': 'Fahrt konnte nicht entfernt werden.',
 
   // --- Karte ------------------------------------------------------------
@@ -287,7 +288,11 @@ export const de = {
   'plan.copyName': '{name} (Kopie)',
   'plan.delete': 'Route löschen',
   'plan.deleteTitle': 'Route löschen?',
-  'plan.deleteDescription': 'Die Route wird für die ganze Crew gelöscht. Bereits heruntergeladene Karten bleiben erhalten.',
+  'plan.deleteDescription':
+    'Die Route wandert für die ganze Crew in den Papierkorb und ist dort noch 30 Tage wiederherstellbar. Bereits heruntergeladene Karten bleiben erhalten.',
+  'plan.trashed': 'Route in den Papierkorb gelegt',
+  'plan.restored': 'Route wiederhergestellt',
+  'plan.deleteFailed': 'Route konnte nicht gelöscht werden.',
   'plan.intro': 'Auf die Karte tippen setzt einen Wegpunkt. Punkte lassen sich ziehen, ein Tipp darauf entfernt sie wieder.',
   'plan.removePoint': 'Wegpunkt entfernen',
   'plan.undo': 'Letzter zurück',
@@ -584,7 +589,7 @@ export const de = {
 
   // --- Papierkorb -----------------------------------------------------
   'trash.title': 'Papierkorb',
-  'trash.subtitle': 'Gelöschte Ereignisse und Ausgaben wiederherstellen',
+  'trash.subtitle': 'Gelöschte Einträge wiederherstellen',
   'trash.section': 'Gelöscht ({count})',
   'trash.empty': 'Papierkorb ist leer',
   'trash.emptyHint_one': 'Gelöschte Einträge landen hier und bleiben {count} Tag wiederherstellbar.',

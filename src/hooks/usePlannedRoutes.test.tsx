@@ -52,7 +52,7 @@ describe('usePlannedRoutes', () => {
     expect(result.current.activeRoute?.id).toBe(id);
   });
 
-  it('speichert Wegpunkte, benennt um und löscht für die ganze Crew', () => {
+  it('speichert Wegpunkte, benennt um und löscht für die ganze Crew', async () => {
     const { result } = renderHook(() => usePlannedRoutes());
     act(() => {
       result.current.create('Tag 1', '');
@@ -69,11 +69,23 @@ describe('usePlannedRoutes', () => {
     act(() => result.current.rename(result.current.routes[0], 'Tag 1: Donau', '2026-05-04'));
     expect(result.current.routes[0]).toMatchObject({ name: 'Tag 1: Donau', date: '2026-05-04' });
 
-    act(() => result.current.remove(result.current.routes[0]));
-    expect(readFakeCollection(ROUTES_PATH)).toHaveLength(0);
+    const deleted = result.current.routes[0];
+    await act(async () => {
+      await result.current.remove(deleted);
+    });
+    // Gelöscht heißt Papierkorb: aus der Liste raus, aber noch da – und
+    // damit über den Rückgängig-Toast wieder zurückzuholen.
+    expect(result.current.routes).toHaveLength(0);
+    expect(readFakeCollection(ROUTES_PATH)[0].data).toMatchObject({ deletedAt: expect.any(Number) });
     // Eine gelöschte Route bleibt nicht als aktive Auswahl zurück.
     expect(readActiveRouteId()).toBeNull();
     expect(result.current.activeRoute).toBeNull();
+
+    await act(async () => {
+      await result.current.restore(deleted.id);
+    });
+    expect(result.current.routes.map((r) => r.name)).toEqual(['Tag 1: Donau']);
+    expect(readFakeCollection(ROUTES_PATH)[0].data).not.toHaveProperty('deletedAt');
   });
 
   it('kopiert eine Route mit eigenen Wegpunkt-Kennungen', () => {
@@ -125,7 +137,7 @@ describe('usePlannedRoutes', () => {
     expect(localStorage.getItem('boat_planned_routes')).toBeNull();
   });
 
-  it('schreibt ohne Schreibrecht nichts', () => {
+  it('schreibt ohne Schreibrecht nichts', async () => {
     roadtrip.role = 'readonly';
     seedFakeDoc(`${ROUTES_PATH}/tag-1`, { waypoints: [], updatedAt: 1 });
     const { result } = renderHook(() => usePlannedRoutes());
@@ -134,10 +146,13 @@ describe('usePlannedRoutes', () => {
     act(() => {
       expect(result.current.create('Tag 2', '')).toBeNull();
     });
-    act(() => result.current.remove(result.current.routes[0]));
+    await act(async () => {
+      expect(await result.current.remove(result.current.routes[0])).toBe(false);
+    });
 
     // Lesen ja, ändern nein – durchgesetzt wird das in firestore.rules.
     expect(readFakeCollection(ROUTES_PATH)).toHaveLength(1);
+    expect(readFakeCollection(ROUTES_PATH)[0].data).not.toHaveProperty('deletedAt');
   });
 
   it('speichert ohne ausgewählten Roadtrip nichts', () => {

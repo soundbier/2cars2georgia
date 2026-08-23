@@ -737,7 +737,22 @@ describe('Benannte Aufzeichnungen', () => {
     );
   });
 
-  it('erlaubt das Löschen nur dem Owner', async () => {
+  it('lässt die Fahrt in den Papierkorb legen und zurückholen', async () => {
+    await seedTripWithCrew(TRIP);
+    // Auch hier die Fahrt einer anderen Person: Wegräumen ist rückholbar.
+    await seed(path, { ...validTrackSession, authorId: OWNER_UID });
+    const db = memberDb();
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
+  });
+
+  it('weist einen unplausiblen Papierkorb-Zeitstempel ab', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackSession);
+    await assertFails(updateDoc(doc(memberDb(), path), { deletedAt: 'gestern' }));
+  });
+
+  it('erlaubt das endgültige Löschen nur dem Owner', async () => {
     await seedTripWithCrew(TRIP);
     await seed(path, validTrackSession);
     await assertFails(deleteDoc(doc(memberDb(), path)));
@@ -953,12 +968,28 @@ describe('Geplante Routen', () => {
     await assertFails(getDoc(doc(outsiderDb(), path)));
   });
 
-  it('lässt die Crew ihre Planung selbst aufräumen', async () => {
+  it('lässt die Crew ihre Planung in den Papierkorb legen und zurückholen', async () => {
     await seedTripWithCrew(TRIP);
     await seed(path, validPlannedRoute);
-    // Anders als beim Logbuch kein Owner-Vorbehalt: eine geplante Route ist
-    // Vorbereitung, kein Protokoll.
-    await assertSucceeds(deleteDoc(doc(memberDb(), path)));
+    const db = memberDb();
+    // Löschen heißt Papierkorb: eine abgesteckte Route ist Arbeit, und der
+    // Knopf sitzt auf dem Telefon neben dem Stift.
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
+  });
+
+  it('weist einen unplausiblen Papierkorb-Zeitstempel ab', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validPlannedRoute);
+    await assertFails(updateDoc(doc(memberDb(), path), { deletedAt: 'gestern' }));
+  });
+
+  it('erlaubt das endgültige Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validPlannedRoute);
+    // Aus dem Papierkorb heraus – für die Crew ist der Weg dorthin gedacht.
+    await assertFails(deleteDoc(doc(memberDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 

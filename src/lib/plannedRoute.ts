@@ -22,6 +22,7 @@
  */
 
 import { distanceMeters } from './geo';
+import { SoftDeletable } from './trash';
 import { Coordinates } from '../types';
 
 /** Aktive Route dieses Geräts (nur die Kennung, die Route selbst liegt online). */
@@ -36,7 +37,7 @@ export interface PlannedWaypoint extends Coordinates {
   id: string;
 }
 
-export interface PlannedRoute {
+export interface PlannedRoute extends SoftDeletable {
   id: string;
   name: string;
   /** Tag der Route als ISO-Datum (YYYY-MM-DD); leer, wenn ohne festen Tag. */
@@ -80,7 +81,10 @@ export function routeFromDoc(id: string, data: Record<string, unknown> | undefin
     date: typeof data?.date === 'string' ? data.date : '',
     waypoints: waypoints.slice(0, MAX_WAYPOINTS),
     author: typeof data?.author === 'string' ? data.author : '',
-    updatedAt: Number.isFinite(data?.updatedAt) ? (data?.updatedAt as number) : 0
+    updatedAt: Number.isFinite(data?.updatedAt) ? (data?.updatedAt as number) : 0,
+    // Im Papierkorb liegende Routen kommen mit herein und werden erst in
+    // hooks/usePlannedRoutes.ts ausgeblendet – der Papierkorb selbst braucht sie.
+    ...(Number.isFinite(data?.deletedAt) ? { deletedAt: data?.deletedAt as number } : {})
   };
 }
 
@@ -91,7 +95,10 @@ export function routeToDoc(route: PlannedRoute): Record<string, unknown> {
     date: route.date,
     waypoints: route.waypoints.map((point) => ({ id: point.id, lat: point.lat, lng: point.lng })),
     author: route.author,
-    updatedAt: route.updatedAt
+    updatedAt: route.updatedAt,
+    // Nur schreiben, wenn gesetzt: Firestore lehnt undefined ab, und eine
+    // aktive Route soll das Feld gar nicht erst tragen.
+    ...(typeof route.deletedAt === 'number' ? { deletedAt: route.deletedAt } : {})
   };
 }
 

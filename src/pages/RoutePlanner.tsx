@@ -139,13 +139,25 @@ export default function RoutePlanner() {
     if (copy) setStakingId(copy.id);
   };
 
-  const confirmDeleteRoute = () => {
+  // Gelöscht wird in den Papierkorb, nicht endgültig: Der Toast holt die
+  // Route sofort zurück, der Papierkorb noch 30 Tage lang.
+  const confirmDeleteRoute = async () => {
     const route = findRoute(routes, deleteRouteId);
-    if (route) {
-      if (stakingId === route.id) setStakingId(null);
-      planner.remove(route);
-    }
     setDeleteRouteId(null);
+    if (!route) return;
+    if (stakingId === route.id) setStakingId(null);
+    const removed = await planner.remove(route);
+    if (!removed) {
+      notify(t('plan.deleteFailed'), 'danger');
+      return;
+    }
+    notify(t('plan.trashed'), 'success', {
+      label: t('common.undo'),
+      onAct: async () => {
+        const back = await planner.restore(route.id);
+        notify(back ? t('plan.restored') : t('common.restoreFailed'), back ? 'success' : 'danger');
+      }
+    });
   };
 
   const editingRoute = findRoute(routes, editRouteId);
@@ -166,12 +178,23 @@ export default function RoutePlanner() {
   const confirmDeleteSession = async () => {
     const session = deletingSession;
     setDeleteSessionId(null);
-    if (!session) return;
+    if (!session?.id) return;
+    const sessionId = session.id;
     const removed = await recordings.remove(session);
-    notify(
-      removed ? t('trackSession.deleted') : t('trackSession.deleteFailed'),
-      removed ? 'success' : 'danger'
-    );
+    if (!removed) {
+      notify(t('trackSession.deleteFailed'), 'danger');
+      return;
+    }
+    notify(t('trackSession.trashed'), 'success', {
+      label: t('common.undo'),
+      onAct: async () => {
+        const back = await recordings.restore(sessionId);
+        notify(
+          back ? t('trackSession.restored') : t('common.restoreFailed'),
+          back ? 'success' : 'danger'
+        );
+      }
+    });
   };
 
   /** Datum und Uhrzeit einer Fahrt – die Fahrt trägt ihren Tag im Start. */
@@ -377,7 +400,7 @@ export default function RoutePlanner() {
                           <Pencil size={18} />
                         </IconButton>
                       )}
-                      {recordings.canDelete && (
+                      {recordings.canEdit && (
                         <IconButton
                           tone="danger"
                           label={t('trackSession.delete')}
