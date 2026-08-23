@@ -318,10 +318,25 @@ service cloud.firestore {
             && isOptionalAuthorId();
         }
 
+        // Beim Umbenennen darf sich ausschließlich der Name ändern. Deshalb
+        // hier eine eigene Prüfung statt isTrackSession(): Die dortige
+        // isOptionalAuthorId() verlangt die eigene UID und ließe damit
+        // niemanden die Fahrt einer anderen Person richtigstellen, obwohl
+        // genau das erlaubt sein soll – die authorId sagt, wer gefahren ist,
+        // nicht wer zuletzt getippt hat.
+        function renamesTrackSessionOnly() {
+          return fieldsAre(['name', 'startedAt', 'endedAt', 'author'], ['authorId'])
+            && isText('name', 120)
+            // Start, Ende, Autor (und die authorId) kommen unverändert zurück.
+            && data().diff(resource.data).affectedKeys().hasOnly(['name']);
+        }
+
         allow read: if isMember();
+        allow create: if canWrite() && isTrackSession();
         // Umbenennen bleibt erlaubt: Der Name ist reine Beschriftung, anders
-        // als die Trackpunkte selbst ist er keine Aufzeichnung.
-        allow create, update: if canWrite() && isTrackSession();
+        // als die Trackpunkte selbst ist er keine Aufzeichnung. Alles andere
+        // am Dokument ist Aufzeichnung und bleibt, wie es war.
+        allow update: if canWrite() && renamesTrackSessionOnly();
         allow delete: if isOwner();
       }
 

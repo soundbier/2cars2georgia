@@ -183,6 +183,22 @@ export const en: Translations = {
   'trackSession.skip': 'Leave unnamed',
   'trackSession.saved': '“{name}” saved',
   'trackSession.saveFailed': 'The recording could not be saved.',
+  'trackSession.listTitle': 'Recorded trips',
+  'trackSession.emptyTitle': 'No trip saved yet',
+  'trackSession.emptyHint':
+    'Stopping a trip in the cockpit offers to name it – named trips show up here afterwards.',
+  'trackSession.listHint':
+    'The name is a label only: renaming and removing leave the recorded points untouched.',
+  'trackSession.rename': 'Rename trip',
+  'trackSession.renameTitle': 'Rename trip',
+  'trackSession.renamed': 'Trip is now called “{name}”',
+  'trackSession.renameFailed': 'The trip could not be renamed.',
+  'trackSession.delete': 'Remove trip from the list',
+  'trackSession.deleteTitle': 'Remove trip?',
+  'trackSession.deleteDescription':
+    'Only the name goes away – the recorded points stay part of the overall track, just no longer tied to this trip.',
+  'trackSession.deleted': 'Trip removed',
+  'trackSession.deleteFailed': 'The trip could not be removed.',
 
   // --- Map --------------------------------------------------------------
   'map.currentPosition': 'Current position ({name})',
@@ -239,11 +255,11 @@ export const en: Translations = {
   'map.offlineSourceTrack': 'recorded track',
 
   // --- Route planner ----------------------------------------------------
-  'plan.title': 'Route planner',
-  'plan.subtitle': 'Plan daily routes ahead, activate the right one on the day',
+  'plan.title': 'Routes',
+  'plan.subtitle': 'Plan daily routes, name the trips you have driven',
   'plan.sharedHint':
     'Routes belong to the roadtrip: what you plan on a computer is there on every crew device. Which route is active is a per-device choice.',
-  'plan.routes': 'Saved routes',
+  'plan.planned': 'Planned routes',
   'plan.addTitle': 'New route',
   'plan.add': 'Create route',
   'plan.namePlaceholder': 'Name, e.g. day 3: Passau – Linz',
@@ -254,8 +270,12 @@ export const en: Translations = {
   'plan.active': 'active',
   'plan.activate': 'Use on the map',
   'plan.deactivate': 'Stop using on the map',
-  'plan.edit': 'Plan waypoints',
+  'plan.stake': 'Plan waypoints',
   'plan.editTitle': 'Planning: {name}',
+  'plan.rename': 'Edit route',
+  'plan.renameTitle': 'Edit route',
+  'plan.nameLabel': 'Route name',
+  'plan.dateLabel': 'Route date',
   'plan.duplicate': 'Duplicate route',
   'plan.copyName': '{name} (copy)',
   'plan.delete': 'Delete route',

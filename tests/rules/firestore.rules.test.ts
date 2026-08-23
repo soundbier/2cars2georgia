@@ -710,6 +710,33 @@ describe('Benannte Aufzeichnungen', () => {
     await assertSucceeds(setDoc(doc(memberDb(), path), { ...validTrackSession, name: 'Tag 1' }));
   });
 
+  it('lässt auch die Fahrt einer anderen Person umbenennen', async () => {
+    await seedTripWithCrew(TRIP);
+    // Gefahren ist der Owner, richtiggestellt wird der Name vom Member: Die
+    // authorId sagt, wer aufgezeichnet hat, nicht wer zuletzt getippt hat.
+    await seed(path, { ...validTrackSession, authorId: OWNER_UID });
+    await assertSucceeds(
+      setDoc(doc(memberDb(), path), { ...validTrackSession, authorId: OWNER_UID, name: 'Tag 1' })
+    );
+  });
+
+  it('lässt beim Umbenennen nichts als den Namen ändern', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validTrackSession);
+    const db = memberDb();
+    // Start, Ende und Autor sind die Aufzeichnung selbst.
+    await assertFails(
+      setDoc(doc(db, path), { ...validTrackSession, name: 'Tag 1', startedAt: NOW - 60_000 })
+    );
+    await assertFails(
+      setDoc(doc(db, path), { ...validTrackSession, name: 'Tag 1', author: 'Fremd' })
+    );
+    // Auch die authorId bleibt an der Person, die gefahren ist.
+    await assertFails(
+      setDoc(doc(db, path), { ...validTrackSession, name: 'Tag 1', authorId: MEMBER_UID })
+    );
+  });
+
   it('erlaubt das Löschen nur dem Owner', async () => {
     await seedTripWithCrew(TRIP);
     await seed(path, validTrackSession);

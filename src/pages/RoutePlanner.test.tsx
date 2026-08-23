@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
   fakeFirestoreModule,
   readFakeCollection,
@@ -11,11 +11,13 @@ import {
 import { resetOfflineAreasCache } from '../lib/offlineTiles';
 import { PreferencesProvider } from '../hooks/usePreferences';
 import { I18nProvider } from '../i18n';
+import { ToastProvider } from '../components/ui';
 
 vi.mock('../firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => fakeFirestoreModule());
+const roadtrip = { tripId: 'sommertour', displayName: 'Skipper', role: 'owner' as string | null };
 vi.mock('../hooks/useRoadtrip', () => ({
-  useRoadtrip: () => ({ tripId: 'sommertour', displayName: 'Skipper', role: 'owner' }),
+  useRoadtrip: () => roadtrip,
   tripPath: (tripId: string, ...segments: string[]) => ['roadtrips', tripId, ...segments].join('/')
 }));
 
@@ -25,6 +27,39 @@ const { readActiveRouteId, resetActiveRouteCache, writeActiveRouteId } = await i
 );
 
 const ROUTES_PATH = 'roadtrips/sommertour/plannedRoutes';
+const SESSIONS_PATH = 'roadtrips/sommertour/trackSessions';
+const TRACK_PATH = 'roadtrips/sommertour/track';
+
+const NOW = 1_770_000_000_000;
+
+/** Eine benannte Aufzeichnung samt zweier Punkte ablegen. */
+function seedSession(id: string, name: string, startedAt: number) {
+  seedFakeDoc(`${SESSIONS_PATH}/${id}`, {
+    name,
+    startedAt,
+    endedAt: startedAt + 3_600_000,
+    author: 'Skipper',
+    authorId: 'uid-crew'
+  });
+  seedFakeDoc(`${TRACK_PATH}/${id}_1`, {
+    timestamp: startedAt,
+    author: 'Skipper',
+    sessionId: id,
+    lat: PASSAU.lat,
+    lng: PASSAU.lng,
+    speedKmh: 10,
+    headingDeg: 90
+  });
+  seedFakeDoc(`${TRACK_PATH}/${id}_2`, {
+    timestamp: startedAt + 3_600_000,
+    author: 'Skipper',
+    sessionId: id,
+    lat: LINZ.lat,
+    lng: LINZ.lng,
+    speedKmh: 10,
+    headingDeg: 90
+  });
+}
 
 /** Eine fertige Route direkt im Roadtrip ablegen. */
 function seedRoute(id: string, name: string, date: string, waypoints: Array<{ id: string; lat: number; lng: number }>) {
@@ -43,6 +78,7 @@ const LINZ = { lat: 48.3069, lng: 14.2858 };
 let sizeSpies: Array<() => void> = [];
 
 beforeEach(() => {
+  roadtrip.role = 'owner';
   localStorage.clear();
   // Sprache festnageln: sonst hinge der Test an der Browsersprache von jsdom.
   localStorage.setItem('boat_preferences', JSON.stringify({ language: 'de' }));
@@ -78,12 +114,14 @@ afterEach(() => {
 function Wrapper({ children }: { children: ReactNode }) {
   return (
     <PreferencesProvider>
-      <I18nProvider>{children}</I18nProvider>
+      <I18nProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </I18nProvider>
     </PreferencesProvider>
   );
 }
 
-describe('Routenplaner-Seite', () => {
+describe('Routenmenü', () => {
   it('legt eine Tagesroute an und öffnet sie zum Abstecken', () => {
     render(<RoutePlanner />, { wrapper: Wrapper });
 
@@ -101,28 +139,35 @@ describe('Routenplaner-Seite', () => {
     expect(screen.getByText('Abstecken: Tag 3: Passau – Linz')).toBeTruthy();
   });
 
-  it('lässt den Namen in Ruhe tippen und speichert ihn danach', () => {
+  it('benennt eine geplante Route über den Bearbeiten-Dialog um', () => {
     seedRoute('tag-1', 'Tag 1', '2026-05-04', []);
     render(<RoutePlanner />, { wrapper: Wrapper });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Route abstecken' }));
-    // Dasselbe Feld gibt es zweimal: oben im Editor, unten im Formular für
-    // eine neue Route.
-    const input = screen.getAllByPlaceholderText('Name, z. B. Tag 3: Passau – Linz')[0];
+    // Umbenannt wird aus der Liste heraus – ohne dass die Karte aufgehen muss.
+    fireEvent.click(screen.getByRole('button', { name: 'Route bearbeiten' }));
+    fireEvent.change(screen.getByLabelText('Name der Route'), {
+      target: { value: 'Tag 1: Passau – Linz' }
+    });
+    fireEvent.change(screen.getByLabelText('Tag der Route'), { target: { value: '2026-05-05' } });
 
-    // Beim Tippen bleibt stehen, was getippt wurde – auch das Leerzeichen am
-    // Wortende, das der Speicher wegkürzen würde.
-    fireEvent.change(input, { target: { value: 'Tag 1 ' } });
-    expect((input as HTMLInputElement).value).toBe('Tag 1 ');
+    // Solange der Dialog offen ist, ist nichts geschrieben.
     expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.name).toBe('Tag 1');
 
-    fireEvent.change(input, { target: { value: 'Tag 1 Passau' } });
-    expect((input as HTMLInputElement).value).toBe('Tag 1 Passau');
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.name).toBe('Tag 1: Passau – Linz');
+    expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.date).toBe('2026-05-05');
+    expect(screen.queryByLabelText('Name der Route')).toBeNull();
+  });
 
-    // Gespeichert wird beim Verlassen des Feldes (und kurz nach dem letzten
-    // Tastendruck).
-    fireEvent.blur(input);
-    expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.name).toBe('Tag 1 Passau');
+  it('verwirft die Änderung beim Abbrechen', () => {
+    seedRoute('tag-1', 'Tag 1', '2026-05-04', []);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Route bearbeiten' }));
+    fireEvent.change(screen.getByLabelText('Name der Route'), { target: { value: 'Verschrieben' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(readFakeDoc(`${ROUTES_PATH}/tag-1`)?.name).toBe('Tag 1');
   });
 
   it('listet gespeicherte Routen mit Tag, Wegpunkten und Länge', () => {
@@ -157,5 +202,67 @@ describe('Routenplaner-Seite', () => {
       within(rows[0]).getByRole('button', { name: 'Nicht mehr auf der Karte verwenden' })
     );
     expect(readActiveRouteId()).toBeNull();
+  });
+
+  it('listet gefahrene Aufzeichnungen mit Zeit, Dauer und Strecke', () => {
+    seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    const row = screen.getByText('Fahrt 04.05., 09:30').closest('.list-item') as HTMLElement;
+    const subtitle = row.querySelector('.list-item-subtitle')?.textContent ?? '';
+    expect(subtitle).toMatch(/1h 0m/);
+    // Passau – Linz, gut 60 km Luftlinie zwischen den beiden Punkten.
+    expect(subtitle).toMatch(/6\d[.,]\d\s*km/);
+    expect(subtitle).toMatch(/Skipper/);
+  });
+
+  it('benennt eine Aufzeichnung um, ohne ihre Aufzeichnung anzurühren', async () => {
+    seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fahrt umbenennen' }));
+    fireEvent.change(screen.getByLabelText('Name der Fahrt'), {
+      target: { value: 'Passau – Linz' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(readFakeDoc(`${SESSIONS_PATH}/session-1`)?.name).toBe('Passau – Linz')
+    );
+    const stored = readFakeDoc(`${SESSIONS_PATH}/session-1`);
+    // Start, Ende und Autor sind Aufzeichnung und bleiben, wie sie waren –
+    // auch die authorId der Person, die gefahren ist.
+    expect(stored?.startedAt).toBe(NOW);
+    expect(stored?.endedAt).toBe(NOW + 3_600_000);
+    expect(stored?.author).toBe('Skipper');
+    expect(stored?.authorId).toBe('uid-crew');
+    // Die Punkte der Fahrt bleiben unberührt.
+    expect(readFakeCollection(TRACK_PATH)).toHaveLength(2);
+  });
+
+  it('entfernt eine Aufzeichnung nur nach Rückfrage und lässt die Punkte liegen', async () => {
+    seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fahrt aus der Liste entfernen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+
+    await waitFor(() => expect(readFakeCollection(SESSIONS_PATH)).toHaveLength(0));
+    expect(readFakeCollection(TRACK_PATH)).toHaveLength(2);
+  });
+
+  it('bietet Read-only weder Umbenennen noch Entfernen an', () => {
+    roadtrip.role = 'readonly';
+    seedSession('session-1', 'Fahrt 04.05., 09:30', NOW);
+    render(<RoutePlanner />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Fahrt 04.05., 09:30')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Fahrt umbenennen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Fahrt aus der Liste entfernen' })).toBeNull();
+  });
+
+  it('erklärt die leere Liste, solange keine Fahrt benannt wurde', () => {
+    render(<RoutePlanner />, { wrapper: Wrapper });
+    expect(screen.getByText('Noch keine Fahrt gespeichert')).toBeTruthy();
   });
 });
