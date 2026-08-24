@@ -36,7 +36,6 @@ import QuickLogSettings from './pages/settings/QuickLogSettings';
 import ExportSettings from './pages/settings/ExportSettings';
 import TrashSettings from './pages/settings/TrashSettings';
 import RoutePlanner from './pages/RoutePlanner';
-import DayView from './pages/DayView';
 import Verpflegung from './pages/kombuese/Verpflegung';
 import MealPlan from './pages/kombuese/MealPlan';
 import Dishes from './pages/kombuese/Dishes';
@@ -116,7 +115,6 @@ function AppShell() {
             <Route path="/settings/export" element={<ExportSettings users={users} />} />
             <Route path="/settings/papierkorb" element={<TrashSettings currentUser={user} />} />
             <Route path="/settings/routenplaner" element={<RoutePlanner />} />
-            <Route path="/settings/tagesansicht" element={<DayView />} />
             <Route path="/settings/verpflegung" element={<Verpflegung />} />
             <Route path="/settings/verpflegung/speiseplan" element={<MealPlan currentUser={user} />} />
             <Route path="/settings/verpflegung/gerichte" element={<Dishes currentUser={user} />} />

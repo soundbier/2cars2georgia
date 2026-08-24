@@ -23,6 +23,27 @@ export function pointsOfSession(points: GpsPoint[], sessionId: string | null): G
   return points.filter((point) => point.sessionId === sessionId);
 }
 
+/**
+ * Die Punkte eines Kalendertags – des Tages, in den `reference` fällt.
+ *
+ * Ein Tag ist dabei der Kalendertag in der Zeitzone des Geräts, nicht eine
+ * Aufzeichnung: Wer nachts um eins noch fährt, zählt das zu dem Tag, an dem
+ * die Uhr gerade steht, genauso wie die Tagesübersicht (lib/dayRecap.ts).
+ * Fahren an einem Tag mehrere Routen hintereinander, liegen sie alle in
+ * diesem Ausschnitt.
+ */
+export function pointsOfDay(points: GpsPoint[], reference: number = Date.now()): GpsPoint[] {
+  const day = new Date(reference);
+  return points.filter((point) => {
+    const then = new Date(point.timestamp);
+    return (
+      then.getDate() === day.getDate() &&
+      then.getMonth() === day.getMonth() &&
+      then.getFullYear() === day.getFullYear()
+    );
+  });
+}
+
 /** Zeitspanne zwischen erstem und letztem Trackpunkt in Millisekunden. */
 export function trackDurationMs(points: GpsPoint[]): number {
   return points.length > 1 ? points[points.length - 1].timestamp - points[0].timestamp : 0;
