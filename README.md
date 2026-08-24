@@ -215,6 +215,29 @@ weggefallen, weil das Cockpit die Tageszahl jetzt selbst zeigt. Wer einen
 zurückliegenden Tag sucht, findet ihn im Logbuch, das Tagesbild dazu ebenfalls
 dort (`src/components/DayRecapDialog.tsx`).
 
+## Karte: Ereignisse und Knopfgrößen
+
+Beides steht unter Einstellungen → Karte, nicht als weiterer Knopf auf der
+Karte selbst – es sind Entscheidungen, die man einmal trifft, und der
+Kartenrand ist bereits belegt:
+
+* **Ereignisse auf der Karte** (`showMapEvents`) blendet die Schnell-Logs als
+  Marker aus. Nach ein paar Tagen liegen Dutzende davon auf der Strecke und
+  verdecken das, worauf man gerade schaut. Ausblenden löscht nichts – die
+  Ereignisse stehen weiter im Logbuch und auf dem Tagesbild.
+* **Größe der Ereignisse** (`mapEventSize`) und **Größe der Kartenknöpfe**
+  (`mapControlSize`) haben je drei Stufen, klein bis groß. Unterwegs geht es
+  um „größer als jetzt", nicht um Pixelwerte; die Maße dahinter stehen in
+  `src/pages/MapTab.tsx`. Die Knopfgröße geht als CSS-Variable
+  (`--map-control-size`) an die Knopfgruppe, die Markergröße schreibt
+  `dotIcon` inline ans Element – die Kantenlänge in `MapTab.css` ist der
+  Ausgangswert.
+
+Die Größenwahl für die Marker steht nur da, solange die Marker eingeschaltet
+sind. Alle drei liegen wie die übrigen Anzeigeeinstellungen im localStorage
+(`src/hooks/usePreferences.tsx`): Es sind Entscheidungen dieses Geräts, keine
+der Crew.
+
 ## Routenmenü
 
 Unter Mehr → Routen stehen die beiden Arten von Route nebeneinander, weil sie

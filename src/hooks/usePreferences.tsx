@@ -6,6 +6,17 @@ import { BackgroundStyle } from '../lib/routeImage';
 
 const STORAGE_KEY = 'boat_preferences';
 
+/**
+ * Größenstufen für die Elemente auf der Karte.
+ *
+ * Drei Stufen statt einer freien Zahl: Die Karte wird im Fahren bedient, da
+ * geht es um „größer als jetzt" und nicht um Pixelwerte. Die tatsächlichen
+ * Maße stehen dort, wo gezeichnet wird (pages/MapTab.tsx).
+ */
+export const MAP_ELEMENT_SIZES = ['small', 'medium', 'large'] as const;
+
+export type MapElementSize = (typeof MAP_ELEMENT_SIZES)[number];
+
 export interface Preferences {
   /** Metrisch (km/h, km) oder nautisch (kn, sm). */
   unitSystem: UnitSystem;
@@ -33,6 +44,18 @@ export interface Preferences {
    * `0` steht für „alle" – dann entfällt das Aufklappen ganz.
    */
   quickLogRows: number;
+  /**
+   * Ereignisse (die Schnell-Logs) als Marker auf der Karte zeigen.
+   *
+   * Nach ein paar Tagen liegen Dutzende davon auf der Strecke und verdecken
+   * genau das, worauf man gerade schaut. Ausblenden löscht nichts – die
+   * Ereignisse stehen weiter im Logbuch.
+   */
+  showMapEvents: boolean;
+  /** Größe der Ereignis-Marker auf der Karte. */
+  mapEventSize: MapElementSize;
+  /** Größe der schwebenden Knöpfe am Kartenrand. */
+  mapControlSize: MapElementSize;
 }
 
 /**
@@ -56,7 +79,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // Wahl im localStorage und überschreibt die Geräteeinstellung nicht mehr.
   language: detectLanguage(),
   dayRecapBackground: 'reduced',
-  quickLogRows: 1
+  quickLogRows: 1,
+  showMapEvents: true,
+  mapEventSize: 'medium',
+  mapControlSize: 'medium'
 };
 
 /** Stand vor der Ebenenauswahl: ein einzelner Schalter für die Seezeichen. */
@@ -83,6 +109,13 @@ function readStored(): Preferences {
     }
     if (!QUICK_LOG_ROW_OPTIONS.includes(merged.quickLogRows as (typeof QUICK_LOG_ROW_OPTIONS)[number])) {
       merged.quickLogRows = DEFAULT_PREFERENCES.quickLogRows;
+    }
+
+    if (typeof merged.showMapEvents !== 'boolean') {
+      merged.showMapEvents = DEFAULT_PREFERENCES.showMapEvents;
+    }
+    for (const key of ['mapEventSize', 'mapControlSize'] as const) {
+      if (!MAP_ELEMENT_SIZES.includes(merged[key])) merged[key] = DEFAULT_PREFERENCES[key];
     }
 
     // Overlays einzeln zusammenführen: Neue Ebenen einer App-Version starten

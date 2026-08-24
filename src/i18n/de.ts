@@ -406,6 +406,17 @@ export const de = {
   'settings.quickLogRowsAll': 'Alle anzeigen',
   'settings.map': 'Karte',
   'settings.baseLayer': 'Grundkarte',
+  'settings.mapEvents': 'Ereignisse auf der Karte',
+  'settings.mapEventsDescription':
+    'Die Schnell-Logs als Marker auf der Strecke. Ausgeblendet bleiben sie erhalten und stehen weiter im Logbuch.',
+  'settings.mapEventSize': 'Größe der Ereignisse',
+  'settings.mapEventSizeDescription': 'Wie groß die Marker auf der Karte sind.',
+  'settings.mapControlSize': 'Größe der Kartenknöpfe',
+  'settings.mapControlSizeDescription':
+    'Kompass, Fahrmodus, Offline-Karten und Zentrieren am rechten Kartenrand.',
+  'settings.sizeSmall': 'Klein',
+  'settings.sizeMedium': 'Mittel',
+  'settings.sizeLarge': 'Groß',
   'settings.layerNote':
     'Ebenen liegen übereinander – die Grundkarte unten, jedes aktive Overlay darüber.',
   'settings.recording': 'Aufzeichnung',

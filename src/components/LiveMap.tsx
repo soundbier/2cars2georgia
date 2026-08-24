@@ -20,7 +20,11 @@ import 'leaflet/dist/leaflet.css';
 
 const DEG_TO_RAD = Math.PI / 180;
 
-// Leaflet-Icons sind pro Farbe identisch – einmal erzeugen statt bei jedem Render.
+/** Kantenlänge des Punktmarkers, wenn keine Größe verlangt wird. */
+export const DOT_ICON_SIZE = 16;
+
+// Leaflet-Icons sind pro Farbe und Größe identisch – einmal erzeugen statt bei
+// jedem Render.
 const iconCache = new Map<string, L.DivIcon>();
 
 function cachedIcon(key: string, create: () => L.DivIcon): L.DivIcon {
@@ -32,14 +36,20 @@ function cachedIcon(key: string, create: () => L.DivIcon): L.DivIcon {
   return icon;
 }
 
-/** Punktmarker für Log-Ereignisse und für Positionen ohne bekannten Kurs. */
-export function dotIcon(color: string): L.DivIcon {
-  return cachedIcon(`dot:${color}`, () =>
+/**
+ * Punktmarker für Log-Ereignisse und für Positionen ohne bekannten Kurs.
+ *
+ * Die Größe steht inline am Element, nicht nur in `iconSize`: Die Kantenlänge
+ * in MapTab.css ist der Ausgangswert, den ein abweichendes Maß hier
+ * überschreibt.
+ */
+export function dotIcon(color: string, size: number = DOT_ICON_SIZE): L.DivIcon {
+  return cachedIcon(`dot:${color}:${size}`, () =>
     L.divIcon({
       className: 'custom-marker',
-      html: `<div class="map-marker-dot" style="background-color: ${color};"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8]
+      html: `<div class="map-marker-dot" style="background-color: ${color}; width: ${size}px; height: ${size}px;"></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2]
     })
   );
 }

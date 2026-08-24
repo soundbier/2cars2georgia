@@ -397,6 +397,17 @@ export const en: Translations = {
   'settings.quickLogRowsAll': 'Show all',
   'settings.map': 'Map',
   'settings.baseLayer': 'Base map',
+  'settings.mapEvents': 'Events on the map',
+  'settings.mapEventsDescription':
+    'The quick logs as markers along the track. Hiding them keeps them – they stay in the logbook.',
+  'settings.mapEventSize': 'Event size',
+  'settings.mapEventSizeDescription': 'How large the markers on the map are.',
+  'settings.mapControlSize': 'Map button size',
+  'settings.mapControlSizeDescription':
+    'Compass, drive mode, offline maps and centring along the right edge of the map.',
+  'settings.sizeSmall': 'Small',
+  'settings.sizeMedium': 'Medium',
+  'settings.sizeLarge': 'Large',
   'settings.layerNote':
     'Layers stack up – the base map at the bottom, every active overlay above it.',
   'settings.recording': 'Recording',

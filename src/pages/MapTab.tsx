@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Pencil, LocateFixed, Navigation, DownloadCloud } from 'lucide-react';
@@ -12,7 +12,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { useSoftDelete } from '../hooks/useSoftDelete';
 import { trackWrite } from '../lib/pendingWrites';
 import { useQuickLogs } from '../hooks/useSettings';
-import { usePreferences } from '../hooks/usePreferences';
+import { usePreferences, MapElementSize } from '../hooks/usePreferences';
 import { getUserColor } from '../lib/userColors';
 import { formatSpeed } from '../lib/units';
 import { getBaseLayer, OVERLAYS, OVERLAY_IDS } from '../lib/mapLayers';
@@ -48,18 +48,41 @@ const TRACK_CASING_COLOR = '#ffffff';
  */
 const MIN_HEADING_CHANGE_DEG = 3;
 
+/**
+ * Kantenlänge der Ereignis-Marker je Größenstufe, in Pixeln.
+ *
+ * Klein für Tage mit vielen Logs auf engem Raum, groß für die Fahrt, bei der
+ * man im Vorbeischauen erkennen will, wo etwas war.
+ */
+const EVENT_MARKER_SIZE: Record<MapElementSize, number> = {
+  small: 11,
+  medium: 16,
+  large: 24
+};
+
+/**
+ * Maß der schwebenden Kartenknöpfe je Größenstufe: Kantenlänge des Knopfs und
+ * Größe des Symbols darin. Die Kantenlänge geht als CSS-Variable an
+ * `.map-controls` (siehe MapTab.css), das Symbol bekommt sie direkt.
+ */
+const CONTROL_SIZE: Record<MapElementSize, { button: number; icon: number }> = {
+  small: { button: 36, icon: 16 },
+  medium: { button: 44, icon: 20 },
+  large: { button: 56, icon: 26 }
+};
+
 /** Kürzester Winkelabstand zwischen zwei Kursen, in Grad (-180 … 180). */
 function angleDelta(a: number, b: number): number {
   return ((((a - b) % 360) + 540) % 360) - 180;
 }
 
 /** Kompassnadel: rote Hälfte nach Norden, graue nach Süden. */
-function CompassNeedle({ bearing }: { bearing: number }) {
+function CompassNeedle({ bearing, size }: { bearing: number; size: number }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="22"
-      height="22"
+      width={size}
+      height={size}
       aria-hidden="true"
       style={{ transform: `rotate(${bearing}deg)` }}
     >
@@ -310,6 +333,10 @@ export default function MapTab({ user }: { user: string }) {
   const [driveMode, setDriveMode] = useState(initialView.driveMode);
 
   const baseLayer = getBaseLayer(preferences.baseLayer);
+  // Anzeigegrößen aus den Einstellungen (Einstellungen → Karte): wie groß die
+  // Ereignis-Marker sind und wie groß die Knöpfe am Kartenrand.
+  const eventMarkerSize = EVENT_MARKER_SIZE[preferences.mapEventSize];
+  const controlSize = CONTROL_SIZE[preferences.mapControlSize];
   const line: [number, number][] = track.map((p) => [p.lat, p.lng]);
   const isOnline = useOnlineStatus();
 
@@ -487,22 +514,35 @@ export default function MapTab({ user }: { user: string }) {
           </PositionMarker>
         )}
 
-        {events.map((evt) => (
-          <Marker key={evt.id} position={[evt.lat, evt.lng]} icon={dotIcon(getUserColor(evt.author))}>
-            <Popup minWidth={200}>
-              <EventPopup
-                event={evt}
-                quickLogs={quickLogs}
-                canEdit={canEdit}
-                onSave={handleSaveEdit}
-                onRequestDelete={requestDelete}
-              />
-            </Popup>
-          </Marker>
-        ))}
+        {/* Ereignisse sind abschaltbar (Einstellungen → Karte): Nach ein paar
+            Tagen liegen Dutzende Marker auf der Strecke. Ausgeblendet heißt
+            nur ausgeblendet – im Logbuch stehen sie weiter. */}
+        {preferences.showMapEvents &&
+          events.map((evt) => (
+            <Marker
+              key={evt.id}
+              position={[evt.lat, evt.lng]}
+              icon={dotIcon(getUserColor(evt.author), eventMarkerSize)}
+            >
+              <Popup minWidth={200}>
+                <EventPopup
+                  event={evt}
+                  quickLogs={quickLogs}
+                  canEdit={canEdit}
+                  onSave={handleSaveEdit}
+                  onRequestDelete={requestDelete}
+                />
+              </Popup>
+            </Marker>
+          ))}
       </MapContainer>
 
-      <div className="map-controls">
+      {/* Die Kantenlänge kommt aus den Einstellungen und geht als Variable an
+          die Gruppe – die Knöpfe selbst lesen sie in MapTab.css. */}
+      <div
+        className="map-controls"
+        style={{ '--map-control-size': `${controlSize.button}px` } as CSSProperties}
+      >
         <button
           type="button"
           className={`map-control map-control-compass ${northUp ? 'map-control-active' : ''}`}
@@ -511,7 +551,7 @@ export default function MapTab({ user }: { user: string }) {
           aria-label={northUp ? t('map.unlockNorth') : t('map.lockNorth')}
           title={northUp ? t('map.unlockNorth') : t('map.lockNorth')}
         >
-          <CompassNeedle bearing={bearing} />
+          <CompassNeedle bearing={bearing} size={controlSize.icon} />
         </button>
         <button
           type="button"
@@ -521,7 +561,7 @@ export default function MapTab({ user }: { user: string }) {
           aria-label={driveMode ? t('map.driveModeOff') : t('map.driveModeOn')}
           title={driveMode ? t('map.driveModeOff') : t('map.driveModeOn')}
         >
-          <Navigation size={20} />
+          <Navigation size={controlSize.icon} />
         </button>
         <button
           type="button"
@@ -531,7 +571,7 @@ export default function MapTab({ user }: { user: string }) {
           aria-label={offline.active ? t('map.offlineClose') : t('map.offlineDownload')}
           title={offline.active ? t('map.offlineClose') : t('map.offlineDownload')}
         >
-          <DownloadCloud size={20} />
+          <DownloadCloud size={controlSize.icon} />
         </button>
         <button
           type="button"
@@ -541,7 +581,7 @@ export default function MapTab({ user }: { user: string }) {
           aria-label={follow ? t('map.unfollow') : t('map.centerOnPosition')}
           title={follow ? t('map.unfollow') : t('map.centerOnPosition')}
         >
-          <LocateFixed size={20} />
+          <LocateFixed size={controlSize.icon} />
         </button>
       </div>
 
