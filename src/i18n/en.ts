@@ -168,6 +168,9 @@ export const en: Translations = {
   'cockpit.fewerLogs': 'Less',
   'cockpit.today': 'Today',
   'cockpit.driveMode': 'Drive mode',
+  'cockpit.scopeLabel': 'Distance and duration for',
+  'cockpit.scopeTrip': 'Total',
+  'cockpit.scopeSession': 'Current route',
   'cockpit.noEntriesToday': 'No entries yet today.',
 
   // --- Saving a recording (after stopping the tour) ---------------------

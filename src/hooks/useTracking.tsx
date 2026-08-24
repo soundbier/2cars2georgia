@@ -87,6 +87,12 @@ interface TrackingContextValue {
   isTracking: boolean;
   setIsTracking: (value: boolean) => void;
   /**
+   * Kennung der laufenden Aufzeichnung – dieselbe, die an jedem Punkt der
+   * Spur mitläuft. Damit lässt sich die aktuelle Route aus der Gesamtspur
+   * herauslösen (siehe Cockpit). null, solange nichts aufgezeichnet wird.
+   */
+  activeSessionId: string | null;
+  /**
    * Gesetzt vom Stoppen der Tour bis zum Schließen des Speichern-Fensters.
    * Solange sichtbar, kann die Aufzeichnung benannt werden.
    */
@@ -131,6 +137,9 @@ export function TrackingProvider({ user, children }: { user: string; children: R
   const [isTracking, setIsTrackingState] = useState(false);
   const [isPaused, setIsPausedState] = useState(false);
   const [finishedSession, setFinishedSession] = useState<FinishedSession | null>(null);
+  // Neben der Ref auch im State, weil die Anzeige davon abhängt: Die Ref
+  // allein löst kein Neuzeichnen aus.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   // Über Refs gelesen, damit das Umschalten der Aufzeichnung den laufenden
   // Watcher nicht neu startet.
@@ -168,6 +177,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
   const persistSession = (session: ActiveTrackSession | null) => {
     sessionRef.current = session;
+    setActiveSessionId(session?.id ?? null);
     if (session) writeActiveSession(session);
     else clearActiveSession();
   };
@@ -237,6 +247,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
 
     if (decision.kind === 'resume') {
       sessionRef.current = decision.session;
+      setActiveSessionId(decision.session.id);
       isTrackingRef.current = true;
       isPausedRef.current = decision.session.paused;
       setIsTrackingState(true);
@@ -439,6 +450,7 @@ export function TrackingProvider({ user, children }: { user: string; children: R
       error,
       isTracking,
       setIsTracking,
+      activeSessionId,
       isPaused,
       setIsPaused,
       finishedSession,
@@ -446,7 +458,16 @@ export function TrackingProvider({ user, children }: { user: string; children: R
       screenLockHeld,
       screenLockSupported
     }),
-    [position, error, isTracking, isPaused, finishedSession, screenLockHeld, screenLockSupported]
+    [
+      position,
+      error,
+      isTracking,
+      activeSessionId,
+      isPaused,
+      finishedSession,
+      screenLockHeld,
+      screenLockSupported
+    ]
   );
 
   return <TrackingContext.Provider value={value}>{children}</TrackingContext.Provider>;
