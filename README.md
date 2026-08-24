@@ -179,23 +179,41 @@ wie im Cockpit.
   Liste ihren eigenen – die Ereignisse landeten dadurch neben der Strecke,
   an der sie protokolliert wurden.
 
-## Einstellungen, Routen, Tagesansicht
+## Einstellungen und Routen
 
-Die drei Seiten außerhalb der Bottom-Navigation liegen nebeneinander statt
+Die beiden Seiten außerhalb der Bottom-Navigation liegen nebeneinander statt
 hintereinander: Ein Umschalter im Seitenkopf
-(`src/components/SettingsSectionNav.tsx`) führt von jeder der drei direkt zu
-den beiden anderen, statt über das „Mehr"-Dropup zurück. Jeder Bereich behält
-seine eigene Adresse (`/settings`, `/settings/routenplaner`,
-`/settings/tagesansicht`), damit Zurück und Neuladen dort landen, wo man war.
+(`src/components/SettingsSectionNav.tsx`) führt von der einen direkt zur
+anderen, statt über das „Mehr"-Dropup zurück. Jeder Bereich behält seine
+eigene Adresse (`/settings`, `/settings/routenplaner`), damit Zurück und
+Neuladen dort landen, wo man war.
 
-**Tagesansicht** (`src/pages/DayView.tsx`) beantwortet die Frage, die weder
-Cockpit noch Logbuch beantworten: Wie weit ging es an einem bestimmten Tag?
-Das Cockpit kennt nur den ganzen Roadtrip und die gerade laufende
-Aufzeichnung – abends im Hafen, mit gestoppter Aufzeichnung, steht dort keine
-Zahl mehr für heute. Die Seite rechnet deshalb nachträglich aus Spur und
-Ereignissen (`groupByDay`, `src/lib/dayRecap.ts`), braucht also keine laufende
-Aufzeichnung, und führt von dort auch direkt ins Tagesbild. Ein Tag ist dabei
-der Kalendertag in der Zeitzone des Geräts, nicht eine Aufzeichnung.
+## Strecke und Dauer im Cockpit
+
+„Wie weit, wie lange" hat unterwegs drei Antworten, und das Instrument zeigt
+immer nur eine davon – welche, sagt der Umschalter darunter
+(`src/pages/Dashboard.tsx`):
+
+* **Aktuelle Route** – die laufende Aufzeichnung, herausgelöst über die
+  Kennung, die jeder Trackpunkt mitträgt (`pointsOfSession`). Diese Wahl steht
+  nur da, solange aufgezeichnet wird; endet die Aufzeichnung, fällt die
+  Anzeige auf den Tag zurück, statt dauerhaft 0 zu zeigen.
+* **Heute** – der ganze Kalendertag in der Zeitzone des Geräts
+  (`pointsOfDay`), also auch dann vollständig, wenn er aus zwei oder drei
+  Routen mit Pausen dazwischen besteht. Das ist die Vorauswahl: die Zahl, die
+  unterwegs am häufigsten gesucht wird, und die es auch ohne laufende
+  Aufzeichnung gibt.
+* **Gesamt** – die Gesamtspur des Roadtrips.
+
+Der Umschalter steht auf dem Papier zwischen Instrument und Tasten – das
+Instrument bleibt ein Ablesegerät ohne Bedienelemente. Im Fahrmodus fehlt er;
+dort sagt ein Zusatz an der Beschriftung, welche der drei Zahlen gerade
+dasteht.
+
+Eine eigene Tagesansicht unter den Einstellungen gab es dafür einmal; sie ist
+weggefallen, weil das Cockpit die Tageszahl jetzt selbst zeigt. Wer einen
+zurückliegenden Tag sucht, findet ihn im Logbuch, das Tagesbild dazu ebenfalls
+dort (`src/components/DayRecapDialog.tsx`).
 
 ## Routenmenü
 

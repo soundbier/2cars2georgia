@@ -5,28 +5,24 @@ import { TranslationKey, useT } from '../i18n';
 import './ui/SegmentedControl.css';
 import './SettingsSectionNav.css';
 
-/**
- * Die drei Bereiche außerhalb der Bottom-Navigation. Reihenfolge wie im
- * Umschalter: von "allgemein" nach "einzelner Tag".
- */
+/** Die beiden Bereiche außerhalb der Bottom-Navigation, von allgemein nach speziell. */
 const SECTIONS: { to: string; labelKey: TranslationKey }[] = [
   { to: '/settings', labelKey: 'settingsNav.general' },
-  { to: '/settings/routenplaner', labelKey: 'settingsNav.routes' },
-  { to: '/settings/tagesansicht', labelKey: 'settingsNav.day' }
+  { to: '/settings/routenplaner', labelKey: 'settingsNav.routes' }
 ];
 
 /**
- * Umschalter zwischen Einstellungen, Routen und Tagesansicht.
+ * Umschalter zwischen Einstellungen und Routen.
  *
- * Die drei Seiten gehören zusammen – man vergleicht sie, statt sie
- * nacheinander abzuarbeiten – lagen aber jeweils hinter dem „Mehr"-Dropup:
- * Wer von den Routen in die Tagesansicht wollte, musste erst wieder zurück.
- * Der Umschalter steht deshalb auf allen dreien an derselben Stelle, direkt
- * unter dem Titel.
+ * Beide Seiten gehören zusammen – man vergleicht sie, statt sie nacheinander
+ * abzuarbeiten – lagen aber jeweils hinter dem „Mehr"-Dropup: Wer von den
+ * Routen in die Einstellungen wollte, musste erst wieder zurück. Der
+ * Umschalter steht deshalb auf beiden an derselben Stelle, direkt unter dem
+ * Titel.
  *
  * Bewusst echte Links: Jeder Bereich behält seine eigene Adresse, damit
- * Zurück und Neuladen dort landen, wo man war, und ein Ziel wie
- * „Tagesansicht" auch von anderswo verlinkbar bleibt.
+ * Zurück und Neuladen dort landen, wo man war, und ein Ziel wie „Routen"
+ * auch von anderswo verlinkbar bleibt.
  */
 export function SettingsSectionNav() {
   const { pathname } = useLocation();

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { totalDistanceKm, trackDurationMs, formatDuration, pointsOfSession } from './tripStats';
+import {
+  totalDistanceKm,
+  trackDurationMs,
+  formatDuration,
+  pointsOfDay,
+  pointsOfSession
+} from './tripStats';
 import { GpsPoint } from '../types';
 
 const T = 1_700_000_000_000;
@@ -59,5 +65,32 @@ describe('pointsOfSession', () => {
 
   it('ist leer, wenn zur Aufzeichnung noch kein Punkt gehört', () => {
     expect(pointsOfSession([older, nameless], 'heute')).toEqual([]);
+  });
+});
+
+describe('pointsOfDay', () => {
+  // Alle Zeiten lokal gerechnet, wie die Anzeige selbst: gleicher Kalendertag
+  // heißt gleicher Tag auf der Uhr des Geräts.
+  const noon = new Date(2026, 7, 24, 12, 0).getTime();
+  const morning = point(52, 13, new Date(2026, 7, 24, 6, 30).getTime());
+  const evening = point(53, 13, new Date(2026, 7, 24, 21, 45).getTime());
+  const yesterday = point(54, 13, new Date(2026, 7, 23, 23, 30).getTime());
+  const tomorrow = point(55, 13, new Date(2026, 7, 25, 0, 15).getTime());
+
+  it('behält nur die Punkte desselben Kalendertags', () => {
+    expect(pointsOfDay([yesterday, morning, evening, tomorrow], noon)).toEqual([morning, evening]);
+  });
+
+  it('nimmt mehrere Fahrten desselben Tages zusammen', () => {
+    // Zwei getrennte Aufzeichnungen, ein Tag – genau der Fall, für den es
+    // den Tagesausschnitt gibt.
+    const first: GpsPoint = { ...morning, sessionId: 'vormittag' };
+    const second: GpsPoint = { ...evening, sessionId: 'abend' };
+
+    expect(pointsOfDay([first, second], noon)).toEqual([first, second]);
+  });
+
+  it('ist leer, wenn an diesem Tag nichts aufgezeichnet wurde', () => {
+    expect(pointsOfDay([yesterday, tomorrow], noon)).toEqual([]);
   });
 });

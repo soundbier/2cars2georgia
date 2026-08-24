@@ -11,7 +11,13 @@ import { useQuickLogs, useTripDates } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { activeOnly } from '../lib/trash';
-import { formatDuration, pointsOfSession, totalDistanceKm, trackDurationMs } from '../lib/tripStats';
+import {
+  formatDuration,
+  pointsOfDay,
+  pointsOfSession,
+  totalDistanceKm,
+  trackDurationMs
+} from '../lib/tripStats';
 import {
   distanceUnitLabel,
   speedUnitLabel,
@@ -71,11 +77,13 @@ function useQuickLogColumns(): number {
 /**
  * Worauf sich Strecke und Dauer im Instrument beziehen.
  *
- * `trip` ist die Gesamtspur des Roadtrips, `session` nur die gerade laufende
- * Aufzeichnung. Die Wahl gibt es erst, sobald aufgezeichnet wird – ohne
- * laufende Aufzeichnung gibt es nichts zu unterscheiden.
+ * Drei Fragen, die unterwegs alle vorkommen: `session` ist die gerade
+ * laufende Route, `day` der ganze heutige Tag – auch wenn er aus zwei oder
+ * drei Routen mit Pausen dazwischen besteht – und `trip` die Gesamtspur des
+ * Roadtrips. `session` gibt es nur, solange aufgezeichnet wird; ohne
+ * laufende Aufzeichnung bleiben Tag und Gesamt.
  */
-type StatsScope = 'trip' | 'session';
+type StatsScope = 'trip' | 'day' | 'session';
 
 /** Wie viele Einträge des Tages im Cockpit stehen, bevor das Logbuch dran ist. */
 const TODAY_PREVIEW_COUNT = 4;
@@ -136,9 +144,9 @@ export default function Dashboard({ user }: { user: string }) {
   // Deshalb auch nicht gespeichert: Wer die App neu öffnet, sitzt nicht
   // zwangsläufig wieder am Steuer.
   const [driveMode, setDriveMode] = useState(false);
-  // Beginnt bei der Gesamtspur: Das ist der Wert, der auch ohne Aufzeichnung
-  // dasteht – die laufende Route ist der Sonderfall, den man dazuwählt.
-  const [statsScope, setStatsScope] = useState<StatsScope>('trip');
+  // Beginnt beim heutigen Tag: Das ist die Zahl, die unterwegs am häufigsten
+  // gesucht wird und die es auch ohne laufende Aufzeichnung gibt.
+  const [statsScope, setStatsScope] = useState<StatsScope>('day');
   const { notify } = useToast();
   const t = useT();
 
@@ -156,19 +164,21 @@ export default function Dashboard({ user }: { user: string }) {
     [allEvents]
   );
 
-  // Ohne laufende Aufzeichnung gibt es nur die Gesamtspur – ein hängen
-  // gebliebenes „Aktuelle Route" würde sonst dauerhaft 0 anzeigen.
+  // Endet die Aufzeichnung, fällt die Anzeige auf den heutigen Tag zurück –
+  // ein hängen gebliebenes „Aktuelle Route" würde sonst dauerhaft 0 anzeigen,
+  // und der Tag enthält die eben beendete Route ohnehin.
   useEffect(() => {
-    if (!activeSessionId) setStatsScope('trip');
+    if (!activeSessionId) setStatsScope((scope) => (scope === 'session' ? 'day' : scope));
   }, [activeSessionId]);
 
-  // Die Punkte der laufenden Aufzeichnung: Jeder Punkt trägt die Kennung
-  // seiner Aufzeichnung (siehe hooks/useTracking.tsx), die aktuelle Route ist
-  // also genau der Teil der Spur mit der Kennung von jetzt.
-  const scopedTrack = useMemo(
-    () => (statsScope === 'session' ? pointsOfSession(track, activeSessionId) : track),
-    [track, statsScope, activeSessionId]
-  );
+  // Der gewählte Ausschnitt der Spur: die laufende Aufzeichnung anhand der
+  // Kennung, die jeder Punkt mitträgt (siehe hooks/useTracking.tsx), der
+  // heutige Kalendertag über den Zeitstempel, sonst alles.
+  const scopedTrack = useMemo(() => {
+    if (statsScope === 'session') return pointsOfSession(track, activeSessionId);
+    if (statsScope === 'day') return pointsOfDay(track);
+    return track;
+  }, [track, statsScope, activeSessionId]);
 
   const { distance, duration } = useMemo(
     () => ({
@@ -254,30 +264,36 @@ export default function Dashboard({ user }: { user: string }) {
     </div>
   );
 
-  /* Sobald aufgezeichnet wird, gibt es zwei Antworten auf „wie weit, wie
-     lange": die des ganzen Roadtrips und die der laufenden Route. Der
-     Umschalter erscheint deshalb genau dann – vorher wäre er eine Wahl
-     zwischen derselben Zahl und derselben Zahl. */
-  const scopeSwitch = activeSessionId ? (
+  /* „Wie weit, wie lange" hat unterwegs drei Antworten: die laufende Route,
+     der heutige Tag mit allen Routen darin, der ganze Roadtrip. Die Wahl der
+     laufenden Route steht nur da, solange aufgezeichnet wird – sonst wäre sie
+     eine Wahl zwischen derselben Zahl und derselben Zahl. */
+  const scopeOptions: { value: StatsScope; label: string }[] = [
+    ...(activeSessionId ? [{ value: 'session' as const, label: t('cockpit.scopeSession') }] : []),
+    { value: 'day', label: t('cockpit.scopeDay') },
+    { value: 'trip', label: t('cockpit.scopeTrip') }
+  ];
+
+  const scopeSwitch = (
     <div className="cockpit-scope">
       <span className="label cockpit-scope-label">{t('cockpit.scopeLabel')}</span>
       <SegmentedControl
         value={statsScope}
-        options={[
-          { value: 'trip', label: t('cockpit.scopeTrip') },
-          { value: 'session', label: t('cockpit.scopeSession') }
-        ]}
+        options={scopeOptions}
         onChange={setStatsScope}
         label={t('cockpit.scopeLabel')}
       />
     </div>
-  ) : null;
+  );
 
   // Im Fahrmodus fehlt der Umschalter – dort sagt der Zusatz an der
-  // Beschriftung, welche der beiden Zahlen gerade dasteht.
-  const scopeNote = activeSessionId
-    ? ` · ${statsScope === 'session' ? t('cockpit.scopeSession') : t('cockpit.scopeTrip')}`
-    : '';
+  // Beschriftung, welche der drei Zahlen gerade dasteht.
+  const scopeLabels: Record<StatsScope, string> = {
+    session: t('cockpit.scopeSession'),
+    day: t('cockpit.scopeDay'),
+    trip: t('cockpit.scopeTrip')
+  };
+  const scopeNote = ` · ${scopeLabels[statsScope]}`;
 
   // Der Umschalter steht in beiden Modi an derselben Stelle oben rechts:
   // Wer im Fahrmodus zurück will, sucht ihn dort, wo er ihn eingeschaltet hat.

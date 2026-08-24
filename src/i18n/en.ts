@@ -169,6 +169,7 @@ export const en: Translations = {
   'cockpit.today': 'Today',
   'cockpit.driveMode': 'Drive mode',
   'cockpit.scopeLabel': 'Distance and duration for',
+  'cockpit.scopeDay': 'Today',
   'cockpit.scopeTrip': 'Total',
   'cockpit.scopeSession': 'Current route',
   'cockpit.noEntriesToday': 'No entries yet today.',
@@ -298,27 +299,10 @@ export const en: Translations = {
   'plan.emptyHint': 'Create a route per day and place its waypoints on the map.',
   'plan.downloadHint': 'The active route shows on the map tab. Download the squares along it there via “Download offline maps”.',
 
-  // --- Section switch (settings / routes / day view) ---------------------
+  // --- Section switch (settings / routes) --------------------------------
   'settingsNav.label': 'Section',
   'settingsNav.general': 'General',
   'settingsNav.routes': 'Routes',
-  'settingsNav.day': 'Day view',
-
-  // --- Day view ---------------------------------------------------------
-  'dayView.title': 'Day view',
-  'dayView.subtitle': 'Distance, driving time and events of a single day',
-  'dayView.dayLabel': 'Day',
-  'dayView.distance': 'Distance',
-  'dayView.duration': 'Driving time',
-  'dayView.authors': 'On the road: {names}',
-  'dayView.noAuthors': 'Nobody is recorded for this day yet.',
-  'dayView.events_one': '{count} event',
-  'dayView.events_other': '{count} events',
-  'dayView.noEvents': 'No events on this day',
-  'dayView.noEventsHint': 'Events come from the cockpit and the map and are listed in full in the logbook.',
-  'dayView.emptyTitle': 'No day with data yet',
-  'dayView.emptyHint':
-    'As soon as you set off or write something into the logbook, the day shows up here – no running recording needed.',
 
   // --- Logbook ----------------------------------------------------------
   'logbook.title': 'Logbook',
