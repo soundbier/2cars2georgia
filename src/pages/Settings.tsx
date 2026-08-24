@@ -36,6 +36,7 @@ import {
   ConfirmDialog,
   useToast
 } from '../components/ui';
+import { SettingsSectionNav } from '../components/SettingsSectionNav';
 import './Settings.css';
 
 interface Props {
@@ -158,6 +159,7 @@ export default function Settings({ currentUser, users }: Props) {
        Settings.css). Die Unterseiten behalten die einspaltige Liste. */
     <div className="settings-page settings-page-columns">
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
+      <SettingsSectionNav />
 
       <Section title={t('settings.thisRoadtrip')}>
         <div className="setting-row">

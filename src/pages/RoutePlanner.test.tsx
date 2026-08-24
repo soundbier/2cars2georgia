@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
@@ -115,7 +116,11 @@ function Wrapper({ children }: { children: ReactNode }) {
   return (
     <PreferencesProvider>
       <I18nProvider>
-        <ToastProvider>{children}</ToastProvider>
+        {/* Der Bereichsumschalter im Seitenkopf sind Links – ohne Router
+            gäbe es kein Ziel dafür. */}
+        <MemoryRouter initialEntries={['/settings/routenplaner']}>
+          <ToastProvider>{children}</ToastProvider>
+        </MemoryRouter>
       </I18nProvider>
     </PreferencesProvider>
   );

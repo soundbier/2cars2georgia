@@ -305,6 +305,28 @@ export const de = {
   'plan.emptyHint': 'Für jeden Tag eine Route anlegen und auf der Karte abstecken.',
   'plan.downloadHint': 'Die aktive Route liegt auf der Karte. Dort lassen sich über „Offline-Karten herunterladen“ die Felder entlang dieser Route laden.',
 
+  // --- Bereichsumschalter (Einstellungen / Routen / Tagesansicht) --------
+  'settingsNav.label': 'Bereich',
+  'settingsNav.general': 'Allgemein',
+  'settingsNav.routes': 'Routen',
+  'settingsNav.day': 'Tagesansicht',
+
+  // --- Tagesansicht -----------------------------------------------------
+  'dayView.title': 'Tagesansicht',
+  'dayView.subtitle': 'Strecke, Fahrzeit und Ereignisse eines einzelnen Tages',
+  'dayView.dayLabel': 'Tag',
+  'dayView.distance': 'Strecke',
+  'dayView.duration': 'Fahrzeit',
+  'dayView.authors': 'Unterwegs: {names}',
+  'dayView.noAuthors': 'Für diesen Tag ist noch niemand vermerkt.',
+  'dayView.events_one': '{count} Ereignis',
+  'dayView.events_other': '{count} Ereignisse',
+  'dayView.noEvents': 'Keine Ereignisse an diesem Tag',
+  'dayView.noEventsHint': 'Ereignisse kommen aus dem Cockpit und der Karte und stehen ausführlich im Logbuch.',
+  'dayView.emptyTitle': 'Noch kein Tag mit Daten',
+  'dayView.emptyHint':
+    'Sobald ihr losfahrt oder etwas ins Logbuch schreibt, steht der Tag hier – eine laufende Aufzeichnung braucht es dafür nicht.',
+
   // --- Logbuch ----------------------------------------------------------
   'logbook.title': 'Logbuch',
   'logbook.subtitle': 'Strecke, Dauer und Ereignisse der Reise',
