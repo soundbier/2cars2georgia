@@ -175,6 +175,9 @@ export const de = {
   'cockpit.fewerLogs': 'Weniger',
   'cockpit.today': 'Heute',
   'cockpit.driveMode': 'Fahrmodus',
+  'cockpit.scopeLabel': 'Strecke und Dauer für',
+  'cockpit.scopeTrip': 'Gesamt',
+  'cockpit.scopeSession': 'Aktuelle Route',
   'cockpit.noEntriesToday': 'Heute noch keine Einträge.',
 
   // --- Aufzeichnung speichern (nach dem Stoppen der Tour) ---------------

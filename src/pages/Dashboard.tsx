@@ -11,7 +11,7 @@ import { useQuickLogs, useTripDates } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { activeOnly } from '../lib/trash';
-import { formatDuration, totalDistanceKm, trackDurationMs } from '../lib/tripStats';
+import { formatDuration, pointsOfSession, totalDistanceKm, trackDurationMs } from '../lib/tripStats';
 import {
   distanceUnitLabel,
   speedUnitLabel,
@@ -20,7 +20,7 @@ import {
 } from '../lib/units';
 import { GpsPoint, LogType, LogEvent } from '../types';
 import { useT } from '../i18n';
-import { Button, EmptyState, Toggle, useToast } from '../components/ui';
+import { Button, EmptyState, SegmentedControl, Toggle, useToast } from '../components/ui';
 import { DriveMap } from '../components/DriveMap';
 import { TrackSessionDialog } from '../components/TrackSessionDialog';
 import './Dashboard.css';
@@ -68,6 +68,15 @@ function useQuickLogColumns(): number {
   return columns;
 }
 
+/**
+ * Worauf sich Strecke und Dauer im Instrument beziehen.
+ *
+ * `trip` ist die Gesamtspur des Roadtrips, `session` nur die gerade laufende
+ * Aufzeichnung. Die Wahl gibt es erst, sobald aufgezeichnet wird – ohne
+ * laufende Aufzeichnung gibt es nichts zu unterscheiden.
+ */
+type StatsScope = 'trip' | 'session';
+
 /** Wie viele Einträge des Tages im Cockpit stehen, bevor das Logbuch dran ist. */
 const TODAY_PREVIEW_COUNT = 4;
 
@@ -106,6 +115,7 @@ export default function Dashboard({ user }: { user: string }) {
     error,
     isTracking,
     setIsTracking,
+    activeSessionId,
     isPaused,
     setIsPaused,
     finishedSession,
@@ -126,6 +136,9 @@ export default function Dashboard({ user }: { user: string }) {
   // Deshalb auch nicht gespeichert: Wer die App neu öffnet, sitzt nicht
   // zwangsläufig wieder am Steuer.
   const [driveMode, setDriveMode] = useState(false);
+  // Beginnt bei der Gesamtspur: Das ist der Wert, der auch ohne Aufzeichnung
+  // dasteht – die laufende Route ist der Sonderfall, den man dazuwählt.
+  const [statsScope, setStatsScope] = useState<StatsScope>('trip');
   const { notify } = useToast();
   const t = useT();
 
@@ -143,12 +156,26 @@ export default function Dashboard({ user }: { user: string }) {
     [allEvents]
   );
 
+  // Ohne laufende Aufzeichnung gibt es nur die Gesamtspur – ein hängen
+  // gebliebenes „Aktuelle Route" würde sonst dauerhaft 0 anzeigen.
+  useEffect(() => {
+    if (!activeSessionId) setStatsScope('trip');
+  }, [activeSessionId]);
+
+  // Die Punkte der laufenden Aufzeichnung: Jeder Punkt trägt die Kennung
+  // seiner Aufzeichnung (siehe hooks/useTracking.tsx), die aktuelle Route ist
+  // also genau der Teil der Spur mit der Kennung von jetzt.
+  const scopedTrack = useMemo(
+    () => (statsScope === 'session' ? pointsOfSession(track, activeSessionId) : track),
+    [track, statsScope, activeSessionId]
+  );
+
   const { distance, duration } = useMemo(
     () => ({
-      distance: toDisplayDistance(totalDistanceKm(track), preferences.unitSystem).toFixed(1),
-      duration: formatDuration(trackDurationMs(track))
+      distance: toDisplayDistance(totalDistanceKm(scopedTrack), preferences.unitSystem).toFixed(1),
+      duration: formatDuration(trackDurationMs(scopedTrack))
     }),
-    [track, preferences.unitSystem]
+    [scopedTrack, preferences.unitSystem]
   );
 
   const handleQuickLog = async (type: LogType, title: string) => {
@@ -227,6 +254,31 @@ export default function Dashboard({ user }: { user: string }) {
     </div>
   );
 
+  /* Sobald aufgezeichnet wird, gibt es zwei Antworten auf „wie weit, wie
+     lange": die des ganzen Roadtrips und die der laufenden Route. Der
+     Umschalter erscheint deshalb genau dann – vorher wäre er eine Wahl
+     zwischen derselben Zahl und derselben Zahl. */
+  const scopeSwitch = activeSessionId ? (
+    <div className="cockpit-scope">
+      <span className="label cockpit-scope-label">{t('cockpit.scopeLabel')}</span>
+      <SegmentedControl
+        value={statsScope}
+        options={[
+          { value: 'trip', label: t('cockpit.scopeTrip') },
+          { value: 'session', label: t('cockpit.scopeSession') }
+        ]}
+        onChange={setStatsScope}
+        label={t('cockpit.scopeLabel')}
+      />
+    </div>
+  ) : null;
+
+  // Im Fahrmodus fehlt der Umschalter – dort sagt der Zusatz an der
+  // Beschriftung, welche der beiden Zahlen gerade dasteht.
+  const scopeNote = activeSessionId
+    ? ` · ${statsScope === 'session' ? t('cockpit.scopeSession') : t('cockpit.scopeTrip')}`
+    : '';
+
   // Der Umschalter steht in beiden Modi an derselben Stelle oben rechts:
   // Wer im Fahrmodus zurück will, sucht ihn dort, wo er ihn eingeschaltet hat.
   const driveModeSwitch = (
@@ -271,7 +323,10 @@ export default function Dashboard({ user }: { user: string }) {
                 dafür den Fahrmodus verlassen zu müssen. Es ist dieselbe Zahl
                 wie im Instrument und im Logbuch. */}
             <div className="cockpit-drive-distance">
-              <span className="label">{t('logbook.distance')}</span>
+              <span className="label">
+                {t('logbook.distance')}
+                {scopeNote}
+              </span>
               <span className="cockpit-drive-distance-value">
                 {distance} {distanceUnitLabel(preferences.unitSystem)}
               </span>
@@ -356,6 +411,10 @@ export default function Dashboard({ user }: { user: string }) {
             </div>
           </dl>
         </section>
+
+        {/* Der Bezug von Strecke und Dauer – auf dem Papier, nicht im
+            Instrument: Das Instrument bleibt ein reines Ablesegerät. */}
+        {scopeSwitch}
 
         {/* Ebene 4: primäre Aktionen, in Daumenreichweite direkt unter dem
             Instrument. */}
