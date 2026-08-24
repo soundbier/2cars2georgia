@@ -4,6 +4,7 @@ import { Check, Copy, MapPin, Pencil, Plus, Route as RouteIcon, Trash2, Undo2, W
 import { OfflineTileLayer } from '../components/OfflineTileLayer';
 import { RouteEditorLayer, useRouteEditor } from '../components/RoutePlanner';
 import { RouteEditDialog } from '../components/RouteEditDialog';
+import { SettingsSectionNav } from '../components/SettingsSectionNav';
 import { useCollection } from '../hooks/useCollection';
 import { usePlannedRoutes } from '../hooks/usePlannedRoutes';
 import { useTrackSessions } from '../hooks/useTrackSessions';
@@ -210,6 +211,7 @@ export default function RoutePlanner() {
   return (
     <div className="settings-page">
       <PageHeader title={t('plan.title')} subtitle={t('plan.subtitle')} />
+      <SettingsSectionNav />
 
       {staking && planner.canEdit && (
         <Section title={t('plan.editTitle', { name: routeLabel(staking) })}>

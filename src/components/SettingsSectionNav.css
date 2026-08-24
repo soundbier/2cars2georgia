@@ -1,0 +1,19 @@
+/* Der Umschalter läuft über die ganze Breite: drei Ziele, gleich breit, auf
+   dem Telefon sicher zu treffen. */
+.settings-section-nav {
+  display: flex;
+  width: 100%;
+  margin-bottom: var(--space-5);
+}
+
+.settings-section-nav .segmented-option {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  /* Der aktive Zustand bringt einen Rahmen mit – hier schon reserviert,
+     damit die Beschriftungen beim Wechseln nicht springen. */
+  border: 1px solid transparent;
+}
