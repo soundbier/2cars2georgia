@@ -12,7 +12,9 @@
   width: 100%;
 }
 
-/* Marker: von L.divIcon in dotIcon()/boatIcon() eingehängt. */
+/* Marker: von L.divIcon in dotIcon()/boatIcon() eingehängt. Die Kantenlänge
+   ist der Ausgangswert – dotIcon() schreibt eine abweichende Größe inline
+   dazu (Einstellungen → Karte). */
 .map-marker-dot {
   width: 16px;
   height: 16px;
@@ -29,6 +31,8 @@
 /* ---- Schwebende Kartenbedienung ---------------------------------------- */
 
 .map-controls {
+  /* Kantenlänge der Knöpfe – aus den Einstellungen, siehe MapTab.tsx. */
+  --map-control-size: 44px;
   position: absolute;
   /* Im Querformat liegt der Notch seitlich – die Knöpfe rücken davor. */
   right: calc(var(--space-3) + var(--safe-right));
@@ -42,8 +46,8 @@
 }
 
 .map-control {
-  width: 44px;
-  height: 44px;
+  width: var(--map-control-size);
+  height: var(--map-control-size);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-strong);
   background: var(--color-bg-raised);

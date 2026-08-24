@@ -14,7 +14,12 @@ import {
   Trash2
 } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { usePreferences, QUICK_LOG_ROW_OPTIONS } from '../hooks/usePreferences';
+import {
+  usePreferences,
+  QUICK_LOG_ROW_OPTIONS,
+  MAP_ELEMENT_SIZES,
+  MapElementSize
+} from '../hooks/usePreferences';
 import { useRoadtrip } from '../hooks/useRoadtrip';
 import { usePermissions } from '../hooks/usePermissions';
 import { signOutAccount } from '../lib/authAccount';
@@ -49,6 +54,16 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string }[] = [
   { value: 'metric', label: 'km/h' },
   { value: 'nautical', label: 'kn' }
 ];
+
+/**
+ * Beschriftung der drei Größenstufen für die Kartenelemente. Die Pixelmaße
+ * dahinter stehen dort, wo gezeichnet wird (pages/MapTab.tsx).
+ */
+const SIZE_LABEL_KEY: Record<MapElementSize, TranslationKey> = {
+  small: 'settings.sizeSmall',
+  medium: 'settings.sizeMedium',
+  large: 'settings.sizeLarge'
+};
 
 const TRACK_INTERVALS: { value: number; labelKey: TranslationKey }[] = [
   { value: 10_000, labelKey: 'settings.interval10s' },
@@ -282,6 +297,57 @@ export default function Settings({ currentUser, users }: Props) {
         <p className="helper-text setting-note">
           {t('settings.layerNote')}
         </p>
+
+        <SettingRow
+          label={t('settings.mapEvents')}
+          description={t('settings.mapEventsDescription')}
+        >
+          <Toggle
+            label={t('settings.mapEvents')}
+            checked={preferences.showMapEvents}
+            onChange={(value) => setPreference('showMapEvents', value)}
+          />
+        </SettingRow>
+
+        {/* Die Größe der Marker steht nur da, solange es Marker gibt – eine
+            Wahl ohne Wirkung wäre schlimmer als eine Wahl weniger. */}
+        {preferences.showMapEvents && (
+          <SettingRow
+            label={t('settings.mapEventSize')}
+            description={t('settings.mapEventSizeDescription')}
+          >
+            <Select
+              className="setting-select"
+              aria-label={t('settings.mapEventSize')}
+              value={preferences.mapEventSize}
+              onChange={(e) => setPreference('mapEventSize', e.target.value as MapElementSize)}
+            >
+              {MAP_ELEMENT_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {t(SIZE_LABEL_KEY[size])}
+                </option>
+              ))}
+            </Select>
+          </SettingRow>
+        )}
+
+        <SettingRow
+          label={t('settings.mapControlSize')}
+          description={t('settings.mapControlSizeDescription')}
+        >
+          <Select
+            className="setting-select"
+            aria-label={t('settings.mapControlSize')}
+            value={preferences.mapControlSize}
+            onChange={(e) => setPreference('mapControlSize', e.target.value as MapElementSize)}
+          >
+            {MAP_ELEMENT_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {t(SIZE_LABEL_KEY[size])}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
       </Section>
 
       <Section title={t('settings.recording')}>
