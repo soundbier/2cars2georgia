@@ -264,6 +264,62 @@ Die Seite liest nur. Deshalb gibt es keine Rechteprüfung – ein
 Read-only-Mitglied sieht dieselbe Auswertung – und keine neuen Collections
 oder Felder in `firestore.rules`.
 
+## Toiletten
+
+Unter Mehr → Toiletten (`src/pages/Toilets.tsx`) stehen der Zähler und die
+Karte der eingetragenen Stopps – bewusst als eigener Tab und nicht im Logbuch.
+Das Logbuch ist die Chronik, die man abends durchblättert und als Tagesbild
+teilt; diese Einträge tauchen deshalb weder unter den Ereignissen noch auf dem
+Kartentab, im Tagesbild, in der Statistik oder im Export auf. Sie leben
+ausschließlich auf dieser Seite.
+
+Gespeichert wird in **zwei** Collections, und das ist der Kern der Sache:
+
+* **`roadtrips/{tripId}/toiletStops`** – der Marker: Zeit, Ort, Autor und die
+  Art der Örtlichkeit (Tankstelle, Restaurant, Wald, Campingplatz …). Für die
+  ganze Crew lesbar, denn genau das nützt gemeinsam: Wo gab es unterwegs
+  überhaupt eine Toilette?
+* **`roadtrips/{tripId}/toiletDetails`** – die Beschreibung nach der
+  Bristol-Stuhlformen-Skala (Typ 1–7), unter derselben Dokument-Id. Lesen und
+  Schreiben darf sie ausschließlich die Person, die sie eingetragen hat.
+
+Die Teilung ist keine Vorliebe, sondern Firestore: Leserechte gelten pro
+Dokument, nicht pro Feld. Stünde der Bristol-Typ im selben Dokument wie der
+Marker, wäre er für jedes Crewmitglied mitlesbar – auch wenn die Oberfläche ihn
+verstecken würde. Aus derselben Regel folgt, dass die App die Beschreibungen
+nur gefiltert abfragen darf (`where('authorId', '==', uid)`, siehe
+`src/hooks/useToiletStops.ts`): Eine Abfrage über die ganze Collection würde
+fremde Dokumente treffen und wird komplett abgelehnt. Beide Richtungen sind in
+`tests/rules/firestore.rules.test.ts` abgedeckt, inklusive der Probe, dass auch
+der Owner nicht in eine fremde Beschreibung sehen kann.
+
+Zwei Schreibvorgänge statt einer Transaktion: Marker und Beschreibung liegen in
+verschiedenen Collections und entstehen oft ohne Netz. Firestore wendet beide
+sofort lokal an und schickt sie einzeln nach; bliebe die Beschreibung dabei auf
+der Strecke, steht der Marker eben unbeschrieben da.
+
+Eingetragen wird auf zwei Wegen: „Hier eintragen" nimmt die aktuelle
+GPS-Position, „Auf Karte setzen" macht den nächsten Tipp auf die Karte zum
+Eintrag – für alles, was erst abends nachgetragen wird. Danach endet der
+Setzmodus wieder, sonst legte der nächste Tipp gleich den nächsten Eintrag an.
+Eigene Marker lassen sich verschieben; geändert wird ansonsten im Popup, samt
+Koordinatenfeldern wie auf dem Kartentab.
+
+Gelöscht wird weich wie überall (`deletedAt`, siehe `src/lib/trash.ts`): Der
+Stopp wandert in den Papierkorb und ist über den Rückgängig-Toast sofort und
+unter Einstellungen → Papierkorb noch 30 Tage zurückzuholen. Dort steht nur der
+Marker mit Örtlichkeit, Tag und Autor – die Beschreibung liest der Papierkorb
+gar nicht erst; sie hängt still an ihrer Id und wird beim endgültigen Löschen
+mit entfernt (Firestore kaskadiert nicht von selbst).
+
+Die Skala selbst steht in `src/lib/toiletStops.ts`, zusammen mit den Zählungen.
+Gerechnet wird auch hier alles beim Anzeigen, gespeichert nichts – aus
+demselben Grund wie in der Statistik. Die Einordnung in „eher fest / im Rahmen /
+eher weich" ist genau das und keine Diagnose.
+
+Nach dem Einspielen dieser Änderung müssen die Firestore-Regeln veröffentlicht
+werden (siehe unten) – ohne sie lehnt der Server beide neuen Collections ab.
+
 ## Karte: Ereignisse und Knopfgrößen
 
 Beides steht unter Einstellungen → Karte, nicht als weiterer Knopf auf der

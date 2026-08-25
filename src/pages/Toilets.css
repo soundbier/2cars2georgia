@@ -1,0 +1,36 @@
+/* Die Seite trägt oben Kennzahlen und darunter Papier-Abschnitte – wie die
+   Statistik. Eigene Stile braucht nur, was es dort nicht gibt: die Karte
+   mitten auf der Seite und die beiden Zeilen darum herum. */
+
+.toilets-page {
+  padding-bottom: var(--space-6);
+}
+
+/* Hoch genug, um mehrere Stopps nebeneinander zu sehen, niedrig genug, dass
+   die Auswertung darunter noch als „geht weiter" erkennbar bleibt. */
+.toilets-map {
+  height: 45vh;
+  min-height: 260px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Im Setzmodus ist der nächste Tipp ein Eintrag, kein Verschieben – das
+   Fadenkreuz sagt es, bevor jemand es ausprobiert. */
+.toilets-map-placing {
+  cursor: crosshair;
+}
+
+.toilets-map-placing .leaflet-grab {
+  cursor: crosshair;
+}
+
+.toilets-crew-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.toilets-dominant {
+  margin-top: var(--space-3);
+}

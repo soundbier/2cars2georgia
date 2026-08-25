@@ -3,6 +3,7 @@ import { deleteDoc, deleteField, doc, updateDoc } from 'firebase/firestore';
 import {
   RotateCcw,
   Trash2,
+  Bath,
   BookOpen,
   Wallet,
   ShieldCheck,
@@ -21,10 +22,20 @@ import { useQuickLogs } from '../../hooks/useSettings';
 import { writeOptimistically } from '../../lib/writeOutcome';
 import { activeOnly, deletedOnly, isExpired, retentionDaysLeft, TRASH_RETENTION_MS } from '../../lib/trash';
 import { plannedRouteLengthMeters, routeFromDoc } from '../../lib/plannedRoute';
+import { placeLabelKey, TOILET_DETAILS, TOILET_STOPS } from '../../lib/toiletStops';
 import { formatDistance } from '../../lib/units';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useI18n, useT } from '../../i18n';
-import { Dish, Expense, InventoryItem, LogEvent, MealPlanEntry, ShoppingListExtra, TrackSession } from '../../types';
+import {
+  Dish,
+  Expense,
+  InventoryItem,
+  LogEvent,
+  MealPlanEntry,
+  ShoppingListExtra,
+  ToiletStop,
+  TrackSession
+} from '../../types';
 import {
   Button,
   Section,
@@ -47,7 +58,8 @@ type TrashCollection =
   | 'inventory'
   | 'shoppingListExtras'
   | 'plannedRoutes'
-  | 'trackSessions';
+  | 'trackSessions'
+  | 'toiletStops';
 
 /** Wie eine geplante Route aus Firestore hereinkommt (siehe lib/plannedRoute.ts). */
 type PlannedRouteDoc = Record<string, unknown> & { id: string };
@@ -60,7 +72,8 @@ const ICON_BY_COLLECTION: Record<TrashCollection, typeof BookOpen> = {
   inventory: Package,
   shoppingListExtras: ShoppingCart,
   plannedRoutes: Waypoints,
-  trackSessions: RouteIcon
+  trackSessions: RouteIcon,
+  toiletStops: Bath
 };
 
 interface TrashItem {
@@ -107,6 +120,14 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
   const trackSessions = useCollection<TrackSession>(
     tripId ? tripPath(tripId, 'trackSessions') : null,
     'startedAt',
+    'desc'
+  );
+  // Nur die Marker – die private Beschreibung dazu liest der Papierkorb gar
+  // nicht erst (siehe lib/toiletStops.ts); sie hängt still an ihrer Id und
+  // geht beim endgültigen Löschen mit.
+  const toiletStops = useCollection<ToiletStop>(
+    tripId ? tripPath(tripId, TOILET_STOPS) : null,
+    'timestamp',
     'desc'
   );
 
@@ -190,6 +211,14 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
       deletedAt: session.deletedAt!
     }));
 
+    const deletedToiletStops = deletedOnly(toiletStops).map<TrashItem>((stop) => ({
+      id: stop.id!,
+      collectionName: 'toiletStops',
+      title: t(placeLabelKey(stop.placeType)),
+      subtitle: `${new Date(stop.timestamp).toLocaleDateString(locale)} · ${stop.author}`,
+      deletedAt: stop.deletedAt!
+    }));
+
     return [
       ...deletedEvents,
       ...deletedExpenses,
@@ -198,7 +227,8 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
       ...deletedInventory,
       ...deletedExtras,
       ...deletedRoutes,
-      ...deletedSessions
+      ...deletedSessions,
+      ...deletedToiletStops
     ].sort((a, b) => b.deletedAt - a.deletedAt);
   }, [
     events,
@@ -209,6 +239,7 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
     shoppingListExtras,
     plannedRoutes,
     trackSessions,
+    toiletStops,
     preferences.unitSystem,
     locale,
     quickLogs,
@@ -236,12 +267,19 @@ export default function TrashSettings({ currentUser }: { currentUser: string }) 
     // über den Firestore-Cache und sollen einzeln nachziehen können. Auf die
     // Server-Bestätigung wird nicht gewartet, siehe lib/writeOutcome.ts.
     let reported = false;
+    const fail = () => {
+      if (reported) return;
+      reported = true;
+      notify(t('trash.purgeFailed'), 'danger');
+    };
     for (const item of toPurge) {
-      writeOptimistically(deleteDoc(doc(db, tripPath(tripId, item.collectionName), item.id)), () => {
-        if (reported) return;
-        reported = true;
-        notify(t('trash.purgeFailed'), 'danger');
-      });
+      writeOptimistically(deleteDoc(doc(db, tripPath(tripId, item.collectionName), item.id)), fail);
+      // Firestore löscht nichts kaskadierend: Die Beschreibung eines
+      // Toilettenstopps liegt unter derselben Id in einer eigenen Collection
+      // und bliebe sonst als Waise zurück.
+      if (item.collectionName === 'toiletStops') {
+        writeOptimistically(deleteDoc(doc(db, tripPath(tripId, TOILET_DETAILS), item.id)), fail);
+      }
     }
     notify(
       toPurge.length === 1 ? t('trash.purgedOne') : t('trash.purgedMany', { count: toPurge.length }),

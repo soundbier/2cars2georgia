@@ -227,3 +227,62 @@ export interface ShoppingListCheck {
   checkedBy: string;
   checkedAt: number;
 }
+
+// ============================================================
+// Toiletten: Zähler und Karte (siehe pages/Toilets.tsx)
+// ============================================================
+
+/**
+ * Bristol-Stuhlformen-Skala, Typ 1 bis 7 – von harten Kügelchen (1) bis
+ * flüssig (7), Typ 4 ist die vielzitierte glatte Wurst.
+ *
+ * Bewusst die etablierte Skala statt eigener Umschreibungen: Sie ist kurz,
+ * eindeutig und sortierbar, und die Verteilung darüber ist die einzige
+ * Auswertung, die aus diesen Einträgen überhaupt etwas Sinnvolles macht.
+ */
+export type BristolType = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** Was für eine Örtlichkeit es war – die Frage, die bei der Reiseplanung hilft. */
+export type ToiletPlaceType =
+  | 'gasStation'
+  | 'restaurant'
+  | 'nature'
+  | 'campsite'
+  | 'publicToilet'
+  | 'accommodation'
+  | 'vehicle'
+  | 'other';
+
+/**
+ * Der Marker auf der Karte: wann, wo, von wem, was für ein Ort.
+ *
+ * Sichtbar für die ganze Crew – das ist der Teil, der gemeinsam etwas
+ * nützt („an der Tankstelle vor Batumi gibt es eine"). Die Beschreibung
+ * gehört bewusst NICHT hierher, sondern in ToiletDetail: Firestore kennt
+ * keine feldweisen Leserechte, privat bleibt also nur, was in einem eigenen
+ * Dokument liegt.
+ */
+export interface ToiletStop extends Coordinates {
+  id?: string;
+  timestamp: number;
+  author: string;
+  /** UID der Person, die den Stopp eingetragen hat – Schlüssel für ToiletDetail. */
+  authorId: string;
+  placeType: ToiletPlaceType;
+  /** Gesetzt, sobald der Eintrag im Papierkorb liegt – siehe lib/trash.ts. */
+  deletedAt?: number;
+}
+
+/**
+ * Die private Beschreibung zu einem Stopp, unter derselben Dokument-Id.
+ *
+ * Liest und schreibt nur die Person, die sie angelegt hat (siehe
+ * firestore.rules) – deshalb steht `authorId` auch hier und nicht nur am
+ * Stopp: Die Regel prüft das Dokument, das sie vor sich hat, und die
+ * Abfrage der App filtert danach.
+ */
+export interface ToiletDetail {
+  id?: string;
+  authorId: string;
+  bristolType: BristolType;
+}

@@ -1,0 +1,125 @@
+/* Kennzahlen liegen wie im Logbuch direkt auf dem Papier – keine Card je
+   Zahl. Zwei Spalten auf dem Handy, mehr sobald Platz da ist; die Trennung
+   machen Linien, nicht Kästen. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4) var(--space-3);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (min-width: 600px) {
+  .stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .stat-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.stat-tile {
+  min-width: 0;
+}
+
+.stat-tile-icon {
+  display: block;
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-1);
+}
+
+.stat-tile-value {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--color-text);
+  /* Lange Werte („1.234,5 km") dürfen umbrechen statt die Spalte zu sprengen. */
+  overflow-wrap: anywhere;
+}
+
+.stat-tile-label {
+  margin-top: 2px;
+}
+
+.stat-tile-hint {
+  font-size: var(--text-label);
+  margin-top: 2px;
+}
+
+.stat-bars {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-3);
+}
+
+/* Der Balken liegt hinter der Zeile, nicht daneben: Auf Handybreite bleibt
+   für eine eigene Balkenspalte kein Platz, und Beschriftung wie Wert sollen
+   an ihren Rändern stehen bleiben. */
+.stat-bar {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  isolation: isolate;
+}
+
+.stat-bar:last-child {
+  border-bottom: none;
+}
+
+.stat-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  background: var(--color-accent-muted);
+  border-radius: var(--radius-sm);
+  transition: width var(--duration-fast) ease-out;
+}
+
+.stat-bar-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stat-bar-hint {
+  font-weight: 400;
+  font-size: var(--text-label);
+}
+
+.stat-bar-value {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+/* Anklickbare Zeilen (Tage, Fahrten) stellen den Ausschnitt oben um. Sie
+   sehen aus wie die übrigen – der Unterschied zeigt sich beim Berühren. */
+.stat-bar-button {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.stat-bar-button:hover .stat-bar-fill,
+.stat-bar-button:focus-visible .stat-bar-fill {
+  background: var(--color-accent-border);
+}

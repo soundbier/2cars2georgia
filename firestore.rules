@@ -573,6 +573,72 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // --- Toiletten: Marker (geteilt) -------------------------------------
+      // Bewusst getrennt von der Beschreibung darunter: Firestore-Regeln
+      // vergeben Leserechte pro Dokument, nicht pro Feld. Alles, was in
+      // diesem Dokument steht, ist damit für die ganze Crew lesbar – und
+      // genau das soll es auch sein: Wo es unterwegs eine Toilette gab,
+      // nützt gemeinsam. Siehe src/lib/toiletStops.ts.
+      match /toiletStops/{stopId} {
+        function isToiletStop() {
+          return fieldsAre(['timestamp', 'author', 'authorId', 'lat', 'lng', 'placeType'],
+                           ['deletedAt'])
+            && isEpochMillis('timestamp')
+            && isText('author', 60)
+            && data().authorId is string
+            && data().authorId.size() > 0
+            && isOptionalEpochMillis('deletedAt')
+            && isLatitude('lat')
+            && isLongitude('lng')
+            && data().placeType in ['gasStation', 'restaurant', 'nature', 'campsite',
+                                    'publicToilet', 'accommodation', 'vehicle', 'other'];
+        }
+
+        allow read: if isMember();
+        // Wie beim Logbuch: Anlegen und Ändern darf die schreibende Crew,
+        // endgültig entfernen nur der Owner über den Papierkorb. Dass die
+        // Oberfläche fremde Marker in Ruhe lässt, ist Höflichkeit, keine
+        // Sicherheitsgrenze – die verläuft eine Collection weiter unten.
+        // Ändern lassen muss die Regel es trotzdem: Sonst könnte niemand
+        // sonst einen versehentlich gelöschten Marker aus dem Papierkorb
+        // zurückholen (siehe pages/settings/TrashSettings.tsx).
+        allow create: if canWrite() && isToiletStop() && data().authorId == request.auth.uid;
+        // Die Urheberschaft bleibt dabei stehen: Sie ist der Schlüssel zur
+        // privaten Beschreibung darunter, ein Umschreiben würde sie von
+        // ihrem Marker trennen.
+        allow update: if canWrite() && isToiletStop()
+          && data().authorId == resource.data.authorId;
+        allow delete: if isOwner();
+      }
+
+      // --- Toiletten: Beschreibung (privat) --------------------------------
+      // Die Bristol-Angabe zum gleichnamigen Marker. Hier ist das Lesen
+      // wirklich eingeschränkt: nur die Person, die sie eingetragen hat.
+      // Deshalb muss die App danach filtern (where authorId == uid, siehe
+      // src/hooks/useToiletStops.ts) – eine Abfrage über die ganze
+      // Collection würde fremde Dokumente treffen und wird abgelehnt.
+      match /toiletDetails/{stopId} {
+        function isToiletDetail() {
+          return fieldsAre(['authorId', 'bristolType'], [])
+            && data().authorId == request.auth.uid
+            && data().bristolType is int
+            && data().bristolType >= 1
+            && data().bristolType <= 7;
+        }
+
+        allow read: if isMember() && resource.data.authorId == request.auth.uid;
+        allow create: if canWrite() && isToiletDetail();
+        // Zusätzlich zum Inhalt zählt beim Ändern, wem der bestehende
+        // Datensatz gehört: Lesen kann ihn ein fremdes Konto ohnehin nicht,
+        // blind überschreiben soll es ihn auch nicht können.
+        allow update: if canWrite() && isToiletDetail()
+          && resource.data.authorId == request.auth.uid;
+        // Der Owner darf mit aufräumen, ohne je hineinzusehen: Beim
+        // endgültigen Löschen im Papierkorb geht die Beschreibung mit dem
+        // Marker (Firestore kaskadiert nicht von selbst).
+        allow delete: if isOwner() || (isMember() && resource.data.authorId == request.auth.uid);
+      }
+
       // --- Fehlerprotokoll -------------------------------------------------
       // Von src/lib/errorLog.ts befüllt, damit Abstürze auf den Geräten der
       // Crew nachvollziehbar sind. Nur anhängen, nie ändern.
