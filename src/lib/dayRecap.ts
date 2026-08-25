@@ -25,7 +25,8 @@ export interface DayRecap {
   authors: string[];
 }
 
-function dayKey(timestamp: number): DayKey {
+/** Kalendertag eines Zeitstempels in der lokalen Zeitzone des Geräts. */
+export function dayKey(timestamp: number): DayKey {
   const d = new Date(timestamp);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');

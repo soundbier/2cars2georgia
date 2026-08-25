@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   ShieldCheck,
   BarChart3,
+  Bath,
   Compass,
   LucideIcon
 } from 'lucide-react';
@@ -31,6 +32,7 @@ import Dashboard from './pages/Dashboard';
 import MapTab from './pages/MapTab';
 import Stats from './pages/Stats';
 import Statistics from './pages/Statistics';
+import Toilets from './pages/Toilets';
 import Costs from './pages/Costs';
 import Settings from './pages/Settings';
 import CrewSettings from './pages/settings/CrewSettings';
@@ -57,6 +59,8 @@ const NAV_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = 
 /** Ziele des "Mehr"-Dropups, siehe Bottom-Navigation weiter unten. */
 const MORE_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = [
   { to: '/statistik', labelKey: 'nav.statistics', icon: BarChart3 },
+  /* Eigener Eintrag statt einer Zeile im Logbuch: siehe pages/Toilets.tsx. */
+  { to: '/toiletten', labelKey: 'nav.toilets', icon: Bath },
   { to: '/settings/verpflegung', labelKey: 'kombuese.sectionTitle', icon: UtensilsCrossed },
   { to: '/settings/routenplaner', labelKey: 'plan.title', icon: RouteIcon },
   { to: '/settings', labelKey: 'nav.settings', icon: SettingsIcon }
@@ -112,6 +116,7 @@ function AppShell() {
             <Route path="/map" element={<MapTab user={user} />} />
             <Route path="/stats" element={<Stats user={user} />} />
             <Route path="/statistik" element={<Statistics />} />
+            <Route path="/toiletten" element={<Toilets />} />
             <Route path="/costs" element={<Costs user={user} users={users} />} />
             <Route path="/settings" element={<Settings currentUser={user} users={users} />} />
             <Route path="/settings/crew" element={<CrewSettings />} />

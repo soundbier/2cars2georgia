@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   BarChart3,
   Clock,
@@ -32,6 +32,7 @@ import { formatDistance, formatSpeed, toDisplaySpeed } from '../lib/units';
 import { GpsPoint, LogEvent, TrackSession } from '../types';
 import { useI18n, useT } from '../i18n';
 import { EmptyState, PageHeader, Section, Select, SegmentedControl } from '../components/ui';
+import { BarRow, StatTile } from '../components/StatTile';
 import { SpeedChart } from '../components/SpeedChart';
 import './Statistics.css';
 
@@ -47,61 +48,6 @@ type ScopeKind = 'trip' | 'day' | 'route';
 
 /** Wie viele Klassen das Geschwindigkeits-Histogramm bekommt. */
 const SPEED_BUCKETS = 6;
-
-interface StatTileProps {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  hint?: string;
-}
-
-/** Eine Kennzahl. Kein eigenes Papier – die Kacheln teilen sich die Fläche der Seite. */
-function StatTile({ icon, label, value, hint }: StatTileProps) {
-  return (
-    <div className="stat-tile">
-      <span className="stat-tile-icon">{icon}</span>
-      <div className="stat-tile-value mono-num">{value}</div>
-      <div className="label stat-tile-label">{label}</div>
-      {hint && <div className="helper-text stat-tile-hint">{hint}</div>}
-    </div>
-  );
-}
-
-interface BarRowProps {
-  label: ReactNode;
-  value: string;
-  /** Anteil am größten Wert der Liste, 0…1 – die Länge des Balkens. */
-  ratio: number;
-  hint?: string;
-  onSelect?: () => void;
-}
-
-/**
- * Eine Zeile mit Balken – für Ranglisten (Tage, Fahrten, Crew, Kategorien).
- *
- * Der Balken liegt hinter der Zeile statt daneben: Auf Handybreite bleibt für
- * eine eigene Balkenspalte kein Platz, und die Zahl soll trotzdem am Rand
- * ausgerichtet stehen bleiben.
- */
-function BarRow({ label, value, ratio, hint, onSelect }: BarRowProps) {
-  const content = (
-    <>
-      <span className="stat-bar-fill" style={{ width: `${Math.max(0, Math.min(1, ratio)) * 100}%` }} />
-      <span className="stat-bar-label">
-        {label}
-        {hint && <span className="helper-text stat-bar-hint">{hint}</span>}
-      </span>
-      <span className="stat-bar-value mono-num">{value}</span>
-    </>
-  );
-
-  if (!onSelect) return <div className="stat-bar">{content}</div>;
-  return (
-    <button type="button" className="stat-bar stat-bar-button" onClick={onSelect}>
-      {content}
-    </button>
-  );
-}
 
 /**
  * Statistik: die gespeicherten Fahrdaten ausgewertet.

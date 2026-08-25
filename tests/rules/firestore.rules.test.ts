@@ -10,11 +10,13 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   setDoc,
   deleteDoc,
   updateDoc,
   deleteField,
-  serverTimestamp
+  serverTimestamp,
+  where
 } from 'firebase/firestore';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
@@ -162,6 +164,20 @@ const validShoppingListExtra = {
   checked: false,
   author: 'Leon',
   timestamp: NOW
+};
+
+const validToiletStop = {
+  timestamp: NOW,
+  author: 'Leon',
+  authorId: MEMBER_UID,
+  lat: 41.7151,
+  lng: 44.8271,
+  placeType: 'gasStation'
+};
+
+const validToiletDetail = {
+  authorId: MEMBER_UID,
+  bristolType: 4
 };
 
 const validShoppingListCheck = {
@@ -1173,6 +1189,126 @@ describe('Einstellungen', () => {
     await seed(`roadtrips/${TRIP}/settings/general`, { startDate: '2026-07-01' });
     await assertFails(deleteDoc(doc(memberDb(), `roadtrips/${TRIP}/settings/general`)));
     await assertSucceeds(deleteDoc(doc(ownerDb(), `roadtrips/${TRIP}/settings/general`)));
+  });
+});
+
+describe('Toilettenstopps (geteilte Marker)', () => {
+  const path = `roadtrips/${TRIP}/toiletStops/s1`;
+
+  it('nimmt einen gültigen Stopp an', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validToiletStop));
+  });
+
+  it('verweigert Readonly das Anlegen', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(
+      setDoc(doc(readonlyDb(), path), { ...validToiletStop, authorId: READONLY_UID })
+    );
+  });
+
+  it('weist eine unbekannte Örtlichkeit ab', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validToiletStop, placeType: 'bahnhof' }));
+  });
+
+  it('weist unbekannte Felder ab – die Beschreibung gehört nicht hierher', async () => {
+    // Der Marker ist für die ganze Crew lesbar. Stünde der Bristol-Typ in
+    // diesem Dokument, wäre er es auch – genau deshalb hat er eine eigene
+    // Collection (siehe src/lib/toiletStops.ts).
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validToiletStop, bristolType: 4 }));
+  });
+
+  it('lässt niemanden im Namen einer anderen Person eintragen', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validToiletStop, authorId: OWNER_UID }));
+  });
+
+  it('lässt die Crew fremde Marker ändern, aber nicht umschreiben', async () => {
+    // Ändern muss erlaubt bleiben, sonst käme ein versehentlich gelöschter
+    // Marker nie aus dem Papierkorb zurück. Die Urheberschaft bleibt dabei
+    // stehen: Sie ist der Schlüssel zur privaten Beschreibung.
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletStop);
+    const db = ownerDb();
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: NOW }));
+    await assertSucceeds(updateDoc(doc(db, path), { deletedAt: deleteField() }));
+    await assertFails(updateDoc(doc(db, path), { authorId: OWNER_UID }));
+  });
+
+  it('lässt jedes Mitglied die Marker lesen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletStop);
+    await assertSucceeds(getDoc(doc(readonlyDb(), path)));
+    await assertSucceeds(getDocs(collection(ownerDb(), `roadtrips/${TRIP}/toiletStops`)));
+    await assertFails(getDoc(doc(outsiderDb(), path)));
+  });
+
+  it('erlaubt das endgültige Löschen nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletStop);
+    await assertFails(deleteDoc(doc(memberDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
+  });
+});
+
+describe('Toilettenbeschreibungen (privat)', () => {
+  const path = `roadtrips/${TRIP}/toiletDetails/s1`;
+
+  it('nimmt die eigene Beschreibung an', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(memberDb(), path), validToiletDetail));
+  });
+
+  it('weist einen Bristol-Typ außerhalb der Skala ab', async () => {
+    await seedTripWithCrew(TRIP);
+    const db = memberDb();
+    await assertFails(setDoc(doc(db, path), { ...validToiletDetail, bristolType: 0 }));
+    await assertFails(setDoc(doc(db, path), { ...validToiletDetail, bristolType: 8 }));
+    await assertFails(setDoc(doc(db, path), { ...validToiletDetail, bristolType: '4' }));
+  });
+
+  it('lässt niemanden im Namen einer anderen Person beschreiben', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(memberDb(), path), { ...validToiletDetail, authorId: OWNER_UID }));
+  });
+
+  it('lässt die Beschreibung nur die Person lesen, die sie geschrieben hat', async () => {
+    // Der Kern der Trennung: Mitglied im selben Roadtrip zu sein reicht hier
+    // ausdrücklich nicht – auch der Owner kommt nicht hinein.
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletDetail);
+    await assertSucceeds(getDoc(doc(memberDb(), path)));
+    await assertFails(getDoc(doc(ownerDb(), path)));
+    await assertFails(getDoc(doc(readonlyDb(), path)));
+    await assertFails(getDoc(doc(outsiderDb(), path)));
+  });
+
+  it('erlaubt die Abfrage nur mit Filter auf die eigene UID', async () => {
+    // Genau so fragt die App (src/hooks/useToiletStops.ts): ohne den Filter
+    // träfe die Abfrage fremde Dokumente und wird komplett abgelehnt.
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletDetail);
+    await seed(`roadtrips/${TRIP}/toiletDetails/s2`, { authorId: OWNER_UID, bristolType: 6 });
+    const db = memberDb();
+    const all = collection(db, `roadtrips/${TRIP}/toiletDetails`);
+    await assertFails(getDocs(all));
+    await assertSucceeds(getDocs(query(all, where('authorId', '==', MEMBER_UID))));
+    await assertFails(getDocs(query(all, where('authorId', '==', OWNER_UID))));
+  });
+
+  it('lässt eine fremde Beschreibung auch nicht blind überschreiben', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletDetail);
+    await assertFails(setDoc(doc(ownerDb(), path), { authorId: OWNER_UID, bristolType: 1 }));
+  });
+
+  it('räumt sie mit dem Marker weg: Owner darf löschen, ohne je zu lesen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(path, validToiletDetail);
+    await assertFails(deleteDoc(doc(readonlyDb(), path)));
+    await assertSucceeds(deleteDoc(doc(ownerDb(), path)));
   });
 });
 
