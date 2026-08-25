@@ -95,6 +95,17 @@
   flex-shrink: 0;
 }
 
-.logbook-recap-button {
+/* Tagesbild und Auswertung stehen nebeneinander, sobald die Breite für zwei
+   Knöpfe reicht, und untereinander, wenn nicht – ein halbierter Knopf mit
+   abgeschnittener Beschriftung wäre auf dem Handy schlechter als zwei
+   Zeilen. */
+.logbook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin-bottom: var(--space-5);
+}
+
+.logbook-actions > * {
+  flex: 1 1 200px;
 }

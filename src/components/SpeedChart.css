@@ -1,0 +1,48 @@
+/* Der Verlauf gehört zur Instrumentenwelt: laufende Messwerte, nicht ruhender
+   Inhalt (siehe styles/tokens.css). Deshalb dunkle Fläche mit den
+   aufgehellten Signalfarben – auf Papier hätte die Kurve zu wenig Kontrast. */
+.speed-chart-plot {
+  position: relative;
+  background: var(--color-instrument);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+}
+
+.speed-chart-plot svg {
+  display: block;
+  width: 100%;
+  height: 140px;
+}
+
+.speed-chart-area {
+  fill: var(--color-accent-on-instrument);
+  opacity: 0.18;
+}
+
+.speed-chart-line {
+  fill: none;
+  stroke: var(--color-accent-on-instrument);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Gestrichelt und blasser: der Durchschnitt ist Vergleichsmaß, nicht Messwert. */
+.speed-chart-average {
+  stroke: var(--color-on-instrument-muted);
+  stroke-width: 1;
+  stroke-dasharray: 6 5;
+}
+
+.speed-chart-peak {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  color: var(--color-on-instrument-muted);
+}
+
+.speed-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--space-1);
+}
