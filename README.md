@@ -11,6 +11,10 @@ npm run typecheck
 npm test
 ```
 
+Was als Nächstes ansteht, steht in `TODO.md` – erledigte Punkte werden dort
+abgehakt und wieder entfernt. `CLAUDE.md` fasst für den KI-Assistenten
+zusammen, wo er nachschlägt und was vor einem Commit laufen muss.
+
 ## Design
 
 Leitbild ist „Instrument auf Papier": Papier trägt die ruhenden Inhalte
