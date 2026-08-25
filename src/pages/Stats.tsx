@@ -1,6 +1,18 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Navigation, Clock, User, BookOpen, Pencil, Trash2, Check, X, Image } from 'lucide-react';
+import {
+  Navigation,
+  Clock,
+  User,
+  BookOpen,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Image,
+  BarChart3
+} from 'lucide-react';
 import { db } from '../firebase';
 import { useCollection } from '../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../hooks/useRoadtrip';
@@ -139,6 +151,7 @@ export default function Stats({ user }: { user: string }) {
   );
   const { notify } = useToast();
   const t = useT();
+  const navigate = useNavigate();
   const [recapOpen, setRecapOpen] = useState(false);
 
   // Einträge im Papierkorb bleiben in Firestore, verschwinden aber aus dem
@@ -198,10 +211,19 @@ export default function Stats({ user }: { user: string }) {
 
       {/* Immer sichtbar, auch ohne Track/Ereignisse – der Dialog selbst zeigt
           dann einen Leer-Hinweis statt einer Vorschau. So verschwindet der
-          Einstieg für die Instagram-Tagesübersicht nie aus dem Logbuch. */}
-      <Button variant="secondary" fullWidth onClick={() => setRecapOpen(true)} className="logbook-recap-button">
-        <Image size={18} /> {t('dayRecap.openButton')}
-      </Button>
+          Einstieg für die Instagram-Tagesübersicht nie aus dem Logbuch.
+
+          Daneben der Weg zur Auswertung: Die beiden Zahlen oben sind die
+          Kurzfassung, die Statistik (pages/Statistics.tsx) die lange – und
+          genau hier wird danach gesucht, nicht im „Mehr"-Dropup. */}
+      <div className="logbook-actions">
+        <Button variant="secondary" fullWidth onClick={() => setRecapOpen(true)}>
+          <Image size={18} /> {t('dayRecap.openButton')}
+        </Button>
+        <Button variant="secondary" fullWidth onClick={() => navigate('/statistik')}>
+          <BarChart3 size={18} /> {t('stats.title')}
+        </Button>
+      </div>
 
       <h2 className="section-title section-title-spaced">
         {t('logbook.events', { count: events.length })}

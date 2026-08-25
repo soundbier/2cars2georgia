@@ -157,7 +157,7 @@ gilt fürs Fahren: Handy angesteckt lassen und die App im Vordergrund.
 
 ## Tagesbild
 
-Unter Statistik lässt sich ein Tag als teilbares Bild exportieren
+Im Logbuch lässt sich ein Tag als teilbares Bild exportieren
 (`src/lib/routeImage.ts`, Vorschau in `src/components/DayRecapDialog.tsx`).
 Gezeichnet wird die Tagesroute, dazu jedes Logbuch-Ereignis mit dem Icon
 seiner Schnell-Log-Kategorie in der Farbe seines Autors – dieselbe Zuordnung
@@ -214,6 +214,55 @@ Eine eigene Tagesansicht unter den Einstellungen gab es dafür einmal; sie ist
 weggefallen, weil das Cockpit die Tageszahl jetzt selbst zeigt. Wer einen
 zurückliegenden Tag sucht, findet ihn im Logbuch, das Tagesbild dazu ebenfalls
 dort (`src/components/DayRecapDialog.tsx`).
+
+## Statistik
+
+Unter Mehr → Statistik (`src/pages/Statistics.tsx`) steht die Auswertung, die
+das Cockpit unterwegs nicht leisten kann: der Blick zurück. Ganz oben wählt ein
+Umschalter den Ausschnitt, und jede Zahl darunter beantwortet ihre Frage für
+genau diesen:
+
+* **Gesamt** – die ganze Spur des Roadtrips.
+* **Tag** – ein Kalendertag, gewählt aus der Liste der Reisetage
+  (`groupByDay`, `src/lib/dayRecap.ts`).
+* **Fahrt** – eine benannte Aufzeichnung, herausgelöst über die Kennung an
+  jedem Trackpunkt (`pointsOfSession`, `src/lib/trackSession.ts`). Ereignisse
+  tragen keine solche Kennung – sie werden der Fahrt über ihre Zeit
+  zugeordnet.
+
+Die beiden Ranglisten am Seitenende („Tage im Vergleich", „Aufgezeichnete
+Fahrten") stehen nur im Gesamtblick und sind zugleich der Weg hinein: Ein
+Tippen auf eine Zeile stellt den Ausschnitt oben darauf um.
+
+Gerechnet wird alles in `src/lib/statistics.ts`, gespeichert nichts davon.
+Eine mitgeschriebene Kennzahl veraltet, sobald ein Punkt nachträglich aus dem
+Offline-Puffer eintrifft (`src/lib/trackBuffer.ts`) – die gerechnete nicht.
+Drei Entscheidungen dort sind erklärungsbedürftig:
+
+* **Fahrzeit gegen Standzeit.** Ein Abschnitt zählt als gefahren, wenn seine
+  aus Weg und Zeit gerechnete Geschwindigkeit über `MOVING_THRESHOLD_KMH`
+  (2 km/h) liegt. Darunter liegt kein Weg, sondern das Zittern des Empfängers:
+  Ein Boot am Steg erzeugt weiter Punkte, die ein paar Meter auseinanderliegen.
+  Ohne diese Schwelle wäre jede Pause Fahrzeit und „Ø in Fahrt" wertlos.
+* **Höchsttempo aus dem Messwert.** Anders als die Fahrzeit kommt die Spitze
+  aus dem Feld `speedKmh`, das der Empfänger geliefert hat – das ist die
+  Geschwindigkeit, die tatsächlich in Firestore steht, und über einen
+  30-Sekunden-Abschnitt gemittelt wäre sie keine Spitze mehr.
+* **Strecke je Person getrennt.** Die Spur enthält die Punkte aller Geräte
+  ineinander verschachtelt. Erst nach Autor gruppieren, dann messen – sonst
+  entstünde bei jedem Wechsel zwischen zwei Fahrzeugen ein Sprung quer über die
+  Landkarte.
+
+Der Geschwindigkeitsverlauf (`src/components/SpeedChart.tsx`) wird vorher auf
+höchstens ein paar hundert Werte eingedampft (`speedSeries`): Eine Tagesfahrt
+im 10-Sekunden-Takt hat tausende Punkte, von denen auf Handybreite nichts zu
+erkennen wäre. Gemittelt wird über gleich große Abschnitte, damit die Form der
+Kurve bleibt; die Spitze geht dabei nicht verloren, sie steht als eigene
+Kennzahl daneben.
+
+Die Seite liest nur. Deshalb gibt es keine Rechteprüfung – ein
+Read-only-Mitglied sieht dieselbe Auswertung – und keine neuen Collections
+oder Felder in `firestore.rules`.
 
 ## Karte: Ereignisse und Knopfgrößen
 
