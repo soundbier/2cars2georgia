@@ -42,6 +42,24 @@ Jede Person meldet sich mit einem persönlichen Firebase-Auth-Konto an
 ersten Login einen eindeutigen Anzeigenamen fest (`src/lib/username.ts`,
 serverseitig über `usernames/{normalizedName}` reserviert).
 
+Diese Reservierung ist kein Verzeichnis: `usernames/` erlaubt `get`, aber kein
+`list`. Ein einzelner Name lässt sich nachschlagen – wer ihn nicht kennt,
+erfährt nichts. Mit `read` (also inklusive Auflisten) hätte jedes angemeldete
+Konto die vollständige Zuordnung Anzeigename → UID aller registrierten
+Personen abziehen können; gebraucht hat das nie jemand, die einzige Abfrage
+ist der Blick der Transaktion auf genau diesen einen Namen. Reserviert wird
+außerdem nur gemeinsam mit dem eigenen, neuen Profil (`existsAfter` auf
+`users/{uid}` in `firestore.rules`) – vorher konnte ein Konto beliebig viele
+Namen belegen, ohne je eines zu haben. Ein Konto, ein Profil, ein Name:
+`users/{uid}` kennt weder `update` noch `delete`.
+
+Was die Regeln nicht leisten können, ist die Gegenprobe in der anderen
+Richtung: Ob `users/{uid}.displayName` wirklich zu der Reservierung passt,
+ließe sich nur mit derselben Normalisierung prüfen (Kleinschreibung, Akzente,
+Sonderzeichen), und die kennen Firestore-Regeln nicht. Die Eindeutigkeit der
+Anzeigenamen gilt deshalb weiterhin so weit, wie der Client mitspielt –
+belastbar ist die UID, nicht der Name.
+
 Ein Roadtrip ist ein Dokument unter `roadtrips/{tripId}` mit einer
 Mitgliedschafts-Collection `roadtrips/{tripId}/members/{uid}`
 (`src/lib/membership.ts`). Wer einen Roadtrip anlegt, wird automatisch

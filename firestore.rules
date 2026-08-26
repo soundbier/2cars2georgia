@@ -130,11 +130,27 @@ service cloud.firestore {
     // eine UID. Wird immer gemeinsam mit users/{uid} in derselben
     // Transaktion angelegt (siehe src/lib/username.ts) – beide oder keins.
     match /usernames/{normalizedName} {
-      allow read: if signedIn();
+      // `get` statt `read`: Nachschlagen, ob ein Name vergeben ist, braucht
+      // genau ein Dokument – wer den Namen nicht kennt, erfährt nichts.
+      // `read` schloss das Auflisten mit ein und gab damit jedem angemeldeten
+      // Konto die vollständige Zuordnung Anzeigename → UID aller
+      // registrierten Personen. Gebraucht hat das niemand: Die einzige
+      // Abfrage ist der Blick der Transaktion auf genau diesen einen Namen.
+      allow get: if signedIn();
+      allow list: if false;
+
+      // Reservieren geht nur zusammen mit dem eigenen, neuen Profil:
+      // `existsAfter` sieht den Stand nach dem Commit, `!exists` den davor.
+      // Damit hängt jede Reservierung an genau einer Profilanlage – vorher
+      // konnte ein Konto beliebig viele Namen belegen, ohne je eines zu
+      // haben. users/{uid} kennt weder update noch delete: ein Konto, ein
+      // Profil, ein Name.
       allow create: if signedIn()
         && fieldsAre(['uid', 'createdAt'], [])
         && data().uid == request.auth.uid
-        && data().createdAt == request.time;
+        && data().createdAt == request.time
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid));
       // Kein Umbenennen/Freigeben: ein einmal vergebener Anzeigename bleibt
       // reserviert, auch wenn users/{uid} nie geschrieben würde.
       allow update, delete: if false;

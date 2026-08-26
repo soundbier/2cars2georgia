@@ -1,4 +1,4 @@
-import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -13,6 +13,13 @@ import { db } from '../firebase';
  * `usernames/{normalizedName}` gemeinsam in einer Transaktion an – entweder
  * beide oder keins, und die Transaktion scheitert atomar, falls der Name in
  * der Zwischenzeit von einer anderen Sitzung belegt wurde.
+ *
+ * Nachschlagen lässt sich immer nur ein einzelner Name, nie die ganze Liste:
+ * `usernames/` erlaubt `get`, aber kein `list` (siehe firestore.rules) – sonst
+ * wäre die Reservierung zugleich ein Verzeichnis aller registrierten Personen
+ * samt UID. Deshalb gibt es hier auch keine freistehende Verfügbarkeitsprüfung
+ * mehr: Ob ein Name frei ist, beantwortet der Reservierungsversuch selbst, und
+ * nur der beantwortet es verbindlich.
  */
 
 /** Passt zur Längenprüfung von `author`/`displayName` in firestore.rules. */
@@ -46,14 +53,6 @@ export class UsernameError extends Error {
     super(`username failed: ${code}`);
     this.name = 'UsernameError';
   }
-}
-
-/** Prüfung, ob ein Name derzeit noch frei ist (best effort, keine Garantie ohne Reservierung). */
-export async function isDisplayNameAvailable(name: string): Promise<boolean> {
-  const key = normalizeUsernameKey(name);
-  if (!key) return false;
-  const snap = await getDoc(doc(db, 'usernames', key));
-  return !snap.exists();
 }
 
 /**

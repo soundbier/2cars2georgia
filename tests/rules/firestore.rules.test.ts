@@ -13,6 +13,7 @@ import {
   query,
   setDoc,
   deleteDoc,
+  runTransaction,
   updateDoc,
   deleteField,
   serverTimestamp,
@@ -283,18 +284,70 @@ describe('Profile & eindeutige Anzeigenamen', () => {
     );
   });
 
-  it('reserviert einen Anzeigenamen nur für die eigene UID', async () => {
-    await assertSucceeds(
+  /**
+   * Der echte Weg aus src/lib/username.ts: Profil und Namensreservierung
+   * entstehen gemeinsam in einer Transaktion – beide oder keins.
+   */
+  function reserve(db: ReturnType<typeof ownerDb>, uid: string, key: string) {
+    return runTransaction(db, async (tx) => {
+      tx.set(doc(db, `usernames/${key}`), { uid, createdAt: serverTimestamp() });
+      tx.set(doc(db, `users/${uid}`), {
+        displayName: key,
+        email: `${uid}@example.com`,
+        createdAt: serverTimestamp()
+      });
+    });
+  }
+
+  it('reserviert einen Anzeigenamen gemeinsam mit dem eigenen Profil', async () => {
+    await assertSucceeds(reserve(ownerDb(), OWNER_UID, 'owner'));
+  });
+
+  it('verweigert eine Reservierung für eine fremde UID', async () => {
+    await assertFails(reserve(memberDb(), OWNER_UID, 'owner2'));
+  });
+
+  it('verweigert eine Reservierung ohne gleichzeitige Profilanlage', async () => {
+    // Namensbesetzung: Vorher konnte jedes Konto beliebig viele Namen
+    // belegen, ohne je ein Profil zu haben.
+    await assertFails(
       setDoc(doc(ownerDb(), 'usernames/owner'), { uid: OWNER_UID, createdAt: serverTimestamp() })
     );
-    await assertFails(
-      setDoc(doc(memberDb(), 'usernames/owner2'), { uid: OWNER_UID, createdAt: serverTimestamp() })
-    );
+  });
+
+  it('verweigert eine zweite Reservierung, wenn das Profil schon steht', async () => {
+    await seed(`users/${OWNER_UID}`, {
+      displayName: 'Owner',
+      email: `${OWNER_UID}@example.com`,
+      createdAt: NOW
+    });
+    // Ein Konto, ein Profil, ein Name: users/{uid} kennt weder update noch
+    // delete, also kann auch kein zweiter Name dazukommen.
+    await assertFails(reserve(ownerDb(), OWNER_UID, 'noch-ein-name'));
   });
 
   it('verweigert das Überschreiben eines bereits reservierten Namens', async () => {
     await seed('usernames/leon', { uid: OWNER_UID, createdAt: NOW });
-    await assertFails(setDoc(doc(memberDb(), 'usernames/leon'), { uid: MEMBER_UID, createdAt: serverTimestamp() }));
+    await assertFails(reserve(memberDb(), MEMBER_UID, 'leon'));
+  });
+
+  it('lässt einen einzelnen Namen nachschlagen, aber nicht die ganze Liste', async () => {
+    // Der Kern des Befunds: `read` schloss das Auflisten mit ein und gab
+    // damit jedem angemeldeten Konto Anzeigename → UID aller registrierten
+    // Personen.
+    await seed('usernames/leon', { uid: OWNER_UID, createdAt: NOW });
+    await assertSucceeds(getDoc(doc(memberDb(), 'usernames/leon')));
+    await assertFails(getDocs(query(collection(memberDb(), 'usernames'))));
+  });
+
+  it('lässt niemanden fremde Profile lesen', async () => {
+    await seed(`users/${OWNER_UID}`, {
+      displayName: 'Owner',
+      email: `${OWNER_UID}@example.com`,
+      createdAt: NOW
+    });
+    await assertFails(getDoc(doc(memberDb(), `users/${OWNER_UID}`)));
+    await assertFails(getDocs(query(collection(memberDb(), 'users'))));
   });
 });
 
