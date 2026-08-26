@@ -33,8 +33,11 @@ jobs:
       - name: Production-Build
         # Die Firebase-Config wird zur Buildzeit eingesetzt. Im CI stehen die
         # echten Werte nicht zur Verfügung und werden auch nicht gebraucht –
-        # hier geht es nur darum, dass der Build durchläuft.
+        # hier geht es nur darum, dass der Build durchläuft. Aus demselben
+        # Grund der Notausgang für App Check: Dieser Build wird nie
+        # ausgeliefert (siehe src/lib/appCheckConfig.ts).
         env:
+          APP_CHECK_OPTIONAL: '1'
           VITE_FIREBASE_API_KEY: ci-dummy
           VITE_FIREBASE_AUTH_DOMAIN: ci-dummy.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: ci-dummy

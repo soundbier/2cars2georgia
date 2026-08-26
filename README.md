@@ -418,6 +418,44 @@ Bei einer Fahrt betrifft das ohnehin nur die Beschriftung: Die aufgezeichneten
 Punkte bleiben in jedem Fall Teil der Gesamtspur, auch nach dem endgültigen
 Löschen – sie sind Aufzeichnung, der Eintrag ist nur ihr Name.
 
+## App Check
+
+App Check ist der einzige Schutz gegen ein Skript, das die App gar nicht erst
+öffnet: reCAPTCHA v3 bestätigt Firebase, dass eine Anfrage aus der echten App
+kommt. Ohne ihn bremst nur die Drosselung von Firebase Auth, und die wirkt
+ausschließlich auf Anmeldeversuche – Firestore-Leseanfragen laufen ungebremst
+durch. Der clientseitige Throttle (`src/lib/attemptThrottle.ts`) hilft
+dagegen nicht: Er läuft im Browser, den ein Angreifer nicht benutzt.
+
+Der Site-Key war bisher optional. Fehlte er, lief der Build durch und die App
+ging ohne Bot-Schutz online, ohne dass irgendwo etwas davon stand. Deshalb
+bricht ein Produktions-Build ohne `VITE_RECAPTCHA_SITE_KEY` jetzt ab
+(`vite.config.ts`, `src/lib/appCheckConfig.ts`) – ein vergessener Schlüssel
+soll nicht wie ein normaler Build aussehen. `npm run dev` bleibt davon
+unberührt: Lokal gibt es nichts zu schützen. Für einen Build, der
+nachweislich nie ausgeliefert wird – etwa den Build-Durchlauf im CI –, gibt es
+`APP_CHECK_OPTIONAL=1`.
+
+Der Build allein genügt aber nicht. Zwei Schritte in der Firebase Console
+gehören dazu, und beide sind, wie das Veröffentlichen der Regeln, von Hand zu
+machen:
+
+1. **App registrieren:** App Check → Apps → Web-App → Anbieter reCAPTCHA v3.
+   Den Site-Key in die Build-Umgebung als `VITE_RECAPTCHA_SITE_KEY` eintragen.
+2. **Enforcement einschalten:** App Check → APIs → für **Firestore und
+   Authentication** erzwingen. Ohne diesen Schritt sammelt Firebase nur
+   Statistik und lässt weiterhin jede Anfrage durch – die App liefert dann
+   zwar Tokens, niemand verlangt sie aber.
+
+Vor dem Erzwingen lohnt der Blick auf die Metriken in der Console: Sie zeigen,
+wie viele Anfragen bereits ein gültiges Token mitbringen. Erst wenn dort im
+Wesentlichen alles verifiziert ist, sperrt das Erzwingen niemanden aus, der
+dazugehört.
+
+Für die lokale Entwicklung mit gesetztem Site-Key schaltet `src/firebase.ts`
+im Dev-Modus den Debug-Token an: Firebase loggt beim Start einen Token, der
+einmalig in der Console unter App Check → Apps → Debug-Tokens hinterlegt wird.
+
 ## Firestore-Regeln veröffentlichen
 
 `firestore.rules` liegt im Repo, wird aber von keinem Workflow ausgerollt.

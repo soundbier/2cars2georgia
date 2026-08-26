@@ -27,14 +27,18 @@ ist, verschwindet wieder.
 
 ## Offen
 
+* [ ] **In der Firebase Console nachziehen** (im Repo nicht machbar): App
+      Check für Firestore **und** Authentication erzwingen, sonst bleibt der
+      Bot-Schutz reine Statistik – Anleitung im README, Abschnitt „App Check".
+      Ebenso die Regeln veröffentlichen, seit der Beitritt an die Freigabe
+      durch den Owner hängt.
 * [ ] Weitere Befunde aus `docs/sicherheitsbericht-2026-08.md` abarbeiten, in
-      der dort empfohlenen Reihenfolge (Abschnitt 4): M1 (App Check
-      verpflichtend), M2 (`list` auf `usernames/` sperren), M3
+      der dort empfohlenen Reihenfolge (Abschnitt 4): M2 (`list` auf `usernames/` sperren), M3
       (Datenschutzhinweis korrigieren, `crewUser`-Tag in Sentry entfernen),
       M5/M6 (Security-Header, Abhängigkeiten), M4/M7 (Selbstlöschung, lokalen
       Cache beim Abmelden leeren), danach die niedrigen Befunde. Der Bericht
       ist vom Stand `87f9488` – vor jedem Punkt prüfen, ob er inzwischen
-      erledigt ist. H1 ist erledigt (siehe unten).
+      erledigt ist. H1 und M1 sind erledigt (siehe unten).
 * [ ] Nachtmodus: Die Rollen-Tokens in `src/styles/tokens.css` sind dafür
       vorbereitet (rohe Farbwelt unten, Rollen darüber). Fehlt noch die zweite
       Belegung der Rollen und ein Schalter dafür in den Einstellungen.
@@ -47,10 +51,10 @@ ist, verschwindet wieder.
 
 ## Zuletzt erledigt
 
+* [x] M1: App Check für den Produktions-Build verpflichtend machen
 * [x] H1: Beitritt zu einem Roadtrip an die Freigabe durch den Owner binden,
       statt an die erratbare Roadtrip-ID
 * [x] Toiletten: Zähler und Karte, Beschreibung privat (`f08f3e8`)
 * [x] Statistik: Roadtrip, Tag oder Fahrt auswerten (`e64b37a`)
 * [x] Karte: Ereignisse ausblenden, Marker und Knöpfe in drei Größen
       (`e5c1354`)
-* [x] Cockpit: Strecke und Dauer für Route, Tag oder Gesamt (`33a6280`)

@@ -1,15 +1,37 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json';
+import { appCheckBuildError, appCheckOptional } from './src/lib/appCheckConfig';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   // Version für die Anzeige in den Einstellungen – hilft beim Einordnen,
   // welcher Stand auf einem Gerät tatsächlich installiert ist.
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
   plugins: [
+    /**
+     * Kein Produktions-Build ohne App Check.
+     *
+     * Der Site-Key war bisher optional – fehlte er, lief der Build durch und
+     * die App ging ohne Bot-Schutz online, ohne dass irgendwo etwas davon
+     * stand. Ein vergessener Schlüssel soll nicht wie ein normaler Build
+     * aussehen, deshalb bricht er hier ab (siehe lib/appCheckConfig.ts).
+     * `vite dev` bleibt unberührt: lokal gibt es nichts zu schützen.
+     */
+    {
+      name: 'require-app-check',
+      config() {
+        if (command !== 'build') return;
+        // process.env deckt CI und Deploy-Umgebungen ab, loadEnv die lokale
+        // .env – gebaut wird mit beidem.
+        const env = { ...loadEnv('production', process.cwd(), 'VITE_'), ...process.env };
+        if (appCheckOptional(env)) return;
+        const error = appCheckBuildError(env);
+        if (error) throw new Error(error);
+      }
+    },
     react(),
     VitePWA({
       // 'prompt' statt 'autoUpdate': Ein neuer Service Worker aktiviert sich
@@ -69,4 +91,4 @@ export default defineConfig({
       }
     })
   ]
-});
+}));

@@ -18,12 +18,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Zusätzliche Bremse gegen automatisiertes Durchprobieren (z.B. von
-// Anmeldedaten oder Roadtrip-IDs): App Check bestätigt serverseitig, dass
-// Anfragen von der echten App kommen statt von einem Skript, und blockt den
-// Rest ab – sobald in der Firebase Console für Auth/Firestore aktiviert
-// (siehe README). Ohne VITE_RECAPTCHA_SITE_KEY bleibt es inaktiv, App und
-// Rules verhalten sich dann exakt wie zuvor.
+// Bremse gegen automatisiertes Durchprobieren (von Anmeldedaten wie von
+// Roadtrip-IDs): App Check bestätigt serverseitig, dass Anfragen von der
+// echten App kommen statt von einem Skript, und blockt den Rest ab – sobald
+// in der Firebase Console für Auth und Firestore erzwungen (siehe README).
+//
+// Im Produktions-Build ist der Site-Key Pflicht: Fehlt er, bricht schon der
+// Build ab (vite.config.ts, lib/appCheckConfig.ts). Die Abfrage hier gilt
+// deshalb nur noch der lokalen Entwicklung, wo es ohne Schlüssel weitergeht.
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 if (recaptchaSiteKey) {
   if (import.meta.env.DEV) {
