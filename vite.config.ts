@@ -4,6 +4,28 @@ import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json';
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        // Die großen Fremdbibliotheken in eigene Dateien statt in ein
+        // gemeinsames Bündel: Sie ändern sich fast nie, bleiben so über
+        // Deploys hinweg im Browser-Cache liegen und müssen nach einem
+        // Update nicht erneut über eine unterwegs schlechte Verbindung.
+        // Leaflet wird zusätzlich erst geladen, wenn jemand die Karte
+        // öffnet – siehe die lazy-Routen in src/App.tsx.
+        manualChunks: {
+          firebase: [
+            'firebase/app',
+            'firebase/firestore',
+            'firebase/auth',
+            'firebase/app-check'
+          ],
+          leaflet: ['leaflet', 'react-leaflet', 'leaflet-rotate'],
+          react: ['react', 'react-dom', 'react-router-dom']
+        }
+      }
+    }
+  },
   // Version für die Anzeige in den Einstellungen – hilft beim Einordnen,
   // welcher Stand auf einem Gerät tatsächlich installiert ist.
   define: {

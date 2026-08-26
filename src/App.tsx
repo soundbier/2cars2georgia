@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import {
   Gauge,
@@ -29,25 +29,38 @@ import AuthGate from './pages/AuthGate';
 import ProfileGate from './pages/ProfileGate';
 import RoadtripGate from './pages/RoadtripGate';
 import Dashboard from './pages/Dashboard';
-import MapTab from './pages/MapTab';
-import Stats from './pages/Stats';
-import Statistics from './pages/Statistics';
-import Toilets from './pages/Toilets';
-import Costs from './pages/Costs';
-import Settings from './pages/Settings';
-import CrewSettings from './pages/settings/CrewSettings';
-import QuickLogSettings from './pages/settings/QuickLogSettings';
-import ExportSettings from './pages/settings/ExportSettings';
-import TrashSettings from './pages/settings/TrashSettings';
-import RoutePlanner from './pages/RoutePlanner';
-import Verpflegung from './pages/kombuese/Verpflegung';
-import MealPlan from './pages/kombuese/MealPlan';
-import Dishes from './pages/kombuese/Dishes';
-import ShoppingList from './pages/kombuese/ShoppingList';
-import Inventory from './pages/kombuese/Inventory';
-import Administration from './pages/Administration';
-import Privacy from './pages/Privacy';
 import PrivacyOnboarding from './pages/PrivacyOnboarding';
+
+/**
+ * Alles außer dem Cockpit wird erst geladen, wenn es aufgerufen wird.
+ *
+ * Vorher lag die ganze App in einer einzigen Datei: Wer nur ins Logbuch
+ * schauen wollte, lud die Kartenbibliothek gleich mit – unterwegs an einer
+ * schlechten Verbindung ist das genau die Wartezeit, die niemand hat. Das
+ * Cockpit ist die Startseite und bleibt deshalb fest eingebunden; die
+ * Anmelde- und Auswahlseiten davor ebenso, sie stehen vor allem anderen.
+ *
+ * Die Übersetzungsschlüssel der Navigation liegen bewusst weiterhin oben –
+ * die Beschriftung der Leiste soll nicht auf ein Nachladen warten.
+ */
+const MapTab = lazy(() => import('./pages/MapTab'));
+const Stats = lazy(() => import('./pages/Stats'));
+const Statistics = lazy(() => import('./pages/Statistics'));
+const Toilets = lazy(() => import('./pages/Toilets'));
+const Costs = lazy(() => import('./pages/Costs'));
+const Settings = lazy(() => import('./pages/Settings'));
+const CrewSettings = lazy(() => import('./pages/settings/CrewSettings'));
+const QuickLogSettings = lazy(() => import('./pages/settings/QuickLogSettings'));
+const ExportSettings = lazy(() => import('./pages/settings/ExportSettings'));
+const TrashSettings = lazy(() => import('./pages/settings/TrashSettings'));
+const RoutePlanner = lazy(() => import('./pages/RoutePlanner'));
+const Verpflegung = lazy(() => import('./pages/kombuese/Verpflegung'));
+const MealPlan = lazy(() => import('./pages/kombuese/MealPlan'));
+const Dishes = lazy(() => import('./pages/kombuese/Dishes'));
+const ShoppingList = lazy(() => import('./pages/kombuese/ShoppingList'));
+const Inventory = lazy(() => import('./pages/kombuese/Inventory'));
+const Administration = lazy(() => import('./pages/Administration'));
+const Privacy = lazy(() => import('./pages/Privacy'));
 
 const NAV_ITEMS: { to: string; labelKey: TranslationKey; icon: LucideIcon }[] = [
   { to: '/', labelKey: 'nav.cockpit', icon: Gauge },
@@ -76,6 +89,22 @@ const ADMIN_MORE_ITEM: { to: string; labelKey: TranslationKey; icon: LucideIcon 
   labelKey: 'nav.administration',
   icon: ShieldCheck
 };
+
+/**
+ * Platzhalter für eine noch nicht geladene Seite.
+ *
+ * Bewusst dieselbe Anmutung wie der Startbildschirm (siehe AppGate), nur
+ * ohne Text: Für den Bruchteil einer Sekunde, den ein Seitenwechsel im Netz
+ * dauert, ist eine Meldung mehr Unruhe als Hilfe – die Bottom-Navigation
+ * bleibt sichtbar und zeigt bereits, wo man ist.
+ */
+function PageFallback() {
+  return (
+    <div className="boot-screen" role="status" aria-live="polite">
+      <Compass size={28} className="boot-screen-icon" />
+    </div>
+  );
+}
 
 /**
  * Die eigentliche App-Oberfläche für ein bestätigtes Roadtrip-Mitglied.
@@ -111,30 +140,35 @@ function AppShell() {
     <TrackingProvider key={user} user={user}>
       <BrowserRouter>
         <div className="content">
-          <Routes>
-            <Route path="/" element={<Dashboard user={user} />} />
-            <Route path="/map" element={<MapTab user={user} />} />
-            <Route path="/stats" element={<Stats user={user} />} />
-            <Route path="/statistik" element={<Statistics />} />
-            <Route path="/toiletten" element={<Toilets />} />
-            <Route path="/costs" element={<Costs user={user} users={users} />} />
-            <Route path="/settings" element={<Settings currentUser={user} users={users} />} />
-            <Route path="/settings/crew" element={<CrewSettings />} />
-            <Route path="/settings/quicklogs" element={<QuickLogSettings currentUser={user} />} />
-            <Route path="/settings/export" element={<ExportSettings users={users} />} />
-            <Route path="/settings/papierkorb" element={<TrashSettings currentUser={user} />} />
-            <Route path="/settings/routenplaner" element={<RoutePlanner />} />
-            <Route path="/settings/verpflegung" element={<Verpflegung />} />
-            <Route path="/settings/verpflegung/speiseplan" element={<MealPlan currentUser={user} />} />
-            <Route path="/settings/verpflegung/gerichte" element={<Dishes currentUser={user} />} />
-            <Route
-              path="/settings/verpflegung/einkaufsliste"
-              element={<ShoppingList currentUser={user} />}
-            />
-            <Route path="/settings/verpflegung/lager" element={<Inventory currentUser={user} />} />
-            <Route path="/administration" element={<Administration />} />
-            <Route path="/datenschutz" element={<Privacy />} />
-          </Routes>
+          {/* Kurzer Platzhalter, während die Seite nachgeladen wird. Beim
+              zweiten Aufruf ist sie im Cache und der Wechsel bleibt sofortig –
+              und offline liegt sie ohnehin im Precache des Service Workers. */}
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/" element={<Dashboard user={user} />} />
+              <Route path="/map" element={<MapTab user={user} />} />
+              <Route path="/stats" element={<Stats user={user} />} />
+              <Route path="/statistik" element={<Statistics />} />
+              <Route path="/toiletten" element={<Toilets />} />
+              <Route path="/costs" element={<Costs user={user} users={users} />} />
+              <Route path="/settings" element={<Settings currentUser={user} users={users} />} />
+              <Route path="/settings/crew" element={<CrewSettings />} />
+              <Route path="/settings/quicklogs" element={<QuickLogSettings currentUser={user} />} />
+              <Route path="/settings/export" element={<ExportSettings users={users} />} />
+              <Route path="/settings/papierkorb" element={<TrashSettings currentUser={user} />} />
+              <Route path="/settings/routenplaner" element={<RoutePlanner />} />
+              <Route path="/settings/verpflegung" element={<Verpflegung />} />
+              <Route path="/settings/verpflegung/speiseplan" element={<MealPlan currentUser={user} />} />
+              <Route path="/settings/verpflegung/gerichte" element={<Dishes currentUser={user} />} />
+              <Route
+                path="/settings/verpflegung/einkaufsliste"
+                element={<ShoppingList currentUser={user} />}
+              />
+              <Route path="/settings/verpflegung/lager" element={<Inventory currentUser={user} />} />
+              <Route path="/administration" element={<Administration />} />
+                <Route path="/datenschutz" element={<Privacy />} />
+            </Routes>
+          </Suspense>
         </div>
         {moreOpen && (
           <div className="more-backdrop" onClick={() => setMoreOpen(false)} />

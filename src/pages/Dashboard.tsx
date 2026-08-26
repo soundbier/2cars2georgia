@@ -11,6 +11,7 @@ import { useQuickLogs, useTripDates } from '../hooks/useSettings';
 import { usePreferences } from '../hooks/usePreferences';
 import { getQuickLogIcon } from '../lib/quickLogIcons';
 import { activeOnly } from '../lib/trash';
+import { readActiveSession } from '../lib/activeTrackSession';
 import {
   formatDuration,
   pointsOfDay,
@@ -150,9 +151,32 @@ export default function Dashboard({ user }: { user: string }) {
   const { notify } = useToast();
   const t = useT();
 
+  // Wie weit die Spur zurück geladen wird. Das Cockpit zeigt je nach
+  // Ausschnitt nur den heutigen Tag oder die laufende Aufzeichnung – dafür
+  // die ganze Reise zu abonnieren, hieße nach ein paar Wochen zehntausende
+  // Punkte zu laden, um ein paar hundert anzuzeigen. Nur „Ganze Reise"
+  // braucht wirklich alles (null).
+  //
+  // Die laufende Aufzeichnung kann über Mitternacht hinausreichen (nachts um
+  // eins ist die Tour dieselbe), deshalb zählt bei ihr die Startzeit und
+  // nicht der Tagesbeginn. Gelesen wird sie aus localStorage, wo
+  // hooks/useTracking sie über Neustarts hinweg führt.
+  const trackSince = useMemo(() => {
+    if (statsScope === 'trip') return null;
+    const startOfToday = new Date().setHours(0, 0, 0, 0);
+    if (statsScope !== 'session') return startOfToday;
+    const active = readActiveSession();
+    return Math.min(startOfToday, active?.startedAt ?? startOfToday);
+  }, [statsScope, activeSessionId]);
+
   // Dieselben Abos wie im Logbuch – die Werte im Instrument sind die Zahlen,
   // die dort ausführlich stehen, hier nur als laufende Anzeige.
-  const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null, 'timestamp', 'asc');
+  const track = useCollection<GpsPoint>(
+    tripId ? tripPath(tripId, 'track') : null,
+    'timestamp',
+    'asc',
+    trackSince
+  );
   const allEvents = useCollection<LogEvent>(
     tripId ? tripPath(tripId, 'events') : null,
     'timestamp',

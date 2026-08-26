@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FileSpreadsheet, Route, FileText, Share2 } from 'lucide-react';
-import { useCollection } from '../../hooks/useCollection';
+import { useCollectionOnce } from '../../hooks/useCollection';
 import { useRoadtrip, tripPath } from '../../hooks/useRoadtrip';
 import { useQuickLogs } from '../../hooks/useSettings';
 import { usePreferences } from '../../hooks/usePreferences';
@@ -34,9 +34,26 @@ export default function ExportSettings({ users }: Props) {
   const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
 
-  const allEvents = useCollection<LogEvent>(tripId ? tripPath(tripId, 'events') : null, 'timestamp', 'asc');
-  const allExpenses = useCollection<Expense>(tripId ? tripPath(tripId, 'expenses') : null, 'timestamp', 'asc');
-  const track = useCollection<GpsPoint>(tripId ? tripPath(tripId, 'track') : null);
+  // Einmalig beim Öffnen gelesen statt laufend abonniert: Ein Export ist eine
+  // Momentaufnahme, und die ganze Spur als Dauerabo mitlaufen zu lassen kostet
+  // Speicher und Leseoperationen für einen Stand, den hier niemand sieht.
+  // Wer den neuesten Stand exportieren will, öffnet die Seite erneut.
+  const { items: allEvents, loading: eventsLoading } = useCollectionOnce<LogEvent>(
+    tripId ? tripPath(tripId, 'events') : null,
+    'timestamp',
+    'asc'
+  );
+  const { items: allExpenses, loading: expensesLoading } = useCollectionOnce<Expense>(
+    tripId ? tripPath(tripId, 'expenses') : null,
+    'timestamp',
+    'asc'
+  );
+  const { items: track, loading: trackLoading } = useCollectionOnce<GpsPoint>(
+    tripId ? tripPath(tripId, 'track') : null
+  );
+  // Solange noch geladen wird, ist „0 Einträge" keine Aussage über die Reise –
+  // ein Export in diesem Moment wäre leer, obwohl Daten da sind.
+  const loading = eventsLoading || expensesLoading || trackLoading;
 
   // Was im Papierkorb liegt, gehört nicht in einen Export, der als Erinnerung
   // oder Abrechnung weitergegeben wird.
@@ -98,7 +115,7 @@ export default function ExportSettings({ users }: Props) {
 
       <Section title={t('export.reportSection')}>
         <p className="helper-text setting-note">{t('export.reportHint')}</p>
-        <Button fullWidth disabled={busy !== null} onClick={exportReport}>
+        <Button fullWidth disabled={busy !== null || loading} onClick={exportReport}>
           <FileText size={18} /> {t('export.reportButton')}
         </Button>
       </Section>
@@ -109,7 +126,7 @@ export default function ExportSettings({ users }: Props) {
           <Button
             variant="secondary"
             fullWidth
-            disabled={busy !== null || events.length === 0}
+            disabled={busy !== null || loading || events.length === 0}
             onClick={() =>
               exportFile('events', 'logbuch', 'csv', 'text/csv', () =>
                 withBom(eventsToCsv(events, quickLogs))
@@ -121,7 +138,7 @@ export default function ExportSettings({ users }: Props) {
           <Button
             variant="secondary"
             fullWidth
-            disabled={busy !== null || expenses.length === 0}
+            disabled={busy !== null || loading || expenses.length === 0}
             onClick={() =>
               exportFile('expenses', 'reisekasse', 'csv', 'text/csv', () =>
                 withBom(expensesToCsv(expenses))
@@ -133,7 +150,7 @@ export default function ExportSettings({ users }: Props) {
           <Button
             variant="secondary"
             fullWidth
-            disabled={busy !== null || track.length === 0}
+            disabled={busy !== null || loading || track.length === 0}
             onClick={() =>
               exportFile('track', 'route', 'gpx', 'application/gpx+xml', () =>
                 trackToGpx(track, events, name)

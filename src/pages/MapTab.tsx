@@ -337,7 +337,14 @@ export default function MapTab({ user }: { user: string }) {
   // Ereignis-Marker sind und wie groß die Knöpfe am Kartenrand.
   const eventMarkerSize = EVENT_MARKER_SIZE[preferences.mapEventSize];
   const controlSize = CONTROL_SIZE[preferences.mapControlSize];
-  const line: [number, number][] = track.map((p) => [p.lat, p.lng]);
+  // Gemerkt statt bei jedem Render neu gebaut: Im Fahrmodus rendert diese
+  // Seite häufig (Kurs, Folgen-Schalter, Toasts), und ein frisches Array
+  // zwänge Leaflet jedes Mal, die gesamte Spur neu zu zeichnen – bei einer
+  // Reise mit zehntausenden Punkten genau dann spürbar, wenn jemand fährt.
+  const line = useMemo<[number, number][]>(
+    () => track.map((p) => [p.lat, p.lng]),
+    [track]
+  );
   const isOnline = useOnlineStatus();
 
   // Offline gespeichert wird genau das, was auch angezeigt wird: die gewählte
