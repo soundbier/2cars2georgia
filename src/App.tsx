@@ -90,11 +90,12 @@ function AppShell() {
   const user = displayName ?? '';
   const moreItems = isPlatformAdmin ? [...MORE_ITEMS, ADMIN_MORE_ITEM] : MORE_ITEMS;
 
-  // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) dem Roadtrip und
-  // Crewmitglied zu, ohne echte personenbezogene Daten zu senden – tripId
-  // ist bereits ein anonymer Slug, kein Klarname oder Kontaktdaten.
+  // Ordnet Fehlerberichte (siehe main.tsx/lib/sentry.ts) einem Konto und
+  // einem Roadtrip zu, ohne einen Klarnamen nach außen zu geben: An Sentry
+  // gehen nur die pseudonyme UID und die Roadtrip-ID. Der Anzeigename bleibt
+  // dem Fehlerprotokoll in der eigenen Datenbank vorbehalten.
   useEffect(() => {
-    setSentryContext(tripId, user || null);
+    setSentryContext(tripId, authUser?.uid ?? null);
     setErrorLogContext(tripId, user || null, authUser?.uid ?? null);
   }, [tripId, user, authUser]);
 

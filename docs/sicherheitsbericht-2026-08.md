@@ -150,11 +150,15 @@ Speicherdauer, Betroffenenrechte). Vier Punkte stimmen aber nicht mit dem Code
 **Empfehlung:** Die vier Punkte in `privacy.*` ergänzen bzw. korrigieren und in
 `setSentryContext` den Klarnamen durch die UID (oder gar nichts) ersetzen.
 
-**Status:** Der Datenschutzhinweis wurde angepasst – Konto-/E-Mail-Daten,
-Fehlerprotokoll, Kartendienste samt Esri/USA und reCAPTCHA sind jetzt benannt,
-ebenso die Offline-Kopie auf dem Gerät. Der Sentry-Tag `crewUser` ist damit
-korrekt beschrieben, aber weiterhin gesetzt; ihn zu entfernen bliebe die
-datensparsamere Variante.
+**Status:** Erledigt. Der Datenschutzhinweis wurde angepasst –
+Konto-/E-Mail-Daten, Fehlerprotokoll, Kartendienste samt Esri/USA und
+reCAPTCHA sind benannt, ebenso die Offline-Kopie auf dem Gerät. Der
+Sentry-Tag `crewUser` ist inzwischen weggefallen: An Sentry gehen nur noch
+die pseudonyme Firebase-UID (als `setUser`) und die Roadtrip-ID (als Tag
+`roadtrip`), kein Klarname (`src/lib/sentry.ts`, festgehalten in
+`src/lib/sentry.test.ts`). Der Anzeigename bleibt im Fehlerprotokoll des
+Roadtrips, das in der eigenen Datenbank liegt und nur für dessen Crew lesbar
+ist – der Hinweistext beschreibt genau das.
 
 ---
 

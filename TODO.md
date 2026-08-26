@@ -33,12 +33,10 @@ ist, verschwindet wieder.
       Ebenso die Regeln veröffentlichen, seit der Beitritt an die Freigabe
       durch den Owner hängt.
 * [ ] Weitere Befunde aus `docs/sicherheitsbericht-2026-08.md` abarbeiten, in
-      der dort empfohlenen Reihenfolge (Abschnitt 4): M3 (Datenschutzhinweis
-      korrigieren, `crewUser`-Tag in Sentry entfernen),
-      M5/M6 (Security-Header, Abhängigkeiten), M4/M7 (Selbstlöschung, lokalen
-      Cache beim Abmelden leeren), danach die niedrigen Befunde. Der Bericht
-      ist vom Stand `87f9488` – vor jedem Punkt prüfen, ob er inzwischen
-      erledigt ist. H1, M1 und M2 sind erledigt (siehe unten).
+      der dort empfohlenen Reihenfolge (Abschnitt 4): M5/M6 (Security-Header,
+      Abhängigkeiten), M4/M7 (Selbstlöschung, lokalen Cache beim Abmelden
+      leeren), danach die niedrigen Befunde. Der Bericht ist vom Stand
+      `87f9488` – vor jedem Punkt prüfen, ob er inzwischen erledigt ist. H1, M1, M2 und M3 sind erledigt (siehe unten).
 * [ ] Nachtmodus: Die Rollen-Tokens in `src/styles/tokens.css` sind dafür
       vorbereitet (rohe Farbwelt unten, Rollen darüber). Fehlt noch die zweite
       Belegung der Rollen und ein Schalter dafür in den Einstellungen.
@@ -51,10 +49,10 @@ ist, verschwindet wieder.
 
 ## Zuletzt erledigt
 
+* [x] M3: An Sentry geht kein Klarname mehr, nur die pseudonyme UID
 * [x] M2: Namensverzeichnis nicht mehr auflistbar, Reservierung an die eigene
       Profilanlage gebunden
 * [x] M1: App Check für den Produktions-Build verpflichtend machen
 * [x] H1: Beitritt zu einem Roadtrip an die Freigabe durch den Owner binden,
       statt an die erratbare Roadtrip-ID
 * [x] Toiletten: Zähler und Karte, Beschreibung privat (`f08f3e8`)
-* [x] Statistik: Roadtrip, Tag oder Fahrt auswerten (`e64b37a`)
