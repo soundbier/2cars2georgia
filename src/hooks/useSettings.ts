@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useRoadtrip, tripPath } from './useRoadtrip';
 import { useT } from '../i18n';
+import { JoinRequest } from '../lib/membership';
 import { DEFAULT_QUICK_LOG_SEEDS, CrewRole, QuickLogConfig } from '../types';
 
 /**
@@ -125,6 +126,52 @@ export function useCrew() {
   const users = useMemo(() => members.map((m) => m.displayName), [members]);
 
   return { members, users, loading };
+}
+
+/**
+ * Offene Beitrittsanfragen des aktuellen Roadtrips
+ * (`roadtrips/{tripId}/joinRequests`), neueste zuletzt.
+ *
+ * Nur der Owner darf sie lesen (siehe firestore.rules) – deshalb hängt das
+ * Abo an `enabled`: Für alle anderen wird gar nicht erst gelauscht, statt in
+ * ein permission-denied zu laufen, das nur die Konsole vollschreibt.
+ */
+export function useJoinRequests(enabled: boolean) {
+  const { tripId } = useRoadtrip();
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tripId || !enabled) {
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    return onSnapshot(
+      collection(db, tripPath(tripId, 'joinRequests')),
+      (snap) => {
+        setRequests(
+          snap.docs
+            .map((d) => ({
+              uid: d.id,
+              displayName: (d.data().displayName as string | undefined) ?? d.id,
+              // Bis der Server den Zeitstempel gesetzt hat, ist das Feld null –
+              // die Anfrage steht dann trotzdem schon da.
+              requestedAt: (d.data().requestedAt as Timestamp | undefined)?.toMillis() ?? null
+            }))
+            .sort((a, b) => (a.requestedAt ?? Infinity) - (b.requestedAt ?? Infinity))
+        );
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Firestore-Fehler (joinRequests):', err);
+        setLoading(false);
+      }
+    );
+  }, [tripId, enabled]);
+
+  return { requests, loading };
 }
 
 /**

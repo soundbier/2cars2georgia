@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { Trash2, ShieldCheck, Copy, Check } from 'lucide-react';
+import { Trash2, ShieldCheck, Copy, Check, UserCheck, UserX } from 'lucide-react';
 import { useRoadtrip } from '../../hooks/useRoadtrip';
-import { useCrew } from '../../hooks/useSettings';
+import { useCrew, useJoinRequests } from '../../hooks/useSettings';
 import { usePermissions } from '../../hooks/usePermissions';
 import { CREW_ROLES, ROLE_LABEL_KEY, countOwners } from '../../lib/permissions';
-import { removeMember, updateMemberRole } from '../../lib/membership';
+import {
+  approveJoinRequest,
+  rejectJoinRequest,
+  removeMember,
+  updateMemberRole
+} from '../../lib/membership';
 import { trackWrite } from '../../lib/pendingWrites';
 import { getUserColor } from '../../lib/userColors';
-import { useT } from '../../i18n';
+import { useI18n, useT } from '../../i18n';
 import { CrewRole } from '../../types';
 import {
   Button,
@@ -22,20 +27,26 @@ import {
 import '../Settings.css';
 
 /**
- * Crew-Verwaltung eines Roadtrips: Liste der Mitglieder aus
- * roadtrips/{tripId}/members (siehe hooks/useSettings.ts), Rollen
- * vergeben und entfernen. Beitreten passiert nicht mehr hier, sondern
- * eigenständig über die Roadtrip-ID (siehe lib/membership.ts) – wer die ID
- * kennt, trägt sich selbst als Mitglied ein. Angemeldete Person und
- * Mitgliederliste kommen direkt aus dem Kontext (useRoadtrip/useCrew), nicht
- * mehr aus Props.
+ * Crew-Verwaltung eines Roadtrips: offene Beitrittsanfragen, Liste der
+ * Mitglieder aus roadtrips/{tripId}/members (siehe hooks/useSettings.ts),
+ * Rollen vergeben und entfernen.
+ *
+ * Die Anfragen stehen oben, weil sie die einzige Stelle sind, an der etwas
+ * auf eine Entscheidung wartet: Niemand kommt mehr von selbst in einen
+ * Roadtrip, die Roadtrip-ID öffnet nur die Anfrage (siehe lib/membership.ts
+ * und firestore.rules). Angemeldete Person und Mitgliederliste kommen direkt
+ * aus dem Kontext (useRoadtrip/useCrew), nicht aus Props.
  */
 export default function CrewSettings() {
   const { tripId, authUser } = useRoadtrip();
   const { members } = useCrew();
   const { isOwner } = usePermissions();
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+  const [pendingRejection, setPendingRejection] = useState<string | null>(null);
+  const [busyRequest, setBusyRequest] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const { requests } = useJoinRequests(isOwner);
+  const { locale } = useI18n();
   const { notify } = useToast();
   const t = useT();
 
@@ -49,6 +60,38 @@ export default function CrewSettings() {
       // Clipboard-API kann fehlen/verweigert werden – die ID steht ohnehin
       // lesbar da, Abtippen bleibt möglich.
     }
+  };
+
+  const handleApprove = async (uid: string, name: string) => {
+    if (!tripId || busyRequest) return;
+    setBusyRequest(uid);
+    try {
+      // Der Anzeigename kommt aus der Anfrage, nicht aus einem Eingabefeld:
+      // Die Regel für members verlangt, dass beide übereinstimmen.
+      await trackWrite(approveJoinRequest(tripId, uid, name));
+      notify(t('crew.approved', { name }), 'success');
+    } catch (err) {
+      console.error(err);
+      notify(t('common.saveError'), 'danger');
+    } finally {
+      setBusyRequest(null);
+    }
+  };
+
+  const confirmReject = async () => {
+    const target = requests.find((r) => r.uid === pendingRejection);
+    if (!tripId || !pendingRejection || !target) {
+      setPendingRejection(null);
+      return;
+    }
+    try {
+      await trackWrite(rejectJoinRequest(tripId, pendingRejection));
+      notify(t('crew.rejected', { name: target.displayName }), 'info');
+    } catch (err) {
+      console.error(err);
+      notify(t('common.deleteError'), 'danger');
+    }
+    setPendingRejection(null);
   };
 
   const handleRemoveClick = (uid: string) => {
@@ -114,6 +157,66 @@ export default function CrewSettings() {
         </div>
       </Section>
 
+      {/* Nur für den Owner – alle anderen dürfen die Anfragen nicht einmal
+          lesen (siehe firestore.rules). */}
+      {isOwner && (
+        <Section title={t('crew.requestsTitle', { count: requests.length })}>
+          {requests.length === 0 ? (
+            <p className="helper-text">{t('crew.requestsEmpty')}</p>
+          ) : (
+            <div className="settings-list">
+              {requests.map(({ uid, displayName, requestedAt }) => (
+                <ListItem
+                  key={uid}
+                  leading={
+                    <span
+                      className="avatar"
+                      style={{ background: getUserColor(displayName), color: '#ffffff' }}
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                  }
+                  title={displayName}
+                  subtitle={
+                    requestedAt
+                      ? t('crew.requestSubtitle', {
+                          date: new Date(requestedAt).toLocaleString(locale, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })
+                        })
+                      : t('crew.requestSubtitlePending')
+                  }
+                  trailing={
+                    <>
+                      <IconButton
+                        label={t('crew.approve', { name: displayName })}
+                        disabled={busyRequest === uid}
+                        onClick={() => handleApprove(uid, displayName)}
+                      >
+                        <UserCheck size={17} />
+                      </IconButton>
+                      <IconButton
+                        label={t('crew.reject', { name: displayName })}
+                        tone="danger"
+                        disabled={busyRequest === uid}
+                        onClick={() => setPendingRejection(uid)}
+                      >
+                        <UserX size={17} />
+                      </IconButton>
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          )}
+          <p className="helper-text setting-note">
+            <ShieldCheck size={13} className="setting-note-icon" />
+            {t('crew.requestsHint')}
+          </p>
+        </Section>
+      )}
+
       <Section title={t('crew.section', { count: members.length })}>
         {!isOwner && (
           <p className="helper-text setting-note">
@@ -169,6 +272,18 @@ export default function CrewSettings() {
           ))}
         </div>
       </Section>
+
+      <ConfirmDialog
+        open={pendingRejection !== null}
+        title={t('crew.rejectTitle')}
+        description={t('crew.rejectDescription', {
+          name: requests.find((r) => r.uid === pendingRejection)?.displayName ?? ''
+        })}
+        confirmLabel={t('common.delete')}
+        destructive
+        onConfirm={confirmReject}
+        onCancel={() => setPendingRejection(null)}
+      />
 
       <ConfirmDialog
         open={pendingRemoval !== null}

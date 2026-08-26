@@ -93,7 +93,7 @@ export const en: Translations = {
   'profileError.unknown': 'Something went wrong. Please try again.',
 
   // --- Create/join a roadtrip (see lib/membership.ts) ---------------------
-  'trip.joinHint': "Enter the crew's roadtrip name or ID to join.",
+  'trip.joinHint': "Enter the crew's roadtrip ID – the owner then lets you in.",
   'trip.createHint': 'Create a new roadtrip – you automatically become its owner.',
   'trip.tabJoin': 'Join',
   'trip.tabCreate': 'Create roadtrip',
@@ -102,15 +102,25 @@ export const en: Translations = {
   'trip.submitting': 'One moment …',
   'trip.createSubmit': 'Create roadtrip',
   'trip.joinSubmit': 'Join',
+  'trip.requestSubmit': 'Request to join',
   'trip.startDatePlaceholder': 'Trip start',
   'trip.endDatePlaceholder': 'Trip end',
   'trip.tripDatesHint': 'The trip dates are used for the meal plan and the day counter in the cockpit.',
   'trip.createFootnote':
-    'After creating it we show you the roadtrip ID – share it with your crew so they can join.',
+    'After creating it we show you the roadtrip ID – share it with your crew so they can request to join.',
   'trip.joinFootnote':
-    'The roadtrip name your crew knows is enough. Alternatively use the roadtrip ID from the owner (see Settings → Crew).',
+    'You get the roadtrip ID from the owner (see Settings → Crew). It grants no access by itself: you are only let in once the owner approves your request.',
   'trip.createdSuccess': '“{tripName}” was created.',
   'trip.joinSuccess': 'Joined “{tripName}”.',
+  'trip.joinRequested': 'Request for “{tripName}” sent.',
+  'trip.joinApproved': '“{tripName}” has let you in.',
+  'trip.joinWithdrawn': 'Request withdrawn.',
+  'trip.pendingTitle': 'Waiting for approval',
+  'trip.pendingHint':
+    'Your request for “{tripName}” is in. As soon as the owner lets you in, this screen moves on by itself.',
+  'trip.pendingFootnote':
+    'The owner sees the request under Settings → Crew. Until then you see nothing of the roadtrip but its name.',
+  'trip.withdrawRequest': 'Withdraw request',
   'trip.verifyRequiredHint':
     'As long as your email address is unverified you can neither join nor create a roadtrip.',
 
@@ -448,7 +458,20 @@ export const en: Translations = {
   'crew.subtitle': 'Who is aboard and can record entries',
   'crew.section': 'Crew ({count})',
   'crew.inviteTitle': 'Invite crew',
-  'crew.inviteHint': 'Share this roadtrip ID with your crew – anyone who knows it can join.',
+  'crew.inviteHint':
+    'Share this roadtrip ID with your crew. Anyone who knows it can send a request – only you can let them in.',
+  'crew.requestsTitle': 'Join requests ({count})',
+  'crew.requestsEmpty': 'No open requests.',
+  'crew.requestsHint': 'Only people with a verified email address can send a request.',
+  'crew.requestSubtitle': 'Requested on {date}',
+  'crew.requestSubtitlePending': 'Just requested',
+  'crew.approve': 'Let {name} in',
+  'crew.approved': '{name} is aboard.',
+  'crew.reject': 'Reject request from {name}',
+  'crew.rejected': 'Request from {name} rejected.',
+  'crew.rejectTitle': 'Reject request',
+  'crew.rejectDescription':
+    'The request from {name} will be deleted. A new request is possible at any time.',
   'crew.removeMember': 'Remove {name}',
   'crew.self': '{name} (you)',
   'crew.cannotRemoveSelf': 'You cannot remove yourself.',

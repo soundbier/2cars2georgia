@@ -27,12 +27,16 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import {
+  approveJoinRequest,
   createRoadtrip,
   deleteRoadtripCascade,
-  joinRoadtrip,
+  joinTripId,
+  rejectJoinRequest,
   removeMember,
+  requestJoin,
   slugifyTripName,
-  updateMemberRole
+  updateMemberRole,
+  withdrawJoinRequest
 } from './membership';
 
 beforeEach(() => {
@@ -94,54 +98,129 @@ describe('createRoadtrip', () => {
   });
 });
 
-describe('joinRoadtrip', () => {
-  it('tritt einem bestehenden Roadtrip als member bei', async () => {
-    getDoc
-      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) })
-      .mockResolvedValueOnce({ exists: () => false });
-    setDoc.mockResolvedValue(undefined);
-
-    const result = await joinRoadtrip('uid-2', 'Niklas', 'sommertour-2026');
-
-    expect(result).toEqual({ tripId: 'sommertour-2026', tripName: 'Sommertour 2026' });
-    const [memberRef, memberData] = setDoc.mock.calls[0];
-    expect((memberRef as { path: string }).path).toBe('roadtrips/sommertour-2026/members/uid-2');
-    expect(memberData).toEqual({ displayName: 'Niklas', role: 'member', joinedAt: 'SERVER_TIMESTAMP' });
+describe('joinTripId', () => {
+  it('nimmt eine ID unverändert', () => {
+    expect(joinTripId('  sommertour-2026 ')).toBe('sommertour-2026');
   });
 
-  it('findet den Roadtrip auch über den sichtbaren Namen statt der ID', async () => {
+  it('bildet aus dem sichtbaren Namen denselben Slug wie beim Anlegen', () => {
+    expect(joinTripId('Sommertour 2026')).toBe('sommertour-2026');
+  });
+});
+
+describe('requestJoin', () => {
+  it('stellt einen Antrag und liefert den Namen des Roadtrips', async () => {
     getDoc
-      // 'Sommertour 2026' als Dokument-ID: gibt es nicht …
+      // Eigene Mitgliedschaft: noch keine.
       .mockResolvedValueOnce({ exists: () => false })
-      // … der daraus gebildete Slug schon.
-      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) })
-      .mockResolvedValueOnce({ exists: () => false });
+      // Eigener Antrag: noch keiner.
+      .mockResolvedValueOnce({ exists: () => false })
+      // Der Roadtrip – lesbar, weil der Antrag jetzt steht.
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) });
     setDoc.mockResolvedValue(undefined);
 
-    const result = await joinRoadtrip('uid-2', 'Niklas', '  Sommertour 2026 ');
+    const result = await requestJoin('uid-2', 'Niklas', 'sommertour-2026');
 
-    expect(result).toEqual({ tripId: 'sommertour-2026', tripName: 'Sommertour 2026' });
-    const [memberRef] = setDoc.mock.calls[0];
-    expect((memberRef as { path: string }).path).toBe('roadtrips/sommertour-2026/members/uid-2');
+    expect(result).toEqual({
+      tripId: 'sommertour-2026',
+      tripName: 'Sommertour 2026',
+      alreadyMember: false
+    });
+    const [requestRef, requestData] = setDoc.mock.calls[0];
+    expect((requestRef as { path: string }).path).toBe(
+      'roadtrips/sommertour-2026/joinRequests/uid-2'
+    );
+    expect(requestData).toEqual({ displayName: 'Niklas', requestedAt: 'SERVER_TIMESTAMP' });
   });
 
-  it('wirft tripNotFound, wenn weder Eingabe noch Slug einen Roadtrip treffen', async () => {
-    getDoc.mockResolvedValue({ exists: () => false });
-    await expect(joinRoadtrip('uid-2', 'Niklas', 'unbekannt')).rejects.toMatchObject({
+  it('trägt niemanden selbst als Mitglied ein', async () => {
+    getDoc
+      .mockResolvedValueOnce({ exists: () => false })
+      .mockResolvedValueOnce({ exists: () => false })
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) });
+    setDoc.mockResolvedValue(undefined);
+
+    await requestJoin('uid-2', 'Niklas', 'sommertour-2026');
+
+    const written = setDoc.mock.calls.map(([ref]) => (ref as { path: string }).path);
+    expect(written).not.toContain('roadtrips/sommertour-2026/members/uid-2');
+  });
+
+  it('räumt den Antrag wieder weg, wenn es den Roadtrip nicht gibt', async () => {
+    getDoc
+      .mockResolvedValueOnce({ exists: () => false })
+      .mockResolvedValueOnce({ exists: () => false })
+      .mockResolvedValueOnce({ exists: () => false });
+    setDoc.mockResolvedValue(undefined);
+    deleteDoc.mockResolvedValue(undefined);
+
+    await expect(requestJoin('uid-2', 'Niklas', 'unbekannt')).rejects.toMatchObject({
       code: 'tripNotFound'
+    });
+    expect(deleteDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'roadtrips/unbekannt/joinRequests/uid-2' })
+    );
+  });
+
+  it('schreibt nichts, wenn die Mitgliedschaft schon besteht', async () => {
+    getDoc
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ role: 'owner' }) })
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) });
+
+    const result = await requestJoin('uid-1', 'Leon', 'sommertour-2026');
+
+    expect(result).toEqual({
+      tripId: 'sommertour-2026',
+      tripName: 'Sommertour 2026',
+      alreadyMember: true
     });
     expect(setDoc).not.toHaveBeenCalled();
   });
 
-  it('schreibt nichts, wenn die Mitgliedschaft schon existiert (Owner bleibt Owner)', async () => {
+  it('stellt keinen zweiten Antrag, wenn schon einer offen ist', async () => {
     getDoc
-      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) })
-      .mockResolvedValueOnce({ exists: () => true, data: () => ({ role: 'owner' }) });
+      .mockResolvedValueOnce({ exists: () => false })
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ displayName: 'Niklas' }) })
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Sommertour 2026' }) });
 
-    const result = await joinRoadtrip('uid-1', 'Leon', 'sommertour-2026');
+    await requestJoin('uid-2', 'Niklas', 'sommertour-2026');
 
-    expect(result).toEqual({ tripId: 'sommertour-2026', tripName: 'Sommertour 2026' });
     expect(setDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('approveJoinRequest / rejectJoinRequest / withdrawJoinRequest', () => {
+  it('legt die Mitgliedschaft an und räumt den Antrag danach weg', async () => {
+    setDoc.mockResolvedValue(undefined);
+    deleteDoc.mockResolvedValue(undefined);
+
+    await approveJoinRequest('sommertour-2026', 'uid-2', 'Niklas');
+
+    const [memberRef, memberData] = setDoc.mock.calls[0];
+    expect((memberRef as { path: string }).path).toBe('roadtrips/sommertour-2026/members/uid-2');
+    expect(memberData).toEqual({
+      displayName: 'Niklas',
+      role: 'member',
+      joinedAt: 'SERVER_TIMESTAMP'
+    });
+    // Erst die Mitgliedschaft, dann der Antrag: Die Regel für members prüft,
+    // dass der Antrag im Moment der Aufnahme noch existiert.
+    expect(deleteDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'roadtrips/sommertour-2026/joinRequests/uid-2' })
+    );
+  });
+
+  it('löscht beim Ablehnen und beim Zurückziehen nur den Antrag', async () => {
+    deleteDoc.mockResolvedValue(undefined);
+
+    await rejectJoinRequest('sommertour-2026', 'uid-2');
+    await withdrawJoinRequest('sommertour-2026', 'uid-3');
+
+    expect(setDoc).not.toHaveBeenCalled();
+    expect(deleteDoc.mock.calls.map(([ref]) => (ref as { path: string }).path)).toEqual([
+      'roadtrips/sommertour-2026/joinRequests/uid-2',
+      'roadtrips/sommertour-2026/joinRequests/uid-3'
+    ]);
   });
 });
 

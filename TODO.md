@@ -27,11 +27,14 @@ ist, verschwindet wieder.
 
 ## Offen
 
-* [ ] Befunde aus `docs/sicherheitsbericht-2026-08.md` abarbeiten, in der dort
-      empfohlenen Reihenfolge (Abschnitt 4), beginnend mit H1: Der Beitritt zu
-      einem Roadtrip hängt allein an der erratbaren Roadtrip-ID. Der Bericht
+* [ ] Weitere Befunde aus `docs/sicherheitsbericht-2026-08.md` abarbeiten, in
+      der dort empfohlenen Reihenfolge (Abschnitt 4): M1 (App Check
+      verpflichtend), M2 (`list` auf `usernames/` sperren), M3
+      (Datenschutzhinweis korrigieren, `crewUser`-Tag in Sentry entfernen),
+      M5/M6 (Security-Header, Abhängigkeiten), M4/M7 (Selbstlöschung, lokalen
+      Cache beim Abmelden leeren), danach die niedrigen Befunde. Der Bericht
       ist vom Stand `87f9488` – vor jedem Punkt prüfen, ob er inzwischen
-      erledigt ist.
+      erledigt ist. H1 ist erledigt (siehe unten).
 * [ ] Nachtmodus: Die Rollen-Tokens in `src/styles/tokens.css` sind dafür
       vorbereitet (rohe Farbwelt unten, Rollen darüber). Fehlt noch die zweite
       Belegung der Rollen und ein Schalter dafür in den Einstellungen.
@@ -44,6 +47,8 @@ ist, verschwindet wieder.
 
 ## Zuletzt erledigt
 
+* [x] H1: Beitritt zu einem Roadtrip an die Freigabe durch den Owner binden,
+      statt an die erratbare Roadtrip-ID
 * [x] Toiletten: Zähler und Karte, Beschreibung privat (`f08f3e8`)
 * [x] Statistik: Roadtrip, Tag oder Fahrt auswerten (`e64b37a`)
 * [x] Karte: Ereignisse ausblenden, Marker und Knöpfe in drei Größen

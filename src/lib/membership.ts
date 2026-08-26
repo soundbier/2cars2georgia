@@ -41,6 +41,23 @@ export type MembershipErrorCode =
   | 'tripNotFound'
   | 'unknown';
 
+/** Stand eines gestellten Beitrittsantrags, wie ihn der Beitritts-Screen zeigt. */
+export interface JoinRequestResult {
+  tripId: string;
+  /** Name des Roadtrips – lesbar, sobald der Antrag steht (siehe firestore.rules). */
+  tripName: string;
+  /** true, wenn die Person bereits Mitglied ist und gar nicht warten muss. */
+  alreadyMember: boolean;
+}
+
+/** Ein offener Antrag, wie ihn der Owner in der Crew-Verwaltung sieht. */
+export interface JoinRequest {
+  uid: string;
+  displayName: string;
+  /** Zeitpunkt des Antrags in Millisekunden, oder null solange der Server ihn setzt. */
+  requestedAt: number | null;
+}
+
 export class MembershipError extends Error {
   constructor(readonly code: MembershipErrorCode) {
     super(`membership failed: ${code}`);
@@ -128,70 +145,111 @@ export async function createRoadtrip(
 }
 
 /**
- * Kandidaten-IDs für eine Beitritts-Eingabe, in Reihenfolge der Prüfung.
+ * Die Roadtrip-ID zu einer Beitritts-Eingabe.
  *
- * Eingegeben wird in aller Regel der sichtbare Roadtrip-Name ("Sommertour
- * 2026"); die Dokument-ID ist aber dessen Slug ("sommertour-2026", siehe
- * createRoadtrip). Beides muss zum Ziel führen: der Name, weil ihn die Crew
- * kennt, und die ID, weil der Owner sie als Beitritts-Code weitergibt
- * (siehe Einstellungen → Crew). Eine Suche über die ganze Collection wäre
- * der Alternativweg, scheidet aber aus: `list` auf roadtrips/ ist in
- * firestore.rules bewusst auf Mitglieder beschränkt, damit niemand fremde
- * Roadtrips auflisten kann.
+ * Eingegeben wird die ID, die der Owner weitergibt ("sommertour-2026"). Wer
+ * stattdessen den sichtbaren Namen tippt ("Sommertour 2026"), landet über
+ * dieselbe Slug-Bildung wie beim Anlegen am selben Ziel. Nachschlagen lässt
+ * sich das nicht mehr: `get` auf einen fremden Roadtrip ist gesperrt, solange
+ * kein Antrag vorliegt (siehe firestore.rules) – genau das war der Weg, auf
+ * dem sich fremde Roadtrips durchprobieren ließen.
  */
-function joinCandidateIds(input: string): string[] {
-  const candidates: string[] = [];
-  // Firestore-Dokument-IDs dürfen keinen Schrägstrich enthalten – eine
-  // solche Eingabe würde doc() werfen statt einfach nicht zu treffen.
-  if (input && !input.includes('/')) candidates.push(input);
-  const slug = slugifyTripName(input);
-  if (slug && !candidates.includes(slug)) candidates.push(slug);
-  return candidates;
+export function joinTripId(input: string): string {
+  const trimmed = input.trim();
+  // Sieht schon aus wie eine ID? Dann unverändert lassen – slugifyTripName
+  // würde sie zwar nicht kaputtmachen, aber die Absicht ist klarer so.
+  if (/^[a-z0-9][a-z0-9-]*$/.test(trimmed)) return trimmed;
+  return slugifyTripName(trimmed);
 }
 
 /**
- * Tritt einem bestehenden Roadtrip als normales Mitglied bei. Akzeptiert
- * sowohl den sichtbaren Roadtrip-Namen als auch die Roadtrip-ID.
+ * Stellt einen Beitrittsantrag für einen bestehenden Roadtrip.
  *
- * Ist die aufrufende Person bereits Mitglied, wird nichts geschrieben und
- * der Roadtrip einfach zurückgegeben: Ein zweiter Beitritt darf weder einen
- * doppelten Datensatz erzeugen noch eine bestehende Owner-Rolle auf
- * `member` zurückstufen.
+ * Beitreten ist kein Selbstbedienungsvorgang mehr: Wer die Roadtrip-ID kennt,
+ * darf sich bewerben, aufgenommen wird er erst vom Owner (siehe
+ * `approveJoinRequest` und firestore.rules). Vorher genügte die Kenntnis der
+ * ID – und die ist der Slug des Reisenamens, also ratbar.
+ *
+ * Die Reihenfolge ist der Preis dafür: Erst wird der Antrag geschrieben, dann
+ * der Roadtrip gelesen. Andersherum ginge es nicht, denn das Leserecht
+ * entsteht überhaupt erst durch den Antrag. Trifft die Eingabe ins Leere,
+ * wird der Antrag wieder eingesammelt, statt als Leiche liegen zu bleiben.
  */
-export async function joinRoadtrip(
+export async function requestJoin(
   uid: string,
   displayName: string,
   nameOrTripId: string
-): Promise<CreateRoadtripResult> {
-  const trimmed = nameOrTripId.trim();
-  if (!trimmed) throw new MembershipError('missingName');
+): Promise<JoinRequestResult> {
+  const tripId = joinTripId(nameOrTripId);
+  if (!tripId) throw new MembershipError('missingName');
 
-  let tripId: string | null = null;
-  let tripName = trimmed;
-  for (const candidate of joinCandidateIds(trimmed)) {
-    const snap = await getDoc(doc(db, 'roadtrips', candidate));
-    if (!snap.exists()) continue;
-    tripId = candidate;
-    tripName = (snap.data().name as string | undefined) ?? candidate;
-    break;
-  }
-  if (!tripId) throw new MembershipError('tripNotFound');
-
-  const memberRef = doc(db, 'roadtrips', tripId, 'members', uid);
-  const existing = await getDoc(memberRef);
-  if (existing.exists()) return { tripId, tripName };
-
-  try {
-    await setDoc(memberRef, {
-      displayName: normalizeDisplayName(displayName),
-      role: 'member' satisfies CrewRole,
-      joinedAt: serverTimestamp()
-    });
-  } catch {
-    throw new MembershipError('unknown');
+  // Wer schon Mitglied ist, braucht keinen Antrag: Das eigene
+  // Mitgliedschafts-Dokument darf man immer lesen.
+  const memberSnap = await getDoc(doc(db, 'roadtrips', tripId, 'members', uid));
+  if (memberSnap.exists()) {
+    const tripSnap = await getDoc(doc(db, 'roadtrips', tripId));
+    return {
+      tripId,
+      tripName: (tripSnap.data()?.name as string | undefined) ?? tripId,
+      alreadyMember: true
+    };
   }
 
-  return { tripId, tripName };
+  const requestRef = doc(db, 'roadtrips', tripId, 'joinRequests', uid);
+  const existing = await getDoc(requestRef);
+  if (!existing.exists()) {
+    try {
+      await setDoc(requestRef, {
+        displayName: normalizeDisplayName(displayName),
+        requestedAt: serverTimestamp()
+      });
+    } catch {
+      throw new MembershipError('unknown');
+    }
+  }
+
+  const tripSnap = await getDoc(doc(db, 'roadtrips', tripId));
+  if (!tripSnap.exists()) {
+    await deleteDoc(requestRef).catch(() => undefined);
+    throw new MembershipError('tripNotFound');
+  }
+
+  return {
+    tripId,
+    tripName: (tripSnap.data().name as string | undefined) ?? tripId,
+    alreadyMember: false
+  };
+}
+
+/** Zieht den eigenen Antrag zurück. */
+export function withdrawJoinRequest(tripId: string, uid: string): Promise<void> {
+  return deleteDoc(doc(db, 'roadtrips', tripId, 'joinRequests', uid));
+}
+
+/**
+ * Nimmt eine Antragstellerin als Mitglied auf – nur der Owner darf das.
+ *
+ * Erst die Mitgliedschaft, dann der Antrag: Die Regel für `members` prüft,
+ * dass der Antrag im Moment der Aufnahme noch existiert und denselben
+ * Anzeigenamen trägt. Andersherum bliebe im Fehlerfall jemand ohne beides
+ * zurück.
+ */
+export async function approveJoinRequest(
+  tripId: string,
+  uid: string,
+  displayName: string
+): Promise<void> {
+  await setDoc(doc(db, 'roadtrips', tripId, 'members', uid), {
+    displayName,
+    role: 'member' satisfies CrewRole,
+    joinedAt: serverTimestamp()
+  });
+  await deleteDoc(doc(db, 'roadtrips', tripId, 'joinRequests', uid));
+}
+
+/** Lehnt einen Antrag ab: Der Antrag verschwindet, eine Mitgliedschaft entsteht nicht. */
+export function rejectJoinRequest(tripId: string, uid: string): Promise<void> {
+  return deleteDoc(doc(db, 'roadtrips', tripId, 'joinRequests', uid));
 }
 
 /** Ändert die Rolle eines Mitglieds – nur der Owner darf das (siehe firestore.rules). */
@@ -215,7 +273,8 @@ const CASCADE_COLLECTIONS = [
   'shoppingListExtras',
   'shoppingListChecks',
   'plannedRoutes',
-  'errors'
+  'errors',
+  'joinRequests'
 ];
 
 const BATCH_CHUNK_SIZE = 400;

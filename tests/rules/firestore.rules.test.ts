@@ -312,11 +312,10 @@ describe('Roadtrip-Abschottung', () => {
     await seedTripWithCrew(TRIP);
     const db = outsiderDb();
 
-    // Das Wurzeldokument selbst darf per get() gelesen werden (siehe
-    // firestore.rules, "Henne-Ei-Problem" – createRoadtrip/joinRoadtrip
-    // brauchen genau das, bevor eine Mitgliedschaft existiert). Alles
-    // dahinter bleibt gesperrt.
-    await assertSucceeds(getDoc(doc(db, `roadtrips/${TRIP}`)));
+    // Auch das Wurzeldokument bleibt zu: Ohne Mitgliedschaft und ohne
+    // offenen Antrag darf nicht einmal bestätigt werden, dass es diese
+    // Roadtrip-ID gibt (siehe firestore.rules).
+    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}`)));
     await assertFails(getDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
     await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/events/e2`), validEvent));
     await assertFails(deleteDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
@@ -359,17 +358,27 @@ describe('Roadtrip-Dokument', () => {
     );
   });
 
-  it('erlaubt einer fremden Person die Existenzprüfung vor Anlegen/Beitreten', async () => {
-    // Reproduziert src/lib/membership.ts: findFreeTripId() prüft per get(),
-    // ob eine Slug-ID schon vergeben ist, joinRoadtrip() prüft so die
-    // Existenz der Ziel-ID – beides passiert, bevor die aufrufende Person
-    // Mitglied ist.
+  it('verweigert einer fremden Person die Existenzprüfung einer Roadtrip-ID', async () => {
+    // Der Weg, auf dem sich fremde Roadtrips durchprobieren ließen: Die
+    // Dokument-ID ist der Slug des Reisenamens, und `get` stand jedem
+    // angemeldeten Konto offen. findFreeTripId() (src/lib/membership.ts)
+    // kommt damit klar – ein permission-denied führt dort zum selben
+    // Ergebnis wie ein Treffer, nämlich zu einem Zufallssuffix.
     await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
-    const snap = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}`)));
-    expect(snap.exists()).toBe(true);
+    await assertFails(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}`)));
+  });
 
-    const missing = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/unbekannte-id`)));
-    expect(missing.exists()).toBe(false);
+  it('lässt den Namen des Roadtrips sehen, sobald ein Antrag gestellt ist', async () => {
+    // Der Beitritts-Screen zeigt, auf welchen Roadtrip man wartet – mehr
+    // gibt der Antrag nicht frei (siehe src/lib/membership.ts, requestJoin).
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await seed(`roadtrips/${TRIP}/joinRequests/${OUTSIDER_UID}`, {
+      displayName: 'Fremd',
+      requestedAt: NOW
+    });
+    const snap = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}`)));
+    expect(snap.data()?.name).toBe('Sommertour 2026');
+    await assertFails(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}/events/e1`)));
   });
 
   it('verweigert das Anlegen ohne bestätigte E-Mail-Adresse', async () => {
@@ -469,31 +478,16 @@ describe('Roadtrip-Dokument', () => {
 });
 
 describe('Mitgliedschaften', () => {
-  it('lässt eine angemeldete Person sich selbst als member eintragen', async () => {
-    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
-    await assertSucceeds(
-      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
-        displayName: 'Member',
-        role: 'member',
-        joinedAt: serverTimestamp()
-      })
-    );
-  });
+  /** Ein offener Antrag, wie ihn requestJoin() hinterlässt. */
+  async function seedRequest(uid: string, displayName: string) {
+    await seed(`roadtrips/${TRIP}/joinRequests/${uid}`, { displayName, requestedAt: NOW });
+  }
 
-  it('verweigert den Beitritt, solange die E-Mail-Adresse nicht bestätigt ist', async () => {
+  it('verweigert das Selbst-Eintragen als member – auch mit bekannter Roadtrip-ID', async () => {
+    // Der Kern der Umstellung: Die Roadtrip-ID ist ratbar, also darf sie
+    // allein keine Mitgliedschaft mehr erzeugen.
     await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
     await assertFails(
-      setDoc(doc(unverifiedDb(MEMBER_UID), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
-        displayName: 'Member',
-        role: 'member',
-        joinedAt: serverTimestamp()
-      })
-    );
-  });
-
-  it('lässt dieselbe Person nach bestätigter E-Mail-Adresse beitreten', async () => {
-    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
-    await assertSucceeds(
       setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
         displayName: 'Member',
         role: 'member',
@@ -502,24 +496,80 @@ describe('Mitgliedschaften', () => {
     );
   });
 
-  it('lässt ein bestehendes Mitglied ohne bestätigte Adresse unangetastet weiterarbeiten', async () => {
-    // Konten aus der Zeit vor dieser Prüfung (etwa das Administrationskonto)
-    // dürfen durch die neue Regel nicht ausgesperrt werden: Verlangt wird sie
-    // nur beim Anlegen einer Mitgliedschaft, nicht beim Nutzen einer
-    // bestehenden.
+  it('verweigert das Selbst-Eintragen auch mit eigenem, offenem Antrag', async () => {
+    // Der Antrag ist die Bewerbung, nicht die Aufnahme: Freigeben darf ihn
+    // nur der Owner.
     await seedTripWithCrew(TRIP);
-    const db = unverifiedDb(MEMBER_UID);
-    await assertSucceeds(getDoc(doc(db, `roadtrips/${TRIP}/members/${OWNER_UID}`)));
-    await assertSucceeds(setDoc(doc(db, `roadtrips/${TRIP}/track/p-alt`), validTrackPoint));
-    await assertSucceeds(deleteDoc(doc(db, `roadtrips/${TRIP}/members/${MEMBER_UID}`)));
+    await seedRequest(OUTSIDER_UID, 'Fremd');
+    await assertFails(
+      setDoc(doc(outsiderDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+        displayName: 'Fremd',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
   });
 
-  it('verweigert das Selbst-Eintragen als owner ohne ownerUid-Übereinstimmung', async () => {
-    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+  it('erlaubt dem Owner, eine Antragstellerin aufzunehmen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seedRequest(OUTSIDER_UID, 'Fremd');
+    await assertSucceeds(
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+        displayName: 'Fremd',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert dem Owner das Aufnehmen ohne Antrag', async () => {
+    await seedTripWithCrew(TRIP);
     await assertFails(
-      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
-        displayName: 'Member',
-        role: 'owner',
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+        displayName: 'Fremd',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert dem Owner, dabei einen anderen Anzeigenamen zu setzen', async () => {
+    // Aufgenommen wird, wer sich beworben hat – unter dem Namen, unter dem
+    // er sich beworben hat.
+    await seedTripWithCrew(TRIP);
+    await seedRequest(OUTSIDER_UID, 'Fremd');
+    await assertFails(
+      setDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+        displayName: 'Umbenannt',
+        role: 'member',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('verweigert dem Owner, jemanden gleich als owner oder readonly aufzunehmen', async () => {
+    // Aufgenommen wird als member; die Rolle ändert der Owner danach über
+    // das Rollen-Update, das seine eigenen Prüfungen hat.
+    await seedTripWithCrew(TRIP);
+    await seedRequest(OUTSIDER_UID, 'Fremd');
+    for (const role of ['owner', 'readonly']) {
+      await assertFails(
+        setDoc(doc(ownerDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+          displayName: 'Fremd',
+          role,
+          joinedAt: serverTimestamp()
+        })
+      );
+    }
+  });
+
+  it('verweigert einem einfachen Mitglied das Aufnehmen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seedRequest(OUTSIDER_UID, 'Fremd');
+    await assertFails(
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
+        displayName: 'Fremd',
+        role: 'member',
         joinedAt: serverTimestamp()
       })
     );
@@ -536,15 +586,37 @@ describe('Mitgliedschaften', () => {
     );
   });
 
-  it('verweigert das Eintragen für eine andere UID', async () => {
+  it('verweigert das Selbst-Eintragen als owner ohne ownerUid-Übereinstimmung', async () => {
     await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
     await assertFails(
-      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`), {
-        displayName: 'Fremd',
-        role: 'member',
+      setDoc(doc(memberDb(), `roadtrips/${TRIP}/members/${MEMBER_UID}`), {
+        displayName: 'Member',
+        role: 'owner',
         joinedAt: serverTimestamp()
       })
     );
+  });
+
+  it('verweigert dem Anlegenden die Owner-Mitgliedschaft ohne bestätigte E-Mail-Adresse', async () => {
+    await seed(`roadtrips/${TRIP}`, { name: 'Sommertour 2026', ownerUid: OWNER_UID, createdAt: NOW });
+    await assertFails(
+      setDoc(doc(unverifiedDb(OWNER_UID), `roadtrips/${TRIP}/members/${OWNER_UID}`), {
+        displayName: 'Owner',
+        role: 'owner',
+        joinedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('lässt ein bestehendes Mitglied ohne bestätigte Adresse unangetastet weiterarbeiten', async () => {
+    // Konten aus der Zeit vor dieser Prüfung (etwa das Administrationskonto)
+    // dürfen durch die Regel nicht ausgesperrt werden: Verlangt wird sie nur
+    // beim Anlegen einer Mitgliedschaft, nicht beim Nutzen einer bestehenden.
+    await seedTripWithCrew(TRIP);
+    const db = unverifiedDb(MEMBER_UID);
+    await assertSucceeds(getDoc(doc(db, `roadtrips/${TRIP}/members/${OWNER_UID}`)));
+    await assertSucceeds(setDoc(doc(db, `roadtrips/${TRIP}/track/p-alt`), validTrackPoint));
+    await assertSucceeds(deleteDoc(doc(db, `roadtrips/${TRIP}/members/${MEMBER_UID}`)));
   });
 
   it('erlaubt nur dem Owner, die Rolle eines Mitglieds zu ändern', async () => {
@@ -578,13 +650,86 @@ describe('Mitgliedschaften', () => {
     await assertFails(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}/members/${OWNER_UID}`)));
   });
 
-  it('erlaubt einer fremden Person nur die eigene, noch nicht existierende Mitgliedschaft zu lesen', async () => {
-    // Reproduziert joinRoadtrip(): bevor das Mitglieds-Dokument angelegt
-    // wird, liest der Client per get(), ob es (durch einen früheren Versuch)
-    // schon existiert.
+  it('erlaubt einer wartenden Person den Blick auf die eigene Mitgliedschaft', async () => {
+    // Genau daran erkennt der Beitritts-Screen die Freigabe (siehe
+    // src/pages/RoadtripGate.tsx).
     await seedTripWithCrew(TRIP);
     const snap = await assertSucceeds(getDoc(doc(outsiderDb(), `roadtrips/${TRIP}/members/${OUTSIDER_UID}`)));
     expect(snap.exists()).toBe(false);
+  });
+});
+
+describe('Beitrittsanfragen', () => {
+  const requestPath = (uid: string) => `roadtrips/${TRIP}/joinRequests/${uid}`;
+
+  const validRequest = { displayName: 'Fremd', requestedAt: serverTimestamp() };
+
+  it('erlaubt jeder angemeldeten Person einen Antrag unter der eigenen UID', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertSucceeds(setDoc(doc(outsiderDb(), requestPath(OUTSIDER_UID)), validRequest));
+  });
+
+  it('verweigert einen Antrag im Namen einer anderen Person', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(setDoc(doc(outsiderDb(), requestPath(MEMBER_UID)), validRequest));
+  });
+
+  it('verweigert einen Antrag ohne bestätigte E-Mail-Adresse', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(
+      setDoc(doc(unverifiedDb(OUTSIDER_UID), requestPath(OUTSIDER_UID)), validRequest)
+    );
+  });
+
+  it('verweigert einen selbst gesetzten Zeitstempel und zusätzliche Felder', async () => {
+    await seedTripWithCrew(TRIP);
+    await assertFails(
+      setDoc(doc(outsiderDb(), requestPath(OUTSIDER_UID)), { displayName: 'Fremd', requestedAt: NOW })
+    );
+    await assertFails(
+      setDoc(doc(outsiderDb(), requestPath(OUTSIDER_UID)), { ...validRequest, role: 'owner' })
+    );
+  });
+
+  it('verweigert das nachträgliche Ändern eines Antrags', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(requestPath(OUTSIDER_UID), { displayName: 'Fremd', requestedAt: NOW });
+    await assertFails(
+      updateDoc(doc(outsiderDb(), requestPath(OUTSIDER_UID)), { displayName: 'Anders' })
+    );
+  });
+
+  it('zeigt die Anträge nur dem Owner', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(requestPath(OUTSIDER_UID), { displayName: 'Fremd', requestedAt: NOW });
+
+    await assertSucceeds(getDocs(query(collection(ownerDb(), `roadtrips/${TRIP}/joinRequests`))));
+    await assertFails(getDocs(query(collection(memberDb(), `roadtrips/${TRIP}/joinRequests`))));
+    await assertFails(getDocs(query(collection(outsiderDb(), `roadtrips/${TRIP}/joinRequests`))));
+    // Den eigenen Antrag darf man sehen, fremde nicht.
+    await assertSucceeds(getDoc(doc(outsiderDb(), requestPath(OUTSIDER_UID))));
+    await assertFails(getDoc(doc(memberDb(), requestPath(OUTSIDER_UID))));
+  });
+
+  it('lässt den Antrag zurückziehen und vom Owner ablehnen', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(requestPath(OUTSIDER_UID), { displayName: 'Fremd', requestedAt: NOW });
+    await assertFails(deleteDoc(doc(memberDb(), requestPath(OUTSIDER_UID))));
+    await assertSucceeds(deleteDoc(doc(outsiderDb(), requestPath(OUTSIDER_UID))));
+
+    await seed(requestPath(OUTSIDER_UID), { displayName: 'Fremd', requestedAt: NOW });
+    await assertSucceeds(deleteDoc(doc(ownerDb(), requestPath(OUTSIDER_UID))));
+  });
+
+  it('gibt einem Antrag keinen Zugriff auf die Daten des Roadtrips', async () => {
+    await seedTripWithCrew(TRIP);
+    await seed(requestPath(OUTSIDER_UID), { displayName: 'Fremd', requestedAt: NOW });
+    const db = outsiderDb();
+
+    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}/events/e1`)));
+    await assertFails(setDoc(doc(db, `roadtrips/${TRIP}/events/e2`), validEvent));
+    await assertFails(getDocs(query(collection(db, `roadtrips/${TRIP}/track`))));
+    await assertFails(getDoc(doc(db, `roadtrips/${TRIP}/members/${OWNER_UID}`)));
   });
 });
 

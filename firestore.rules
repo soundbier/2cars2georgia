@@ -172,6 +172,15 @@ service cloud.firestore {
         return isMember() && myRole() == 'owner';
       }
 
+      // Offener Beitrittsantrag der aufrufenden Person (siehe
+      // roadtrips/{tripId}/joinRequests weiter unten). Ein Antrag ist kein
+      // Zugang: Er erlaubt nur, den Namen des Roadtrips zu sehen, auf den man
+      // wartet – alles Weitere entsteht erst mit der Freigabe durch den Owner.
+      function hasJoinRequest() {
+        return signedIn()
+          && exists(/databases/$(database)/documents/roadtrips/$(tripId)/joinRequests/$(request.auth.uid));
+      }
+
       // Owner + member dürfen anlegen/ändern, readonly nur lesen.
       function canWrite() {
         return isMember() && myRole() != 'readonly';
@@ -189,14 +198,23 @@ service cloud.firestore {
         && data().ownerUid == request.auth.uid
         && data().createdAt == request.time;
 
-      // Einzeldokument statt Liste: Vor dem Beitreten (createRoadtrip prüft
-      // per get() auf freie Slugs, joinRoadtrip auf Existenz der Trip-ID,
-      // siehe src/lib/membership.ts) ist die aufrufende Person noch kein
-      // Mitglied – ein `read`, das komplett an isMember() hängt, würde genau
-      // diese Prüfung selbst blockieren. Die Trip-ID dient ohnehin als
-      // Beitritts-Code (siehe RoadtripGate) und ihr Inhalt ist unkritisch;
-      // eine Auflistung fremder Roadtrips bleibt aber gesperrt.
-      allow get: if signedIn();
+      // Einzeldokument statt Liste, und nicht mehr für jedes angemeldete
+      // Konto: Wer weder Mitglied ist noch einen offenen Antrag gestellt hat,
+      // darf nicht einmal bestätigt bekommen, dass es eine Roadtrip-ID gibt.
+      // Vorher genügte `signedIn()` – zusammen mit der aus dem Namen
+      // abgeleiteten ID ließ sich damit eine Wortliste plausibler Reisenamen
+      // durchprobieren und Name plus ownerUid abgreifen.
+      //
+      // Der Antrag als Ausnahme ist kein Schlupfloch, sondern der Weg: Er
+      // steht unter der eigenen UID, der Owner sieht ihn und entscheidet.
+      // Bis dahin gibt er nur den Namen des Roadtrips frei, auf den man
+      // wartet (siehe src/lib/membership.ts, requestJoin).
+      //
+      // createRoadtrip prüft weiterhin per get() auf freie Slugs – das
+      // scheitert für fremde IDs jetzt mit permission-denied statt mit
+      // „existiert nicht"; beides führt dort zum selben Ergebnis, nämlich
+      // einem Zufallssuffix (siehe findFreeTripId).
+      allow get: if isMember() || isPlatformAdmin() || hasJoinRequest();
       // Auflisten bleibt Mitgliedern vorbehalten; zusätzlich darf die
       // Plattform-Administration alle Roadtrips sehen (nur lesen).
       allow list: if isMember() || isPlatformAdmin();
@@ -216,31 +234,42 @@ service cloud.firestore {
 
       // --- Mitgliedschaften ------------------------------------------------
       match /members/{memberUid} {
-        // Beitreten: jede angemeldete Person trägt sich selbst als normales
-        // Mitglied ein (siehe src/lib/membership.ts, joinRoadtrip). Wer den
-        // Roadtrip anlegt, wird stattdessen Owner – nur zulässig, wenn die
-        // aufrufende Person laut roadtrips/{tripId}.ownerUid tatsächlich die
-        // Person ist, die ihn gerade angelegt hat.
-        // Beitreten setzt eine bestätigte E-Mail-Adresse voraus – ein frisch
-        // registriertes, unbestätigtes Konto kommt hier nicht durch (siehe
-        // emailVerified() oben und src/lib/authAccount.ts).
+        // Eine Mitgliedschaft entsteht auf genau zwei Wegen:
+        //
+        // 1. Der Owner trägt sich beim Anlegen des Roadtrips selbst ein –
+        //    nur zulässig, wenn er laut roadtrips/{tripId}.ownerUid
+        //    tatsächlich die Person ist, die ihn gerade angelegt hat. Das
+        //    verlangt eine bestätigte E-Mail-Adresse (siehe emailVerified()
+        //    oben und src/lib/authAccount.ts).
+        //
+        // 2. Der Owner nimmt jemanden auf, der einen Antrag gestellt hat
+        //    (roadtrips/{tripId}/joinRequests/{uid}). Niemand trägt sich mehr
+        //    selbst als Mitglied ein: Vorher genügte dafür die Kenntnis der
+        //    Roadtrip-ID, und die ist der Slug des Reisenamens.
+        //
+        // Der Anzeigename muss dem aus dem Antrag entsprechen – der Owner
+        // gibt frei, wer sich beworben hat, und benennt niemanden um.
         allow create: if signedIn()
-          && emailVerified()
-          && request.auth.uid == memberUid
           && fieldsAre(['displayName', 'role', 'joinedAt'], [])
           && isText('displayName', 60)
           && data().joinedAt == request.time
           && (
-            data().role == 'member'
-            || (data().role == 'owner'
-                && get(/databases/$(database)/documents/roadtrips/$(tripId)).data.ownerUid == request.auth.uid)
+            (request.auth.uid == memberUid
+              && emailVerified()
+              && data().role == 'owner'
+              && get(/databases/$(database)/documents/roadtrips/$(tripId)).data.ownerUid == request.auth.uid)
+            || (isOwner()
+                && data().role == 'member'
+                && exists(/databases/$(database)/documents/roadtrips/$(tripId)/joinRequests/$(memberUid))
+                && get(/databases/$(database)/documents/roadtrips/$(tripId)/joinRequests/$(memberUid)).data.displayName
+                   == data().displayName)
           );
 
-        // Gleiches Henne-Ei-Problem wie oben: joinRoadtrip prüft per get()
-        // die eigene (noch nicht existierende) Mitgliedschaft, bevor sie
-        // angelegt wird. `get` erlaubt deshalb zusätzlich den Blick auf das
-        // eigene Dokument unabhängig vom Mitgliedsstatus – fremde
-        // Mitgliedsdaten bleiben, wie zuvor, nur für Mitglieder sichtbar.
+        // Der Blick auf das eigene Dokument ist unabhängig vom
+        // Mitgliedsstatus erlaubt: Wer auf eine Freigabe wartet, fragt genau
+        // damit ab, ob sie inzwischen erteilt wurde (siehe RoadtripGate).
+        // Fremde Mitgliedsdaten bleiben, wie zuvor, nur für Mitglieder
+        // sichtbar.
         allow get: if isMember() || isPlatformAdmin() || (signedIn() && request.auth.uid == memberUid);
         allow list: if isMember() || isPlatformAdmin();
 
@@ -259,6 +288,35 @@ service cloud.firestore {
         // leisten; die Oberfläche warnt davor (siehe lib/permissions.ts,
         // countOwners).
         allow delete: if (isOwner() && request.auth.uid != memberUid) || request.auth.uid == memberUid;
+      }
+
+      // --- Beitrittsanträge ------------------------------------------------
+      // Der einzige Weg in einen fremden Roadtrip: Man stellt unter der
+      // eigenen UID einen Antrag, der Owner macht daraus eine Mitgliedschaft
+      // (siehe members create oben und src/pages/settings/CrewSettings.tsx).
+      // Ein Antrag allein gibt keinerlei Zugriff auf die Daten des Roadtrips.
+      match /joinRequests/{applicantUid} {
+        // Nur für sich selbst, nur mit bestätigter E-Mail-Adresse und nur,
+        // solange man noch kein Mitglied ist. Der Antrag trägt denselben
+        // Anzeigenamen, unter dem die Person später in der Crew steht.
+        allow create: if signedIn()
+          && emailVerified()
+          && request.auth.uid == applicantUid
+          && !isMember()
+          && fieldsAre(['displayName', 'requestedAt'], [])
+          && isText('displayName', 60)
+          && data().requestedAt == request.time;
+
+        // Der Owner sieht die Anträge, die Antragstellerin sieht ihren
+        // eigenen – niemand sonst, und niemand eine fremde Liste.
+        allow get: if isOwner() || (signedIn() && request.auth.uid == applicantUid);
+        allow list: if isOwner();
+
+        // Ein Antrag wird gestellt und wieder weggeräumt, nie geändert:
+        // Zurückziehen (selbst), ablehnen oder nach der Aufnahme aufräumen
+        // (Owner).
+        allow update: if false;
+        allow delete: if isOwner() || (signedIn() && request.auth.uid == applicantUid);
       }
 
       // --- GPS-Spur ------------------------------------------------------

@@ -45,8 +45,8 @@ serverseitig über `usernames/{normalizedName}` reserviert).
 Ein Roadtrip ist ein Dokument unter `roadtrips/{tripId}` mit einer
 Mitgliedschafts-Collection `roadtrips/{tripId}/members/{uid}`
 (`src/lib/membership.ts`). Wer einen Roadtrip anlegt, wird automatisch
-`owner`; Beitreten geschieht über die Roadtrip-ID (kein gemeinsames
-Passwort mehr).
+`owner`; alle anderen kommen nur über eine Anfrage hinein, die der Owner
+freigibt (siehe unten).
 
 | Rolle | Darf |
 | --- | --- |
@@ -61,6 +61,42 @@ Oberfläche.
 In der Firebase Console müssen unter Authentication die Anbieter
 „E-Mail/Passwort" und „Google" aktiviert sein, sonst schlagen die
 entsprechenden Anmeldewege fehl.
+
+### Beitreten: anfragen, der Owner nimmt auf
+
+Die Roadtrip-ID ist der Slug des Reisenamens – aus „Sommertour 2026" wird
+`sommertour-2026`. Sie ist damit ratbar, und genau darauf lief der frühere
+Beitrittsweg hinaus: Wer die ID kannte oder erriet, trug sich selbst als
+Mitglied ein und konnte anschließend alles lesen und schreiben, von der
+GPS-Spur bis zur Kostenabrechnung. Eine Wortliste plausibler Reisenamen
+genügte (Befund H1, `docs/sicherheitsbericht-2026-08.md`).
+
+Deshalb entsteht eine Mitgliedschaft jetzt auf genau zwei Wegen:
+
+1. **Owner beim Anlegen.** `createRoadtrip` trägt die anlegende Person selbst
+   als `owner` ein – zulässig nur, wenn sie laut `roadtrips/{tripId}.ownerUid`
+   tatsächlich diejenige ist, die den Roadtrip gerade angelegt hat.
+2. **Freigabe durch den Owner.** Alle anderen stellen unter ihrer eigenen UID
+   einen Antrag (`roadtrips/{tripId}/joinRequests/{uid}`, `requestJoin`). Der
+   Owner sieht ihn unter Einstellungen → Crew und macht daraus eine
+   Mitgliedschaft (`approveJoinRequest`) oder lehnt ihn ab.
+
+Die Roadtrip-ID ist damit kein Schlüssel mehr, sondern eine Adresse: Sie sagt
+nur, wo man anklopft. Ein Antrag allein gibt keinerlei Zugriff auf die Daten –
+er erlaubt genau eines, nämlich den Namen des Roadtrips zu sehen, auf den man
+wartet. Dafür ist `get` auf `roadtrips/{tripId}` nicht mehr für jedes
+angemeldete Konto offen, sondern nur noch für Mitglieder, für die
+Plattform-Administration und für Personen mit offenem Antrag: Ohne eines von
+beidem lässt sich nicht einmal bestätigen, dass es eine ID gibt.
+
+Der Anzeigename ist dabei an den Antrag gebunden – `firestore.rules` verlangt,
+dass die neue Mitgliedschaft denselben Namen trägt wie der Antrag. Der Owner
+gibt frei, wer sich beworben hat, und benennt niemanden um.
+
+Auf der Warteseite (`src/pages/RoadtripGate.tsx`) steht der gestellte Antrag,
+bis er freigegeben wird; die Seite lauscht dafür auf das eigene
+Mitgliedschafts-Dokument und schaltet von selbst weiter. Der Antrag überlebt
+das Neuladen (localStorage) und lässt sich zurückziehen.
 
 ### E-Mail-Bestätigung
 

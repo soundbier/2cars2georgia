@@ -100,7 +100,7 @@ export const de = {
   'profileError.unknown': 'Da ist etwas schiefgelaufen. Bitte erneut versuchen.',
 
   // --- Roadtrip erstellen/beitreten (siehe lib/membership.ts) ------------
-  'trip.joinHint': 'Roadtrip-Namen oder -ID der Crew eingeben, um beizutreten.',
+  'trip.joinHint': 'Roadtrip-ID der Crew eingeben – der Owner nimmt dich dann auf.',
   'trip.createHint': 'Neuen Roadtrip anlegen – du wirst automatisch Owner.',
   'trip.tabJoin': 'Beitreten',
   'trip.tabCreate': 'Roadtrip erstellen',
@@ -109,15 +109,25 @@ export const de = {
   'trip.submitting': 'Einen Moment …',
   'trip.createSubmit': 'Roadtrip anlegen',
   'trip.joinSubmit': 'Beitreten',
+  'trip.requestSubmit': 'Beitritt anfragen',
   'trip.startDatePlaceholder': 'Start der Reise',
   'trip.endDatePlaceholder': 'Ende der Reise',
   'trip.tripDatesHint': 'Der Reisezeitraum wird für den Speiseplan und die Tagesanzeige im Cockpit gebraucht.',
   'trip.createFootnote':
-    'Nach dem Anlegen zeigen wir dir die Roadtrip-ID – die teilst du der Crew mit, damit sie beitreten kann.',
+    'Nach dem Anlegen zeigen wir dir die Roadtrip-ID – die teilst du der Crew mit, damit sie einen Beitritt anfragen kann.',
   'trip.joinFootnote':
-    'Es genügt der Roadtrip-Name, den die Crew kennt. Alternativ die Roadtrip-ID vom Owner (siehe Einstellungen → Crew).',
+    'Die Roadtrip-ID bekommst du vom Owner (siehe Einstellungen → Crew). Sie allein gibt noch keinen Zugriff: Aufgenommen wirst du erst, wenn der Owner die Anfrage freigibt.',
   'trip.createdSuccess': '„{tripName}“ wurde angelegt.',
   'trip.joinSuccess': '„{tripName}“ beigetreten.',
+  'trip.joinRequested': 'Anfrage für „{tripName}“ gestellt.',
+  'trip.joinApproved': '„{tripName}“ hat dich aufgenommen.',
+  'trip.joinWithdrawn': 'Anfrage zurückgezogen.',
+  'trip.pendingTitle': 'Warten auf Freigabe',
+  'trip.pendingHint':
+    'Deine Anfrage für „{tripName}“ ist gestellt. Sobald der Owner dich aufnimmt, geht es hier von selbst weiter.',
+  'trip.pendingFootnote':
+    'Der Owner sieht die Anfrage unter Einstellungen → Crew. Bis dahin siehst du nichts vom Roadtrip außer seinem Namen.',
+  'trip.withdrawRequest': 'Anfrage zurückziehen',
   'trip.verifyRequiredHint':
     'Solange deine E-Mail-Adresse nicht bestätigt ist, kannst du keinem Roadtrip beitreten und keinen anlegen.',
 
@@ -457,7 +467,20 @@ export const de = {
   'crew.subtitle': 'Wer an Bord ist und Logs erfassen kann',
   'crew.section': 'Besatzung ({count})',
   'crew.inviteTitle': 'Crew einladen',
-  'crew.inviteHint': 'Diese Roadtrip-ID an die Crew weitergeben – wer sie kennt, kann beitreten.',
+  'crew.inviteHint':
+    'Diese Roadtrip-ID an die Crew weitergeben. Wer sie kennt, kann eine Anfrage stellen – aufgenommen wird sie erst von dir.',
+  'crew.requestsTitle': 'Beitrittsanfragen ({count})',
+  'crew.requestsEmpty': 'Keine offenen Anfragen.',
+  'crew.requestsHint': 'Nur Anfragen von Personen mit bestätigter E-Mail-Adresse kommen hier an.',
+  'crew.requestSubtitle': 'Angefragt am {date}',
+  'crew.requestSubtitlePending': 'Gerade angefragt',
+  'crew.approve': '{name} aufnehmen',
+  'crew.approved': '{name} ist jetzt an Bord.',
+  'crew.reject': 'Anfrage von {name} ablehnen',
+  'crew.rejected': 'Anfrage von {name} abgelehnt.',
+  'crew.rejectTitle': 'Anfrage ablehnen',
+  'crew.rejectDescription':
+    'Die Anfrage von {name} wird gelöscht. Eine neue Anfrage ist jederzeit wieder möglich.',
   'crew.removeMember': '{name} entfernen',
   'crew.self': '{name} (Du)',
   'crew.cannotRemoveSelf': 'Du kannst dich nicht selbst löschen.',
